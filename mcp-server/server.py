@@ -1097,7 +1097,7 @@ class SolidWorksHoleFeatureInput(BaseInput):
     slot_end_x_mm: Optional[float] = Field(default=None, description="Slot end X on the sketch plane, mm.")
     slot_end_y_mm: Optional[float] = Field(default=None, description="Slot end Y on the sketch plane, mm.")
     plane_name: str = Field(default="Front Plane", min_length=1, max_length=120, description="Standard sketch plane.")
-    feature_name: str = Field(default="MCP_孔槽", min_length=1, max_length=120, description="Feature tree name.")
+    feature_name: str = Field(default="MCP_HoleSlot", min_length=1, max_length=120, description="Feature tree name.")
     response_format: ResponseFormat = Field(default=ResponseFormat.JSON, description="Return format.")
 
 
@@ -1188,8 +1188,8 @@ class SolidWorksRotaryMotorInput(BaseInput):
     rotor_radius_min_mm: float = Field(default=0.0, ge=0.0, description="Minimum rotor cylinder radius in mm.")
     rotor_radius_max_mm: Optional[float] = Field(default=None, ge=0.0, description="Maximum rotor cylinder radius in mm.")
     rpm: float = Field(default=60.0, description="Constant motor speed in RPM.")
-    study_name: str = Field(default="MCP_旋转马达算例", min_length=1, max_length=120, description="Motion Study name.")
-    motor_name: str = Field(default="MCP_匀速旋转马达", min_length=1, max_length=120, description="Motor feature name.")
+    study_name: str = Field(default="MCP_RotaryMotorStudy", min_length=1, max_length=120, description="Motion Study name.")
+    motor_name: str = Field(default="MCP_ConstantRotaryMotor", min_length=1, max_length=120, description="Motor feature name.")
     duration_seconds: float = Field(default=4.0, gt=0.0, le=120.0, description="Motion Study duration in seconds.")
     calculate: bool = Field(default=True, description="Calculate the Motion Study after creating the motor.")
     play: bool = Field(default=False, description="Play the animation after calculation.")
@@ -1383,8 +1383,8 @@ def _run_locked(operation, response_format: ResponseFormat, load_automation: boo
             "status": "error",
             "error_type": "SolidWorksBusyTimeout",
             "message": (
-                f"等待 SolidWorks 操作锁超过 {timeout_seconds:.0f} 秒仍未获得。"
-                f"上一个操作可能被模态对话框阻塞。"
+                f"SolidWorks operation lock timeout after waiting {timeout_seconds:.0f}s. "
+                f"The previous operation may be blocked by a modal dialog."
             ),
             "holder": dict(_lock_state),
             "suggestion": (
@@ -1674,7 +1674,7 @@ def cadstudio_prepare_fea(params: CadStudioFeaPrepareInput) -> str:
                 "manual_review_required": True,
                 "retryable": False,
                 "error_code": "fea_elmer_adapter_not_implemented",
-                "message": "Elmer 安全输入适配器尚未实现；当前 prepare_fea 只生成 CalculiX .inp。",
+                "message": "Safe Elmer input adapter is not implemented; prepare_fea currently only generates CalculiX .inp files.",
             }
         output_dir.mkdir(parents=True, exist_ok=True)
         return build_calculix_input(request, output_dir / f"{request['analysisId']}.inp")
@@ -1935,7 +1935,7 @@ def _enumerate_solidworks_windows():
     try:
         import win32gui  # type: ignore
     except Exception:
-        return None, [], "win32gui 不可用，无法枚举窗口（pywin32 未安装或不完整）"
+        return None, [], "win32gui is unavailable; cannot enumerate windows (pywin32 is not installed or incomplete)."
 
     dialogs = []
     main_window = None
@@ -1962,7 +1962,7 @@ def _enumerate_solidworks_windows():
     try:
         win32gui.EnumWindows(visit, None)
     except Exception as exc:
-        return main_window, dialogs, f"枚举窗口失败: {exc}"
+        return main_window, dialogs, f"Failed to enumerate windows: {exc}"
 
     return main_window, dialogs, None
 
@@ -2006,7 +2006,7 @@ def solidworks_recover(params: SolidWorksRecoverInput = SolidWorksRecoverInput()
                 import win32con  # type: ignore
                 import win32gui  # type: ignore
             except Exception as exc:
-                probe["dismiss_error"] = f"无法发送关闭消息: {exc}"
+                probe["dismiss_error"] = f"Failed to send close message: {exc}"
             else:
                 for dialog in dialogs:
                     try:
@@ -2037,7 +2037,7 @@ def solidworks_recover(params: SolidWorksRecoverInput = SolidWorksRecoverInput()
                         _sw_lock.release()
                 else:
                     com_status = "locked"
-                    com_detail = "操作锁仍被占用，说明上一个操作尚未返回。"
+                    com_detail = "Operation lock is still held; the previous operation has not returned."
         except Exception as exc:
             com_status = "error"
             com_detail = f"{type(exc).__name__}: {exc}"
@@ -2777,7 +2777,7 @@ def design_spec_build(params: DesignSpecBuildInput) -> str:
         audit["output_path"] = resolved_output
         audit["document"] = _model_summary(model)
         if params.output_path and not saved:
-            audit["errors"].append(f"模型已构建但保存失败: {resolved_output}")
+            audit["errors"].append(f"Model built but failed to save: {resolved_output}")
             audit["status"] = "error"
         return audit
 
@@ -3663,18 +3663,18 @@ def cadstudio_read_artifact(params: ArtifactReadInput):
         if params.as_preview and params.offset == 0 and path.suffix.lower() in {".png", ".jpg", ".jpeg", ".bmp"}:
             path, data, metadata = _artifact_access().read(params.artifact_id, 0, MAX_INLINE)
             if metadata["next_offset"] is not None:
-                raise ValueError("预览图片超过内联大小上限")
+                raise ValueError("Preview image exceeds inline size limit")
             import io
             from PIL import Image as PillowImage
             from mcp.server.fastmcp import Image
             with PillowImage.open(io.BytesIO(data)) as source:
                 if source.width * source.height > 20_000_000:
-                    raise ValueError("预览像素数超过上限")
+                    raise ValueError("Preview pixel count exceeds limit")
                 converted = io.BytesIO()
                 source.convert("RGB").save(converted, format="PNG")
             encoded = converted.getvalue()
             if len(encoded) > MAX_INLINE:
-                raise ValueError("转换后的 PNG 超过内联大小上限，请取回原始文件块")
+                raise ValueError("Converted PNG exceeds inline size limit; fetch raw file chunks instead")
             return Image(data=encoded, format="png")
         return _result({"status": "ok", **metadata, "encoding": "base64",
             "data": base64.b64encode(data).decode("ascii")}, params.response_format)
@@ -3687,7 +3687,7 @@ def read_artifact_resource(artifact_id: str) -> bytes:
     """@brief 原始交付文件资源；超大文件通过有界块工具读取。"""
     _, data, metadata = _artifact_access().read(artifact_id)
     if metadata["next_offset"] is not None:
-        raise ValueError("文件超过内联资源大小，请使用 cadstudio_read_artifact 分块读取")
+        raise ValueError("File exceeds inline resource size limit; use cadstudio_read_artifact for chunked reads")
     return data
 
 
@@ -3739,7 +3739,7 @@ def sw_describe_tool(name: str) -> str:
     """Return a tool's full input schema, side-effect level, and whether manual approval is required before execution."""
     tool = _gate.describe(name)
     if tool is None:
-        raise ToolError(f"未知工具: {name}。先用 sw_search_tools 检索。")
+        raise ToolError(f"Unknown tool: {name}. Use sw_search_tools to search first.")
     return json.dumps(tool, ensure_ascii=False)
 
 
@@ -3752,9 +3752,9 @@ async def sw_call_tool(name: str, arguments: Dict[str, Any] | None = None,
                        document_target: Dict[str, Any] | None = None, ctx: Context = None) -> Any:
     """Execute a tool by name; optionally provide a saved document path and SolidWorks process ID to verify the target."""
     if name in DISCOVERY_TOOLS:
-        raise ToolError("sw_call_tool 不能调用发现入口自身。")
+        raise ToolError("sw_call_tool cannot invoke discovery entry points themselves.")
     if _gate.get_tool(name) is None:
-        raise ToolError(f"未知工具: {name}。先用 sw_search_tools 检索。")
+        raise ToolError(f"Unknown tool: {name}. Use sw_search_tools to search first.")
     result = await _gate.call_tool(name, arguments or {}, context=ctx, convert_result=True,
                                    document_target=document_target)
     # FastMCP 的嵌套调用可能同时返回 content 和 structuredContent；直接返回
@@ -3814,12 +3814,12 @@ def main() -> None:
     try:
         args.port = args.port if args.port is not None else int(os.environ.get("SW_MCP_PORT", "8000"))
     except ValueError:
-        parser.error("SW_MCP_PORT 必须是整数")
+        parser.error("SW_MCP_PORT must be an integer")
     if not 1 <= args.port <= 65535:
-        parser.error("port 必须在 1..65535")
+        parser.error("port must be in 1..65535")
     token = os.environ.get("SW_MCP_TOKEN")
     if args.host not in {"127.0.0.1", "localhost", "::1"} and (not token or not args.allow_host):
-        parser.error("远端监听需设置 SW_MCP_TOKEN 并显式指定 --allow-host")
+        parser.error("Remote listening requires SW_MCP_TOKEN and explicit --allow-host")
 
     # streamable-http is served by uvicorn, which FastMCP imports lazily.
     if importlib.util.find_spec("uvicorn") is None:

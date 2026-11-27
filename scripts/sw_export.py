@@ -94,7 +94,7 @@ def _sheet_metal_alignment_variant(alignment=None):
     """@brief 创建 ``ExportToDWG2`` 要求的 12 个双精度对齐参数。"""
     values = tuple(alignment or (0.0,) * 12)
     if len(values) != 12:
-        raise ValueError("钣金 DXF 对齐参数必须包含 12 个双精度数值")
+        raise ValueError("Sheet metal DXF alignment must contain 12 double-precision numbers")
     return VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, values)
 
 
@@ -130,7 +130,7 @@ def export_flat_pattern_dxf(
     """
     model_path = str(get_com_member(model, "GetPathName") or "")
     if not model_path:
-        raise ValueError("导出展开 DXF 前必须先保存钣金零件")
+        raise ValueError("Sheet metal part must be saved before exporting flat pattern DXF")
 
     output_path = os.path.abspath(os.path.expandvars(os.path.expanduser(output_path)))
     _ensure_parent_dir(output_path)
@@ -188,7 +188,7 @@ def _normalize_format(format_ext):
     if not extension.startswith("."):
         extension = f".{extension}"
     if extension not in SUPPORTED_BATCH_FORMATS:
-        raise ValueError(f"暂不支持批量导出格式: {extension}")
+        raise ValueError(f"Unsupported batch export format: {extension}")
     return extension
 
 
@@ -205,7 +205,7 @@ def _activate_source_document(sw, model, source_path):
     """@brief 激活并回读源文档，防止 STL 等导出器误用当前活动装配体。"""
     title = str(get_com_member(model, "GetTitle") or "")
     if not title:
-        raise RuntimeError("源文档没有可激活的标题")
+        raise RuntimeError("Source document has no activatable title")
     errors = VARIANT(pythoncom.VT_BYREF | pythoncom.VT_I4, 0)
     try:
         active = sw.ActivateDoc3(title, False, 0, errors)
@@ -226,10 +226,10 @@ def _activate_source_document(sw, model, source_path):
             dynamic_sw.ActivateDoc2(title, False, errors)
         active = get_com_member(sw, "ActiveDoc")
     if active is None:
-        raise RuntimeError(f"SolidWorks 无法激活源文档: {source_path}")
+        raise RuntimeError(f"SolidWorks could not activate source document: {source_path}")
     active_path = str(get_com_member(active, "GetPathName") or "")
     if not active_path or Path(active_path).resolve() != Path(source_path).resolve():
-        raise RuntimeError(f"活动文档与导出源不一致: active={active_path}, source={source_path}")
+        raise RuntimeError(f"Active document does not match export source: active={active_path}, source={source_path}")
     return active
 
 
@@ -247,7 +247,7 @@ def _export_for_format(model, output_path, extension, stl_quality):
         return export_to_pdf(model, output_path)
     if extension in {".dxf", ".dwg"}:
         return export_to_dxf(model, output_path)
-    raise ValueError(f"没有导出器: {extension}")
+    raise ValueError(f"No exporter for format: {extension}")
 
 
 def batch_export_formats(
@@ -267,10 +267,10 @@ def batch_export_formats(
     """
     source_paths = [str(Path(os.path.expandvars(str(path))).expanduser().resolve()) for path in file_paths]
     if not source_paths:
-        raise ValueError("file_paths 不能为空")
+        raise ValueError("file_paths must not be empty")
     extensions = list(dict.fromkeys(_normalize_format(item) for item in formats))
     if not extensions:
-        raise ValueError("formats 不能为空")
+        raise ValueError("formats must not be empty")
     output_root = Path(os.path.expandvars(str(output_dir))).expanduser().resolve()
     output_root.mkdir(parents=True, exist_ok=True)
     claimed_outputs = set()
@@ -280,7 +280,7 @@ def batch_export_formats(
         source = Path(source_path)
         document_result = {"source": source_path, "success": False, "outputs": [], "was_open": False}
         if not source.is_file():
-            document_result["error"] = "源文件不存在"
+            document_result["error"] = "Source file not found"
             documents.append(document_result)
             continue
         try:
@@ -291,7 +291,7 @@ def batch_export_formats(
         document_result["was_open"] = was_open
         model = existing_model or open_document(sw, source_path, silent=True, raise_on_error=False)
         if model is None:
-            document_result["error"] = "SolidWorks 无法打开源文件"
+            document_result["error"] = "SolidWorks could not open source file"
             documents.append(document_result)
             continue
 
@@ -302,12 +302,12 @@ def batch_export_formats(
                 before = _file_signature(output_path)
                 output_result = {"format": extension, "path": str(output_path), "success": False}
                 if output_key in claimed_outputs:
-                    output_result["error"] = "不同源文件产生同名输出，已阻止覆盖"
+                    output_result["error"] = "Output name collision from different source files; overwrite blocked"
                     document_result["outputs"].append(output_result)
                     continue
                 claimed_outputs.add(output_key)
                 if before is not None and not overwrite:
-                    output_result["error"] = "目标文件已存在；未显式允许覆盖"
+                    output_result["error"] = "Target file already exists; overwrite not explicitly allowed"
                     document_result["outputs"].append(output_result)
                     continue
                 try:
@@ -323,7 +323,7 @@ def batch_export_formats(
                         "produced_this_run": bool(produced),
                     })
                     if api_success and not produced:
-                        output_result["error"] = "SolidWorks 返回成功，但没有检测到本轮新产物"
+                        output_result["error"] = "SolidWorks reported success, but no new output artifact was detected for this run"
                 except Exception as error:
                     output_result["error"] = str(error)
                 document_result["outputs"].append(output_result)

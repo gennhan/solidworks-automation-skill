@@ -169,17 +169,17 @@ def classify(tool_name: str, arguments: Any = None) -> tuple[Effect, str]:
     if tool_name == "solidworks_health_check" and isinstance(arguments, dict):
         params = arguments.get("params", {})
         if isinstance(params, dict) and params.get("start_solidworks") not in (None, False, 0):
-            return Effect.WRITE, "请求启动或连接 SolidWorks 进行检查。"
+            return Effect.WRITE, "Requested launching or connecting to SolidWorks for health check."
     if tool_name == "solidworks_lookup_api":
         params = arguments.get("params", {}) if isinstance(arguments, dict) else {}
         if not isinstance(params, dict):
-            return Effect.UNKNOWN, "API 查证参数无效。"
+            return Effect.UNKNOWN, "Invalid API lookup arguments."
         if params.get("offline") is True or params.get("auto_install") is False:
-            return Effect.READ, "本次关闭自动安装；查证可读取本地资料及历史缓存。"
+            return Effect.READ, "Auto-install disabled for this call; lookup reads local docs and cache only."
         return Effect.WRITE, _NOTES[tool_name]
     effect = _EFFECTS.get(tool_name, Effect.UNKNOWN)
     if effect is Effect.UNKNOWN:
-        return effect, "未登记副作用的工具：默认拒绝，请先在 policy.py 补充分级。"
+        return effect, "Unregistered side-effect tool: denied by default (not allowed); add classification in policy.py first."
     return effect, _NOTES.get(tool_name, "")
 
 

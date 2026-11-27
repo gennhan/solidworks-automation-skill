@@ -42,11 +42,11 @@ class ToolGate:
     def __init__(self, manager: Any, *, mode: str = "search", approval_mode: str = "auto",
                  ledger: ApprovalLedger | None = None):
         if mode not in MODES:
-            raise ValueError(f"SW_MCP_DISCOVERY 只能是 {'/'.join(MODES)}，收到 {mode!r}")
+            raise ValueError(f"SW_MCP_DISCOVERY must be one of {'/'.join(MODES)}, got {mode!r}")
         if approval_mode not in APPROVAL_MODES:
-            raise ValueError(f"SW_MCP_APPROVAL 只能是 {'/'.join(APPROVAL_MODES)}，收到 {approval_mode!r}")
+            raise ValueError(f"SW_MCP_APPROVAL must be one of {'/'.join(APPROVAL_MODES)}, got {approval_mode!r}")
         if mode == "search" and approval_mode == "client":
-            raise ValueError("发现模式不能使用 client 审批：客户端只能看到通用入口，无法按原工具审批。")
+            raise ValueError("Discovery mode cannot use client approval: clients only see generic entry points and cannot approve underlying tools.")
         self._manager = manager
         self.mode = mode
         self.approval_mode = "task" if (approval_mode == "auto" and mode == "search") else (
@@ -78,7 +78,7 @@ class ToolGate:
                     self._subjects[session] = subject
                 return subject
         except (AttributeError, TypeError, ValueError) as exc:
-            raise ToolError("无法绑定审批到当前客户端会话，拒绝执行。") from exc
+            raise ToolError("Cannot bind approval to the current client session; execution denied.") from exc
 
     # ------------------------------------------------------------ 注册表代理
     @property
@@ -161,8 +161,8 @@ class ToolGate:
                 and policy.needs_active_document_identity(name)
                 and not policy.supports_document_identity(name)):
             return (
-                f"已阻止：{name} 依赖 SolidWorks 活动文档；当前服务端审批无法绑定并复核文档身份。"
-                "请使用具有可信逐工具审批的原生模式，或等待文档身份绑定功能。"
+                f"Blocked: {name} depends on the active SolidWorks document; server approval cannot bind and verify document identity. "
+                "Use native mode with trusted per-tool approval, or wait for document identity binding."
             )
         return None
 
@@ -177,8 +177,8 @@ class ToolGate:
         effect, note = policy.classify(name, arguments)
         if effect is policy.Effect.UNKNOWN:
             raise ToolError(
-                f"工具 {name} 未登记副作用等级，服务端拒绝执行。"
-                "请先在 mcp-server/policy.py 补充分级后再发布。"
+                f"Tool {name} has no registered side-effect level; execution not allowed. "
+                "Add classification in mcp-server/policy.py before release."
             )
 
         blocked = self._blocked_reason(name)
@@ -188,11 +188,11 @@ class ToolGate:
         identity = None
         approval_arguments: dict[str, Any] = arguments
         if document_target is not None and policy.needs_active_document_identity(name) and not policy.supports_document_identity(name):
-            raise ToolError(f"{name} 暂不支持 document_target 校验，无法使用此目标参数。")
+            raise ToolError(f"{name} does not support document_target verification (unsupported target parameter).")
         if (policy.supports_document_identity(name)
                 and (self.approval_mode not in _EXTERNAL_APPROVAL_MODES or document_target is not None)):
             if not isinstance(document_target, dict) or set(document_target) != {"process_id", "path"}:
-                raise ToolError("该操作需要 document_target：已保存文档绝对路径 path 和 SolidWorks 进程 ID process_id。")
+                raise ToolError("This operation requires document_target: saved document absolute 'path' and SolidWorks 'process_id'.")
             try:
                 identity = DocumentIdentity.create(document_target["process_id"], document_target["path"])
             except DocumentIdentityError as exc:
@@ -238,10 +238,10 @@ class ToolGate:
             return False
         targets = policy.targets(arguments)
         message = (
-            f"SolidWorks MCP 请求执行写操作。\n工具: {name}\n等级: {effect.value}\n"
-            f"参数: {parameters}"
-            + (f"\n目标: {', '.join(targets)}" if targets else "")
-            + (f"\n注意: {note}" if note else "")
+            f"SolidWorks MCP requests write operation approval.\nTool: {name}\nLevel: {effect.value}\n"
+            f"Arguments: {parameters}"
+            + (f"\nTargets: {', '.join(targets)}" if targets else "")
+            + (f"\nNote: {note}" if note else "")
         )
         try:
             result = await context.elicit(message=message, schema=_Confirm)
@@ -257,12 +257,12 @@ def allowed_reason(ledger: ApprovalLedger, name: str, arguments: dict[str, Any],
     try:
         request = ledger.request(name, arguments, effect.value, subject=subject)
         request_id = request["id"]
-        detail = f"审批请求 {request_id}（{int(request['expires_at'] - request['created_at'])} 秒内有效）"
+        detail = f"Approval request {request_id} (valid for {int(request['expires_at'] - request['created_at'])}s)"
     except ApprovalError as exc:  # 账本不可写时不能假装只是"等待批准"
-        return f"工具 {name} 需要人工批准，但审批账本不可用：{exc}"
+        return f"Tool {name} requires manual approval, but the approval ledger is unavailable: {exc}"
     return (
-        f"已阻止：{name} 属于 {effect.value} 操作，需要人工批准后才会执行。\n"
+        f"Blocked: {name} is a {effect.value} operation and requires manual approval before execution.\n"
         f"{detail}\n"
-        f"请在 MCP 服务端所在机器的安装目录打开终端，运行：python scripts/sw_mcp_approve.py approve {request_id}\n"
-        f"然后用完全相同的参数重试；参数一旦变化，原批准不再适用。"
+        f"Open a terminal in the MCP server installation directory and run: python scripts/sw_mcp_approve.py approve {request_id}\n"
+        f"Then retry with identical arguments; any change invalidates the approval."
     )

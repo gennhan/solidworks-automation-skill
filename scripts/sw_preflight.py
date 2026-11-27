@@ -24,7 +24,7 @@ except ImportError:
 
 
 PIP_REQUIREMENTS = ("pywin32>=305", "comtypes>=1.2.0")
-DEPENDENCY_PROMPT = "检测到当前 Python 环境缺少 comtypes / win32com 库，是否授权 AI 自动为您配置本地环境？[Y/N]"
+DEPENDENCY_PROMPT = "Missing comtypes / win32com in the current Python environment. Authorize automatic local setup? [Y/N]"
 
 
 def _configure_stdio_utf8() -> None:
@@ -167,7 +167,7 @@ def ensure_com_dependencies(
     if not should_install:
         command = shell_command_text(pip_install_command())
         raise DependencyInstallDeclined(
-            "当前 Python 环境缺少 SolidWorks COM 依赖。请手动执行：\n"
+            "Missing SolidWorks COM dependencies in the current Python environment. Run manually:\n"
             f"{command}"
         )
 
@@ -175,7 +175,7 @@ def ensure_com_dependencies(
     still_missing = missing_com_dependencies()
     if still_missing:
         raise ModuleNotFoundError(
-            "依赖安装后仍无法导入: " + ", ".join(still_missing)
+            "Dependencies still cannot be imported after installation: " + ", ".join(still_missing)
         )
     return missing
 
@@ -224,7 +224,7 @@ def ensure_solidworks_installed() -> None:
     if solidworks_installed():
         return
     raise SolidWorksNotInstalledError(
-        "未检测到 SolidWorks。请先手动安装 SolidWorks，并至少启动一次完成 COM 注册后再使用本技能。"
+        "SolidWorks not installed or not detected. Please install SolidWorks manually and launch it at least once to register COM before using this skill."
     )
 
 

@@ -77,9 +77,9 @@ def test_new_document_never_falls_back_to_preexisting_active_document():
         sw_connect.new_document(sw, "part")
 
     message = str(excinfo.value)
-    assert "未返回新文档" in message
+    assert "did not return a new document" in message
     # 错误信息必须给出可操作的下一步，而不是只报"失败"
-    assert "模板" in message
+    assert "template" in message
 
 
 def test_new_document_recovers_when_return_value_is_none_but_document_exists():

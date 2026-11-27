@@ -53,7 +53,7 @@ def test_flat_pattern_export_uses_alignment_array_and_option_bitmask(tmp_path):
 
 
 def test_flat_pattern_export_requires_saved_model(tmp_path):
-    with pytest.raises(ValueError, match="必须先保存"):
+    with pytest.raises(ValueError, match="must be saved"):
         export_flat_pattern_dxf(FakePart(""), tmp_path / "flat.dxf")
 
 

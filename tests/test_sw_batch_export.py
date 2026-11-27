@@ -64,8 +64,8 @@ def test_batch_export_blocks_existing_and_colliding_outputs(tmp_path, monkeypatc
     report = sw_export.batch_export_formats(sw, [first, second], output_dir, ["step"])
 
     assert report["success"] is False
-    assert "已存在" in report["documents"][0]["outputs"][0]["error"]
-    assert "同名输出" in report["documents"][1]["outputs"][0]["error"]
+    assert "already exists" in report["documents"][0]["outputs"][0]["error"]
+    assert "collision" in report["documents"][1]["outputs"][0]["error"]
     assert (output_dir / "same.step").read_bytes() == b"old"
 
 

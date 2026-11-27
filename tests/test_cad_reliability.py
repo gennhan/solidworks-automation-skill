@@ -132,7 +132,7 @@ def test_doctor_missing_environment_includes_download_remediations(monkeypatch):
     assert remediations["solver.calculix"]["downloadUrl"] == "https://www.calculix.de/"
     assert remediations["cad.solidworks"]["downloadUrl"] == "https://www.solidworks.com/"
     assert remediations["cad.autocad"]["downloadUrl"].startswith("https://www.autodesk.com/")
-    assert "开放格式仍可使用" in next(item["message"] for item in result["checks"] if item["id"] == "cad.solidworks")
+    assert "open formats such as STEP/IGES/BREP/STL/GLB remain usable" in next(item["message"] for item in result["checks"] if item["id"] == "cad.solidworks")
     assert "DXF/SVG/PDF/PNG" in next(item["message"] for item in result["checks"] if item["id"] == "cad.autocad")
 
 

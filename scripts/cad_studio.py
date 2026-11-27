@@ -58,7 +58,7 @@ def _job_path(queue_dir: Path, job_id: str) -> Path:
                 return candidate
         except Exception:
             continue
-    raise FileNotFoundError(f"未找到任务: {job_id}")
+    raise FileNotFoundError(f"Job not found: {job_id}")
 
 
 def _retry_from_stage(job: dict[str, Any]) -> str:
@@ -90,7 +90,7 @@ def _run_history_snapshot(job: dict[str, Any]) -> dict[str, Any]:
 def prepare_job_for_retry(job: dict[str, Any], updated_at: str) -> dict[str, Any]:
     """将终态任务重置为新一轮执行，同时保留旧产物和失败证据。"""
     if job.get("status") not in {"failed", "cancelled", "blocked", "review_required"}:
-        raise ValueError(f"任务当前状态不可重试: {job.get('status')}")
+        raise ValueError(f"Job status is not retryable: {job.get('status')}")
     previous_run_id = job.get("runId")
     history = [*(job.get("runHistory") or []), _run_history_snapshot(job)][-20:]
     retry_stage = _retry_from_stage(job)
@@ -108,7 +108,7 @@ def prepare_job_for_retry(job: dict[str, Any], updated_at: str) -> dict[str, Any
         "status": "queued",
         "progress": 0,
         "updatedAt": updated_at,
-        "lastMessage": "已重新排队，将从失败阶段及其后继阶段执行。",
+        "lastMessage": "Re-queued; execution will resume from the failed stage and downstream stages.",
         "artifacts": [],
     })
     for field in (
@@ -214,7 +214,7 @@ def main(argv: list[str] | None = None) -> int:
                 raise SystemExit(str(exc)) from exc
             cancel_marker_path(path).unlink(missing_ok=True)
         else:
-            job.update({"status": "cancelled", "cancelRequested": True, "updatedAt": now, "lastMessage": "已请求取消任务。"})
+            job.update({"status": "cancelled", "cancelRequested": True, "updatedAt": now, "lastMessage": "Job cancellation requested."})
             cancel_marker_path(path).touch()
         write_job(path, job)
         _print_json(job)
@@ -297,7 +297,7 @@ def main(argv: list[str] | None = None) -> int:
                 "manual_review_required": True,
                 "retryable": False,
                 "error_code": "fea_elmer_adapter_not_implemented",
-                "message": "Elmer 安全输入适配器尚未实现；当前 prepare-fea 只生成 CalculiX .inp。",
+                "message": "Safe Elmer input adapter is not implemented; prepare-fea currently only generates CalculiX .inp files.",
             }
         else:
             args.out_dir.mkdir(parents=True, exist_ok=True)

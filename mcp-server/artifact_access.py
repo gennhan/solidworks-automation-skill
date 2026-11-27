@@ -22,7 +22,7 @@ class ArtifactAccess:
         """@brief 拒绝绝对路径、链接或 ledger 内容造成的越界读取。"""
         resolved = Path(path).expanduser().resolve()
         if not resolved.is_relative_to(self.root) or not resolved.is_file():
-            raise ValueError("产物不在允许的输出目录或文件不存在")
+            raise ValueError("Artifact is outside the allowed output directory or file not found.")
         return resolved
 
     def publish(self, payload):
@@ -68,12 +68,12 @@ class ArtifactAccess:
         """@brief 有界读取并核对内容 hash；客户端不能用 path 参数读取任意文件。"""
         match = _ID.fullmatch(str(artifact_id))
         if not match or offset < 0 or not 1 <= max_bytes <= MAX_INLINE:
-            raise ValueError("产物 ID 或读取范围无效")
+            raise ValueError("Invalid artifact ID or read range.")
         ledger = json.loads(ledger_path_for(self.queue_dir, match[1]).read_text(encoding="utf-8"))
         items = ledger["artifacts"]
         index = int(match[2])
         if index >= len(items):
-            raise ValueError("产物 ID 不存在")
+            raise ValueError("Artifact ID not found.")
         record = items[index]
         path = self._inside(record["path"])
         # 用同一只读文件句柄计算 hash 和读取块，避免验证后另开文件的路径竞态。
@@ -84,9 +84,9 @@ class ArtifactAccess:
                 size += len(chunk)
                 digest.update(chunk)
             if digest.hexdigest() != record["sha256"] or size != record["sizeBytes"]:
-                raise ValueError("产物内容已变化，请重新执行交付复核")
+                raise ValueError("Artifact content has changed; re-run delivery review.")
             if offset > size:
-                raise ValueError("读取偏移超过文件大小")
+                raise ValueError("Read offset exceeds file size.")
             stream.seek(offset)
             data = stream.read(max_bytes)
         return path, data, {"sha256": record["sha256"], "total_bytes": size, "offset": offset,

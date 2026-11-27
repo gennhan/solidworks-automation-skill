@@ -87,7 +87,7 @@ class ApprovalLedger:
                     break
                 except OSError as exc:
                     if time.monotonic() >= deadline:
-                        raise ApprovalError('审批账本锁超时，拒绝执行。') from exc
+                        raise ApprovalError("Approval ledger lock timeout; execution denied.") from exc
                     time.sleep(0.01)
             try:
                 yield
@@ -119,13 +119,13 @@ class ApprovalLedger:
         """登记一次待批准调用；同一工具同一参数重复请求会复用原 id。"""
         summary = json.dumps(arguments, ensure_ascii=False, sort_keys=True, default=str)
         if len(summary.encode('utf-8')) > MAX_APPROVAL_ARGUMENT_BYTES:
-            raise ApprovalError('操作参数超过审批显示上限，拒绝执行。')
+            raise ApprovalError("Operation arguments exceed approval display limit; execution denied.")
         digest = canonical_digest(tool, arguments)
         for existing in self.pending():
             if existing["tool"] == tool and existing["digest"] == digest and existing.get("subject") == subject:
                 return existing
         if sum(1 for _ in self.requests_dir.glob("*.json")) >= MAX_APPROVAL_REQUEST_RECORDS:
-            raise ApprovalError("审批请求记录已达容量上限；请在安全位置归档旧记录后重试。")
+            raise ApprovalError("Approval request capacity limit reached; archive old records to a safe location and retry.")
         # 短 ID 可能发生碰撞；不得覆盖已经存在的请求或旧授权。
         request_id = None
         for _ in range(32):
@@ -134,7 +134,7 @@ class ApprovalLedger:
                 request_id = candidate
                 break
         if request_id is None:
-            raise ApprovalError("无法生成唯一的审批请求 ID，拒绝创建请求。")
+            raise ApprovalError("Unable to generate a unique approval request ID; request creation denied.")
         now = time.time()
         record = {
             "id": request_id,
@@ -172,7 +172,7 @@ class ApprovalLedger:
     # ------------------------------------------------------------------ 人工决定
     def _request_path(self, request_id: str) -> Path:
         if not isinstance(request_id, str) or not _REQUEST_ID.fullmatch(request_id):
-            raise ApprovalError(f"非法的请求 ID: {request_id!r}")
+            raise ApprovalError(f"Invalid request ID: {request_id!r}")
         return self.requests_dir / f"{request_id}.json"
 
     def request_record(self, request_id: str) -> dict[str, Any]:
@@ -185,7 +185,7 @@ class ApprovalLedger:
         """把一条 pending 请求变成一次性 call 批准记录。"""
         record = self.request_record(request_id)
         if expected_record is not None and record != expected_record:
-            raise ApprovalError(f"请求 {request_id} 在展示后发生变化，拒绝批准。")
+            raise ApprovalError(f"Request {request_id} changed after display; approval denied.")
         try:
             displayed_arguments = json.loads(record["summary"])
             matches_display = (
@@ -195,17 +195,17 @@ class ApprovalLedger:
         except (KeyError, TypeError, ValueError):
             matches_display = False
         if not matches_display:
-            raise ApprovalError(f"请求 {request_id} 的参数摘要与执行内容不一致，拒绝批准。")
+            raise ApprovalError(f"Request {request_id} argument digest does not match execution payload; approval denied.")
         effect, _ = classify(record["tool"], displayed_arguments)
         if effect not in (Effect.WRITE, Effect.DESTRUCTIVE) or record.get("effect") != effect.value:
-            raise ApprovalError(f"请求 {request_id} 的副作用等级与当前策略不一致，拒绝批准。")
+            raise ApprovalError(f"Request {request_id} side-effect level does not match current policy; approval denied.")
         if record.get("status") != "pending":
-            raise ApprovalError(f"请求 {request_id} 当前状态是 {record.get('status')}，不能批准。")
+            raise ApprovalError(f"Request {request_id} has status {record.get('status')} and cannot be approved.")
         if record.get("expires_at", 0) <= time.time():
-            raise ApprovalError(f"请求 {request_id} 已过期，重新调用工具即可生成新的请求。")
+            raise ApprovalError(f"Request {request_id} has expired; call the tool again to create a new request.")
         # 容量检查必须在锁内、修改请求状态前完成，避免批准后无法签发授权。
         if sum(1 for _ in self.grants_dir.glob("*.json")) >= MAX_APPROVAL_GRANT_RECORDS:
-            raise ApprovalError("审批授权记录已达容量上限；请在安全位置归档旧记录后重试。")
+            raise ApprovalError("Approval grant capacity limit reached; archive old records to a safe location and retry.")
         record.update({"status": "approved", "decided_at": time.time()})
         self._write(self.requests_dir / f"{request_id}.json", record)
 
@@ -226,7 +226,7 @@ class ApprovalLedger:
     def deny(self, request_id: str) -> dict[str, Any]:
         record = self.request_record(request_id)
         if record.get("status") != "pending":
-            raise ApprovalError(f"请求 {request_id} 当前状态是 {record.get('status')}，不能拒绝。")
+            raise ApprovalError(f"Request {request_id} has status {record.get('status')} and cannot be denied.")
         record.update({"status": "denied", "decided_at": time.time()})
         return self._write(self.requests_dir / f"{request_id}.json", record)
 
@@ -234,7 +234,7 @@ class ApprovalLedger:
     def grant_scope(self, tools: list[str], paths: list[str], ttl_seconds: int | None = None,
                     max_uses: int | None = None) -> dict[str, Any]:
         """批准一组工具在一段时间内的写入范围。"""
-        raise ApprovalError("范围授权已停用；请逐次审核并批准具体调用。")
+        raise ApprovalError("Scoped grants are disabled; review and approve each call individually.")
 
     # ------------------------------------------------------------------ 校验
     @_locked
@@ -322,9 +322,9 @@ class ApprovalLedger:
         try:
             return json.loads(path.read_text(encoding="utf-8"))
         except FileNotFoundError as exc:
-            raise ApprovalError(f"没有找到批准记录：{path.name}") from exc
+            raise ApprovalError(f"Approval record not found: {path.name}") from exc
         except json.JSONDecodeError as exc:
-            raise ApprovalError(f"批准记录已损坏：{path.name}") from exc
+            raise ApprovalError(f"Corrupted approval record: {path.name}") from exc
 
 
 def _unsigned(record: dict[str, Any]) -> dict[str, Any]:
@@ -334,7 +334,7 @@ def _unsigned(record: dict[str, Any]) -> dict[str, Any]:
 def _normalize_path(value: Any) -> str:
     path = Path(str(value))
     if not path.is_absolute():
-        raise ValueError('审批范围和目标必须是绝对路径')
+        raise ValueError("Approval scope and target paths must be absolute")
     return os.path.normcase(str(path.resolve(strict=False)))
 
 

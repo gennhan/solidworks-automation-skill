@@ -37,9 +37,9 @@ DOC_TYPE_MAP = {
 }
 
 DOC_TYPE_LABELS = {
-    "part": "零件",
-    "assembly": "装配体",
-    "drawing": "工程图",
+    "part": "part",
+    "assembly": "assembly",
+    "drawing": "drawing",
 }
 
 DEFAULT_TEMPLATE_PREFS = {
@@ -82,12 +82,12 @@ class _LaunchGuard:
             kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
             self.handle = kernel32.CreateMutexW(None, False, self.name)
             if not self.handle:
-                raise SolidWorksConnectionError("SW_MUTEX", "locking", "无法创建 SolidWorks 启动互斥锁")
+                raise SolidWorksConnectionError("SW_MUTEX", "locking", "Failed to create SolidWorks launch mutex")
             wait_result = kernel32.WaitForSingleObject(self.handle, 15000)
             if wait_result not in (0, 0x80):
                 kernel32.CloseHandle(self.handle)
                 self.handle = None
-                raise SolidWorksConnectionError("SW_MUTEX_TIMEOUT", "locking", "等待其它启动任务超时")
+                raise SolidWorksConnectionError("SW_MUTEX_TIMEOUT", "locking", "Timeout waiting for another SolidWorks launch task")
             return self
 
         try:
@@ -102,7 +102,7 @@ class _LaunchGuard:
             except (ProcessLookupError, ValueError):
                 self.path.unlink(missing_ok=True)
                 return self.__enter__()
-            raise SolidWorksConnectionError("SW_MUTEX_BUSY", "locking", "已有 SolidWorks 启动任务") from exc
+            raise SolidWorksConnectionError("SW_MUTEX_BUSY", "locking", "Another SolidWorks launch task is already running") from exc
         return self
 
     def __exit__(self, *_):
@@ -180,7 +180,7 @@ def normalize_doc_type(doc_type):
     key = str(doc_type).strip().lower().lstrip(".")
     enum_value = DOC_TYPE_MAP.get(key)
     if enum_value is None:
-        raise ValueError(f"未知文档类型: {doc_type}")
+        raise ValueError(f"Unknown document type: {doc_type}")
 
     name_map = {1: "part", 2: "assembly", 3: "drawing"}
     return name_map[enum_value], enum_value
@@ -205,9 +205,9 @@ def _prog_id_for_version(version):
     try:
         year = int(version)
     except (TypeError, ValueError) as exc:
-        raise ValueError(f"SolidWorks 版本必须是年份，例如 2024: {version}") from exc
+        raise ValueError(f"SolidWorks version must be a year, e.g. 2024: {version}") from exc
     if year < 2010 or year > 2035:
-        raise ValueError(f"不支持的 SolidWorks 版本年份: {year}")
+        raise ValueError(f"Unsupported SolidWorks version year: {year}")
     return f"SldWorks.Application.{(year - 2000) + 8}"
 
 
@@ -231,7 +231,7 @@ def _wait_until_ready(sw, timeout_seconds):
             last_error = exc
             time.sleep(0.1)
     raise SolidWorksConnectionError(
-        "SW_START_TIMEOUT", "ready", f"SolidWorks 启动超时（{timeout_seconds:.1f}s）: {last_error or 'COM 未就绪'}"
+        "SW_START_TIMEOUT", "ready", f"SolidWorks startup timeout ({timeout_seconds:.1f}s): {last_error or 'COM not ready'}"
     )
 
 
@@ -258,21 +258,21 @@ def close_owned_solidworks(sw, started_by_cad_studio, expected_pid=None):
 def _attach_existing_with_pid_check(before, requested_version):
     """仅用于明确启用的构造器附着回退，不取得未知进程的退出所有权。"""
     if not before or any(year is None for year in before.values()):
-        raise SolidWorksConnectionError("SW_FALLBACK_IDENTITY_UNKNOWN", "attach", "既有实例版本不明，拒绝附着回退")
+        raise SolidWorksConnectionError("SW_FALLBACK_IDENTITY_UNKNOWN", "attach", "Existing instance version unknown; attach fallback refused")
     candidates = {pid: year for pid, year in before.items()
                   if requested_version is None or year == int(requested_version)}
     if len(candidates) != 1:
-        raise SolidWorksConnectionError("SW_FALLBACK_AMBIGUOUS", "attach", "目标版本实例不唯一，拒绝附着回退")
+        raise SolidWorksConnectionError("SW_FALLBACK_AMBIGUOUS", "attach", "Target version instance is not unique; attach fallback refused")
     expected_pid, expected_year = next(iter(candidates.items()))
     candidate = win32com_client.Dispatch(_prog_id_for_version(expected_year))
     actual_pid = int(get_com_member(candidate, "GetProcessID"))
     if actual_pid != expected_pid:
-        raise SolidWorksConnectionError("SW_FALLBACK_PID_MISMATCH", "attach", "构造器未返回目标既有实例；停止操作且不退出身份不符的进程，请检查实例清单")
+        raise SolidWorksConnectionError("SW_FALLBACK_PID_MISMATCH", "attach", "Constructor did not return target existing instance; stopped without terminating mismatched process—check running instances")
     if get_sw_version(candidate)["year"] != expected_year:
-        raise SolidWorksConnectionError("SW_FALLBACK_VERSION_MISMATCH", "attach", "附着实例版本不符，停止操作")
+        raise SolidWorksConnectionError("SW_FALLBACK_VERSION_MISMATCH", "attach", "Attached instance version mismatch; stopped")
     after = solidworks_processes()
     if after != before:
-        raise SolidWorksConnectionError("SW_FALLBACK_PROCESS_CHANGED", "attach", "附着前后CAD实例清单变化，停止操作")
+        raise SolidWorksConnectionError("SW_FALLBACK_PROCESS_CHANGED", "attach", "CAD instance list changed during attach; stopped")
     return candidate
 
 
@@ -341,7 +341,7 @@ def connect_solidworks(
         except Exception as attach_error:
             try:
                 if before is None:
-                    raise SolidWorksConnectionError("SW_PROCESS_STATE_UNAVAILABLE", "attach", "无法读取 CAD 进程状态，已阻止不确定的启动")
+                    raise SolidWorksConnectionError("SW_PROCESS_STATE_UNAVAILABLE", "attach", "Unable to read CAD process state; uncertain launch blocked")
                 if before and (version is None or any(year is None or year == int(version) for year in before.values())):
                     # ROT 尚未注册时等待已有实例，禁止重复 Dispatch 启动同版本。
                     deadline = time.monotonic() + max(.1, float(wait_seconds))
@@ -355,7 +355,7 @@ def connect_solidworks(
                         if os.environ.get("SW_ATTACH_EXISTING_DISPATCH") == "1":
                             sw = _attach_existing_with_pid_check(before, version)
                         else:
-                            raise SolidWorksConnectionError("SW_INSTANCE_NOT_READY", "attach", "已有实例尚不可连接，已阻止重复启动")
+                            raise SolidWorksConnectionError("SW_INSTANCE_NOT_READY", "attach", "Existing instance is not ready to connect; duplicate launch blocked")
                 if sw is None:
                     sw = win32com_client.Dispatch(prog_id)
                     dispatched = True
@@ -375,7 +375,7 @@ def connect_solidworks(
             except Exception as launch_error:
                 close_owned_solidworks(sw, launched_here)
                 raise SolidWorksConnectionError(
-                    "SW_LAUNCH_FAILED", "launch", f"无法启动 {prog_id}: {launch_error}; attach={attach_error}"
+                    "SW_LAUNCH_FAILED", "launch", f"Failed to launch {prog_id}: {launch_error}; attach={attach_error}"
                 ) from launch_error
 
         _wait_until_ready(sw, wait_seconds)
@@ -385,12 +385,12 @@ def connect_solidworks(
         actual = get_sw_version(sw)
         if version is not None and actual["year"] != int(version):
             close_owned_solidworks(sw, launched_here)
-            raise SolidWorksConnectionError("SW_VERSION_MISMATCH", "verify", f"请求 {version}，实际连接 {actual['year']}")
+            raise SolidWorksConnectionError("SW_VERSION_MISMATCH", "verify", f"Requested {version}, but connected to {actual['year']}")
         if launched_here or ensure_visible or user_control is not None:
             ensure_visible_user_control(sw, visible=bool(visible), user_control=resolved_user_control)
 
     if sw is None:
-        raise SolidWorksConnectionError("SW_NO_INSTANCE", "connect", "未获得 SolidWorks COM 实例")
+        raise SolidWorksConnectionError("SW_NO_INSTANCE", "connect", "Failed to obtain SolidWorks COM instance")
 
     model = _read_active_document(sw)
     if model:
@@ -464,7 +464,7 @@ def find_template(sw, doc_type="part"):
         if matches:
             return matches[0]
 
-    raise FileNotFoundError(f"无法找到 {doc_type} 模板文件，请手动指定路径")
+    raise FileNotFoundError(f"Unable to find {doc_type} template file; please specify the path manually")
 
 
 def ensure_default_templates(sw):
@@ -500,14 +500,14 @@ def snapshot_open_documents(sw, *, strict=False):
         documents = get_com_member(sw, "GetDocuments")
     except Exception as error:
         if strict:
-            raise SolidWorksConnectionError("SW_DOCUMENT_STATE_UNAVAILABLE", "documents", "无法读取打开文档清单，已阻止新建") from error
+            raise SolidWorksConnectionError("SW_DOCUMENT_STATE_UNAVAILABLE", "documents", "Unable to read open document list; document creation blocked") from error
         return titles
     for document in documents or ():
         try:
             titles.add(str(get_com_member(document, "GetTitle")))
         except Exception as error:
             if strict:
-                raise SolidWorksConnectionError("SW_DOCUMENT_STATE_UNAVAILABLE", "documents", "无法确认已有文档身份，已阻止新建") from error
+                raise SolidWorksConnectionError("SW_DOCUMENT_STATE_UNAVAILABLE", "documents", "Unable to verify existing document identity; document creation blocked") from error
             continue
     return titles
 
@@ -560,7 +560,7 @@ def new_document(sw, doc_type="part", template_path=None, *, max_documents=None)
     preexisting_titles = snapshot_open_documents(sw, strict=True)
     budget = int(max_documents if max_documents is not None else os.environ.get("SW_MAX_DOCUMENTS", "8"))
     if budget < 1 or len(preexisting_titles) >= budget:
-        raise SolidWorksConnectionError("SW_DOCUMENT_BUDGET", "new_document", f"打开文档数已达预算 {budget}；请保存并关闭本轮文档")
+        raise SolidWorksConnectionError("SW_DOCUMENT_BUDGET", "new_document", f"Open document count reached budget ({budget}); please save and close documents from this run")
 
     model = sw.NewDocument(template_path, 0, 0, 0)
     if model is not None:
@@ -583,8 +583,8 @@ def new_document(sw, doc_type="part", template_path=None, *, max_documents=None)
 
     if model is None:
         raise RuntimeError(
-            f"创建{DOC_TYPE_LABELS.get(doc_type, doc_type)}文档失败：SolidWorks 未返回新文档。"
-            f"请确认模板可用（{template_path}）且未弹出模态对话框阻塞自动化。"
+            f"Failed to create {DOC_TYPE_LABELS.get(doc_type, doc_type)} document: SolidWorks did not return a new document. "
+            f"Verify template availability ({template_path}) and ensure no modal dialog is blocking automation."
         )
 
     print(f"Created new {doc_type} document")
@@ -607,7 +607,7 @@ def open_document(sw, file_path, read_only=False, silent=False, raise_on_error=F
     """
     file_path = _expand_path(file_path)
     if not os.path.exists(file_path):
-        message = f"文件不存在: {file_path}"
+        message = f"File not found: {file_path}"
         if raise_on_error:
             raise FileNotFoundError(message)
         print(message)
@@ -641,7 +641,7 @@ def open_document(sw, file_path, read_only=False, silent=False, raise_on_error=F
         ensure_default_templates(sw)
         import_data = sw.GetImportFileData(file_path)
         if import_data is None:
-            message = f"获取导入数据失败: {file_path}"
+            message = f"Failed to get import file data: {file_path}"
             if raise_on_error:
                 raise RuntimeError(message)
             print(message)
@@ -682,7 +682,7 @@ def open_document(sw, file_path, read_only=False, silent=False, raise_on_error=F
     if model:
         print(f"Opened: {file_path}")
     else:
-        message = f"打开失败, 错误码: {errors.value} ({classify_sw_file_load_errors(errors.value)}), 警告码: {warnings.value} ({classify_sw_file_load_warnings(warnings.value)})"
+        message = f"Open failed, error code: {errors.value} ({classify_sw_file_load_errors(errors.value)}), warning code: {warnings.value} ({classify_sw_file_load_warnings(warnings.value)})"
         if raise_on_error:
             raise SolidWorksDocumentOpenError(message, errors.value, warnings.value)
         print(message)

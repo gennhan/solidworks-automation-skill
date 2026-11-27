@@ -59,7 +59,7 @@ def test_cli_retry_rejects_active_job():
     try:
         prepare_job_for_retry(job, "2026-08-02T00:00:00+00:00")
     except ValueError as exc:
-        assert "不可重试" in str(exc)
+        assert "not retryable" in str(exc)
     else:
         raise AssertionError("运行中任务不应允许重试")
 

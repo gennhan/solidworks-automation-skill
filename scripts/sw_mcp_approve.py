@@ -54,13 +54,13 @@ def _show_list(ledger: ApprovalLedger) -> int:
 def _confirm(prompt: str) -> bool:
     """要求交互式输入；TTY 本身不证明输入来自真人。"""
     if not sys.stdin.isatty():
-        print("拒绝：批准必须在交互式终端里由人完成（当前标准输入不是终端）。", file=sys.stderr)
+        print("Denied: approval must be completed interactively in a terminal (stdin is not a TTY).", file=sys.stderr)
         return False
     try:
-        answer = input(f"{prompt} 输入 yes 确认: ")
+        answer = input(f"{prompt} Type 'yes' to confirm: ")
     except (EOFError, KeyboardInterrupt):
         # Windows 的 NUL 设备也会让 isatty() 返回真，必须兜住读不到输入的情况。
-        print("\n拒绝：没有收到人工确认。", file=sys.stderr)
+        print("\nDenied: no human confirmation received.", file=sys.stderr)
         return False
     return answer.strip().lower() == "yes"
 
@@ -106,24 +106,24 @@ def main(argv: list[str] | None = None) -> int:
             return _show_list(ledger)
         if command == "approve":
             record = _show_request(ledger, args.request_id)
-            if not _confirm(f"批准 {record['tool']} 这次调用？"):
+            if not _confirm(f"Approve this call to {record['tool']}?"):
                 return 1
             grant = ledger.approve(args.request_id, args.ttl, expected_record=record)
             print(f"Approved until {_format_time(grant['expires_at'])} (valid for this call only).")
             return 0
         if command == "deny":
             _show_request(ledger, args.request_id)
-            if not _confirm("拒绝这次调用？"):
+            if not _confirm("Deny this call?"):
                 return 1
             ledger.deny(args.request_id)
             print("Denied.")
             return 0
         if command == "scope":
-            raise ApprovalError("范围授权已停用；请对具体调用逐次审批。")
+            raise ApprovalError("Scoped grants are disabled; review and approve each call individually.")
     except ApprovalError as exc:
         print(f"Failed: {exc}", file=sys.stderr)
         return 1
-    parser.error(f"未知命令: {command}")
+    parser.error(f"Unknown command: {command}")
     return 2
 
 

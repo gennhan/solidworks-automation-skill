@@ -394,7 +394,7 @@ def test_pack_and_go_rejects_staged_destination_name_collision(tmp_path):
     assert report["success"] is False
     assert report["status"] == "blocked"
     assert report["error_code"] == "SW_PACK_AND_GO_DEPENDENCY_ENUMERATION_INCOMPLETE"
-    assert any("重名冲突" in item for item in report["fallback_errors"])
+    assert any("filename collision" in item for item in report["fallback_errors"])
 
 
 def test_model_doc_extension_wraps_parent_with_generated_interface(tmp_path, monkeypatch):
@@ -431,7 +431,7 @@ def test_pack_and_go_rejects_nonempty_target_by_default(tmp_path):
     try:
         sw_delivery.pack_and_go(model, target)
     except FileExistsError as error:
-        assert "目标目录非空" in str(error)
+        assert "target directory is not empty" in str(error)
     else:
         raise AssertionError("nonempty target must require overwrite")
     assert (target / "keep.txt").read_text(encoding="utf-8") == "keep"

@@ -124,7 +124,7 @@ def probe_running_cad(product: str, installed: bool) -> dict[str, Any]:
         import pythoncom
         import win32com.client
     except ImportError:
-        return {**result, "mode": "missing_dependency", "message": "缺少 pywin32，无法验证 COM 连接"}
+        return {**result, "mode": "missing_dependency", "message": "Missing pywin32; unable to verify COM connection"}
     app = None
     initialized = False
     try:
@@ -135,16 +135,16 @@ def probe_running_cad(product: str, installed: bool) -> dict[str, Any]:
             app = win32com.client.GetActiveObject(prog_id)
         except Exception as error:
             if getattr(error, "hresult", None) == -2147221021:  # MK_E_UNAVAILABLE
-                return {**result, "mode": "not_running", "message": "已安装，尚未发现运行实例" if installed else "未发现安装或运行实例"}
-            return {**result, "message": f"COM 握手不可用: {error}"}
+                return {**result, "mode": "not_running", "message": "Installed, no running instance detected" if installed else "Not installed and no running instance detected"}
+            return {**result, "message": f"COM handshake unavailable: {error}"}
         member = getattr(app, "RevisionNumber" if product == "solidworks" else "Version")
         revision = member() if callable(member) else member
         if not isinstance(revision, str) or not revision.strip():
-            raise RuntimeError("COM 未返回版本")
+            raise RuntimeError("COM did not return a version")
         revision = revision.strip()
-        return {**result, "ok": True, "mode": "active", "revision": revision, "message": f"COM 已连接，版本 {revision}"}
+        return {**result, "ok": True, "mode": "active", "revision": revision, "message": f"COM connected, revision {revision}"}
     except Exception as error:
-        return {**result, "message": f"COM 握手失败: {error}"}
+        return {**result, "message": f"COM handshake failed: {error}"}
     finally:
         app = None
         if initialized:
@@ -158,19 +158,19 @@ def run_doctor(*, probe_cad: bool = False, live_cad: bool = False) -> dict[str, 
     checks.append(_check(
         "python",
         python_ready,
-        f"Python {platform.python_version()}" if python_ready else f"Python {platform.python_version()} 低于推荐的 3.10",
+        f"Python {platform.python_version()}" if python_ready else f"Python {platform.python_version()} is below recommended 3.10",
         code="PYTHON_VERSION_UNSUPPORTED" if not python_ready else "PYTHON_READY",
-        action="安装 Python 3.10 或更高版本",
+        action="Install Python 3.10 or higher",
         install_command="winget install -e --id Python.Python.3.12",
         download_url="https://www.python.org/downloads/windows/",
         required=True,
     ))
     dependencies = (
-        (("win32com.client",), "pywin32", "warning", "安装 SolidWorks COM 自动化依赖", 'python -m pip install "pywin32>=305"', "https://pypi.org/project/pywin32/"),
-        (("comtypes",), "comtypes", "warning", "安装 Windows COM 兼容依赖", 'python -m pip install "comtypes>=1.2.0"', "https://pypi.org/project/comtypes/"),
-        (("ezdxf",), "ezdxf", "warning", "安装 DXF 无头读写依赖", 'python -m pip install "ezdxf>=1.3,<2"', "https://pypi.org/project/ezdxf/"),
-        (("OCP",), "OCP", "warning", "安装 OCCT 开放格式几何后端", "python -m pip install -r requirements-occt.txt", "https://pypi.org/project/cadquery-ocp/"),
-        (("fitz", "pymupdf"), "PyMuPDF", "warning", "安装 PDF 预览与文字复核依赖", "python -m pip install -r requirements-pdf.txt", "https://pymupdf.readthedocs.io/en/latest/installation.html"),
+        (("win32com.client",), "pywin32", "warning", "Install SolidWorks COM automation dependency", 'python -m pip install "pywin32>=305"', "https://pypi.org/project/pywin32/"),
+        (("comtypes",), "comtypes", "warning", "Install Windows COM compatibility dependency", 'python -m pip install "comtypes>=1.2.0"', "https://pypi.org/project/comtypes/"),
+        (("ezdxf",), "ezdxf", "warning", "Install headless DXF read/write dependency", 'python -m pip install "ezdxf>=1.3,<2"', "https://pypi.org/project/ezdxf/"),
+        (("OCP",), "OCP", "warning", "Install OCCT open-format geometry backend", "python -m pip install -r requirements-occt.txt", "https://pypi.org/project/cadquery-ocp/"),
+        (("fitz", "pymupdf"), "PyMuPDF", "warning", "Install PDF preview and text review dependency", "python -m pip install -r requirements-pdf.txt", "https://pymupdf.readthedocs.io/en/latest/installation.html"),
     )
     for module_names, label, severity, action, install_command, download_url in dependencies:
         available = False
@@ -182,7 +182,7 @@ def run_doctor(*, probe_cad: bool = False, live_cad: bool = False) -> dict[str, 
         checks.append(_check(
             f"python.{label.lower()}",
             available,
-            f"{label} {'已安装' if available else '未安装；仅影响对应能力，其余后端仍可使用'}",
+            f"{label} {'installed' if available else 'not installed; only affects its capability, other backends remain usable'}",
             severity=severity,
             code="DEPENDENCY_MISSING" if not available else "DEPENDENCY_READY",
             action=action,
@@ -200,10 +200,10 @@ def run_doctor(*, probe_cad: bool = False, live_cad: bool = False) -> dict[str, 
     checks.append(_check(
         "solver.calculix",
         calculix_ready,
-        "CalculiX 已发现" if calculix_ready else "未发现 CalculiX；仅阻断开放 FEA 求解，不影响建模、图纸和预览",
+        "CalculiX detected" if calculix_ready else "CalculiX not found; only blocks open FEA solving, modeling/drawings/previews remain usable",
         severity="warning",
         code="CALCULIX_READY" if calculix_ready else "CALCULIX_NOT_FOUND",
-        action="下载 CalculiX，并设置 CADSTUDIO_CALCULIX_EXE 指向 ccx.exe",
+        action="Download CalculiX and set CADSTUDIO_CALCULIX_EXE to point to ccx.exe",
         download_url="https://www.calculix.de/",
     ))
 
@@ -212,10 +212,10 @@ def run_doctor(*, probe_cad: bool = False, live_cad: bool = False) -> dict[str, 
         checks.append(_check(
             f"agent.{cli}",
             bool(found),
-            f"{cli}: {'已发现' if found else '未发现；安装任意一个受支持的 Agent CLI 即可'}",
+            f"{cli}: {'detected' if found else 'not found; install any supported Agent CLI'}",
             severity="warning",
             code="AGENT_NOT_FOUND" if not found else "AGENT_READY",
-            action=f"安装 {cli} CLI",
+            action=f"Install {cli} CLI",
             download_url=_AGENT_DOWNLOADS[cli],
         ))
 
@@ -224,10 +224,10 @@ def run_doctor(*, probe_cad: bool = False, live_cad: bool = False) -> dict[str, 
     checks.append(_check(
         "cad.solidworks",
         sw_ready,
-        "SolidWorks COM 或安装目录已发现" if sw_ready else "未发现 SolidWorks；仅阻断 SLDPRT/SLDASM/SLDDRW 原生格式，STEP/IGES/BREP/STL/GLB 等开放格式仍可使用",
+        "SolidWorks COM or installation directory detected" if sw_ready else "SolidWorks not found; only blocks native SLDPRT/SLDASM/SLDDRW formats, open formats such as STEP/IGES/BREP/STL/GLB remain usable",
         severity="warning",
         code="SOLIDWORKS_READY" if sw_ready else "SOLIDWORKS_NOT_FOUND",
-        action="需要 SolidWorks 原生格式时，从官方渠道安装并完成授权",
+        action="Install and license SolidWorks from official channels when native SolidWorks formats are required",
         download_url="https://www.solidworks.com/",
     ))
     autocad = discover_all()["autocad"]
@@ -235,10 +235,10 @@ def run_doctor(*, probe_cad: bool = False, live_cad: bool = False) -> dict[str, 
     checks.append(_check(
         "cad.autocad",
         autocad_ready,
-        "AutoCAD 安装已发现" if autocad_ready else "未发现 AutoCAD；仅阻断原生 DWG 后端，DXF/SVG/PDF/PNG 无头交付仍可使用",
+        "AutoCAD installation detected" if autocad_ready else "AutoCAD not found; only blocks native DWG backend, headless DXF/SVG/PDF/PNG delivery remains usable",
         severity="warning",
         code="AUTOCAD_READY" if autocad_ready else "AUTOCAD_NOT_FOUND",
-        action="需要原生 DWG 时，从 Autodesk 官方渠道安装并完成授权",
+        action="Install and license AutoCAD from official Autodesk channels when native DWG is required",
         download_url="https://www.autodesk.com/products/autocad/overview",
     ))
 
@@ -247,18 +247,18 @@ def run_doctor(*, probe_cad: bool = False, live_cad: bool = False) -> dict[str, 
     checks.append(_check(
         "filesystem.documents",
         documents_writable,
-        f"文档目录可写: {documents.name}",
+        f"Documents directory writable: {documents.name}",
         code="DOCUMENTS_READY" if documents_writable else "DOCUMENTS_NOT_WRITABLE",
-        action="为文档目录授予当前用户写入权限，或在 CAD Studio 中选择其他输出目录",
+        action="Grant write permission to the Documents directory for the current user or choose another output directory in CAD Studio",
         required=True,
     ))
     temp_writable = _is_writable(Path(os.environ.get("TEMP", str(Path.home()))))
     checks.append(_check(
         "filesystem.temp",
         temp_writable,
-        "临时目录可写",
+        "Temp directory writable",
         code="TEMP_READY" if temp_writable else "TEMP_NOT_WRITABLE",
-        action="修复当前用户临时目录权限后重新诊断",
+        action="Fix permissions for the current user temp directory and re-run diagnostics",
         required=True,
     ))
 
@@ -271,16 +271,16 @@ def run_doctor(*, probe_cad: bool = False, live_cad: bool = False) -> dict[str, 
 
             with redirect_stdout(io.StringIO()):
                 app, _, metadata = connect_solidworks(wait_seconds=8, visible=False, return_metadata=True)
-            checks.append(_check("cad.solidworks.com", app is not None, "SolidWorks COM 连接成功", code="SOLIDWORKS_COM_READY" if app is not None else "SOLIDWORKS_COM_FAILED"))
+            checks.append(_check("cad.solidworks.com", app is not None, "SolidWorks COM connection succeeded", code="SOLIDWORKS_COM_READY" if app is not None else "SOLIDWORKS_COM_FAILED"))
         except Exception as exc:  # pragma: no cover - 真实 Windows 环境执行
             checks.append(_check("cad.solidworks.com", False, str(exc), code="SOLIDWORKS_COM_FAILED"))
         finally:
             if app is not None and metadata.get("started_by_cad_studio"):
                 try:
                     if list(get_com_member(app, "GetDocuments") or []):
-                        checks.append(_check("cad.solidworks.com.cleanup", False, "自检实例已有文档，已保留供用户处理", severity="warning", code="SOLIDWORKS_COM_CLEANUP_SKIPPED"))
+                        checks.append(_check("cad.solidworks.com.cleanup", False, "Self-check instance has open documents; kept open for user handling", severity="warning", code="SOLIDWORKS_COM_CLEANUP_SKIPPED"))
                     elif not close_owned_solidworks(app, True, metadata.get("process_id")):
-                        raise RuntimeError("自检实例未退出")
+                        raise RuntimeError("Self-check instance did not exit")
                 except Exception as error:
                     checks.append(_check("cad.solidworks.com.cleanup", False, str(error), severity="warning", code="SOLIDWORKS_COM_CLEANUP_FAILED"))
 

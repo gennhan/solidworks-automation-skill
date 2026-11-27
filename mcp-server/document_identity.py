@@ -20,23 +20,23 @@ class DocumentIdentityError(ValueError):
 
 def _path(value: object) -> str:
     if not isinstance(value, str) or not value or value != value.strip() or "\x00" in value:
-        raise DocumentIdentityError("文档路径必须是有效的非空绝对路径。")
+        raise DocumentIdentityError("Document path must be a valid non-empty absolute path.")
     if any(character in value for character in ("*", "?")):
-        raise DocumentIdentityError("文档路径不能包含通配符。")
+        raise DocumentIdentityError("Document path must not contain wildcards.")
     candidate = Path(value)
     if not candidate.is_absolute():
-        raise DocumentIdentityError("文档路径必须是绝对路径；未保存文档不能使用此验证。")
+        raise DocumentIdentityError("Document path must be an absolute path; unsaved documents cannot use this verification.")
     if candidate.suffix.lower() not in {".sldprt", ".sldasm", ".slddrw"}:
-        raise DocumentIdentityError("目标必须是已保存的 SolidWorks 原生文档路径。")
+        raise DocumentIdentityError("Target must be a saved native SolidWorks document path.")
     try:
         return os.path.normcase(str(candidate.resolve(strict=False)))
     except (OSError, RuntimeError, ValueError) as exc:
-        raise DocumentIdentityError("文档路径无法规范化。") from exc
+        raise DocumentIdentityError("Document path could not be normalized.") from exc
 
 
 def _pid(value: object) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
-        raise DocumentIdentityError("SolidWorks 进程 ID 必须是正整数。")
+        raise DocumentIdentityError("SolidWorks process ID must be a positive integer.")
     return value
 
 
@@ -58,9 +58,9 @@ class DocumentIdentity:
     def verify(self, process_id: object, path: object) -> None:
         """核对实际活动文档；调用方应在执行锁内立即使用已取回的模型对象。"""
         if _pid(process_id) != self.process_id:
-            raise DocumentIdentityError("SolidWorks 进程与批准时的目标不一致。")
+            raise DocumentIdentityError("SolidWorks process does not match the approved target.")
         if _path(path) != self.path:
-            raise DocumentIdentityError("活动文档与批准时的目标不一致。")
+            raise DocumentIdentityError("Active document does not match the approved target.")
 
 
 _target: contextvars.ContextVar[DocumentIdentity | None] = contextvars.ContextVar(
@@ -72,7 +72,7 @@ _target: contextvars.ContextVar[DocumentIdentity | None] = contextvars.ContextVa
 def bind_document(identity: DocumentIdentity) -> Iterator[None]:
     """把经批准的目标绑定到本次调用上下文，退出时恢复上层上下文。"""
     if not isinstance(identity, DocumentIdentity):
-        raise DocumentIdentityError("缺少有效的批准文档身份。")
+        raise DocumentIdentityError("Missing valid approved document identity.")
     token = _target.set(identity)
     try:
         yield
@@ -84,7 +84,7 @@ def verify_bound_document(process_id: object, path: object) -> None:
     """验证当前调用所绑定的目标；缺少绑定时失败关闭。"""
     identity = _target.get()
     if identity is None:
-        raise DocumentIdentityError("该调用没有绑定获批准的文档身份。")
+        raise DocumentIdentityError("This call has no bound approved document identity.")
     identity.verify(process_id, path)
 
 
