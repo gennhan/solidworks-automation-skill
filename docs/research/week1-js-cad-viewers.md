@@ -1,25 +1,25 @@
-# 第 1 周：JS CAD 预览调研
+# Week 1: JS CAD Preview Research
 
-调研日期：2026-07-31。数据来自 GitHub REST 仓库公开元数据，Stars/Forks 会随时间变化。
+Research date: 2026-07-31. Metrics are sourced from public GitHub REST repository metadata; stars and forks change over time.
 
-| 项目 | Stars | Forks | 许可证 | 适合用途 | 本周结论 |
+| Project | Stars | Forks | License | Suitable Use | Week 1 Decision |
 |---|---:|---:|---|---|---|
-| [three.js](https://github.com/mrdoob/three.js) | 114,133 | 36,455 | MIT | WebGL 场景、GLTF/STL/OBJ Loader、交互控制 | 作为 CAD Studio 预览底座 |
-| [Online3DViewer](https://github.com/kovacsv/Online3DViewer) | 3,617 | 759 | MIT | 多格式浏览器查看器，支持 STEP/IGES/STL/OBJ 等 | 后续评估其格式适配和 UI 能力 |
-| [replicad](https://github.com/sgenoud/replicad) | 661 | 78 | MIT | 浏览器 OpenCascade 参数化建模 | 作为未来浏览器端参数化实验参考，不进入本周运行时 |
-| [three-cad-viewer](https://github.com/bernhard-42/three-cad-viewer) | 380 | 65 | MIT | 基于 Three.js 的 CAD Viewer 组件 | 参考树结构、选择与相机交互 |
-| [occt-import-js](https://github.com/kovacsv/occt-import-js) | 278 | 54 | LGPL-2.1 | OpenCascade WASM 导入 STEP/IGES/BREP | 暂不直接并入 MIT 主包，先做隔离进程/许可证评估 |
-| [ThatOpen/engine_components](https://github.com/ThatOpen/engine_components) | 691 | 204 | MIT | BIM/IFC 组件和 3D 引擎 | 与机械 CAD 目标不完全匹配，暂不引入 |
+| [three.js](https://github.com/mrdoob/three.js) | 114,133 | 36,455 | MIT | WebGL scenes, GLTF/STL/OBJ loaders, interactive controls | Adopted as CAD Studio preview foundation |
+| [Online3DViewer](https://github.com/kovacsv/Online3DViewer) | 3,617 | 759 | MIT | Multi-format browser viewer supporting STEP/IGES/STL/OBJ, etc. | Evaluate format adapters and UI capabilities later |
+| [replicad](https://github.com/sgenoud/replicad) | 661 | 78 | MIT | In-browser OpenCascade parametric modeling | Reference for future browser-side parametric experiments; excluded from Week 1 runtime |
+| [three-cad-viewer](https://github.com/bernhard-42/three-cad-viewer) | 380 | 65 | MIT | Three.js-based CAD viewer component | Reference for tree hierarchy, selection, and camera interaction |
+| [occt-import-js](https://github.com/kovacsv/occt-import-js) | 278 | 54 | LGPL-2.1 | OpenCascade WASM import for STEP/IGES/BREP | Defer bundling directly into MIT main package; run process-isolation and license assessment first |
+| [ThatOpen/engine_components](https://github.com/ThatOpen/engine_components) | 691 | 204 | MIT | BIM/IFC components and 3D engine | Not an exact match for mechanical CAD goals; not adopted for now |
 
-## 本周实现边界
+## Week 1 Implementation Boundaries
 
-- SolidWorks 产物优先显示 STL、GLB/GLTF、OBJ；Three.js Loader 使用动态导入，避免首屏阻塞。
-- DXF 使用浏览器只读解析回退，覆盖 `LINE`、`CIRCLE` 和 `LWPOLYLINE`，解析失败明确显示错误，不伪造 CAD 成功。
-- STEP/IGES、DWG 的真实几何预览仍以原生 SolidWorks/AutoCAD 导出 PNG 或网格产物为准；不把线框占位图当作实体预览。
-- 本地路径仅通过 Tauri `convertFileSrc` 访问；诊断包仍脱敏，不上传 CAD 文件、Prompt 或密钥。
+- SolidWorks deliverables prioritize displaying STL, GLB/GLTF, and OBJ; Three.js loaders are dynamically imported to avoid blocking initial load.
+- DXF uses a read-only browser parser fallback covering `LINE`, `CIRCLE`, and `LWPOLYLINE`; parse failures display clear errors instead of fabricating CAD success.
+- True geometry previews for STEP/IGES and DWG remain grounded in native SolidWorks/AutoCAD exported PNGs or meshes; wireframe placeholders are never presented as solid previews.
+- Local paths are accessed exclusively via Tauri `convertFileSrc`; diagnostic bundles remain sanitized and never upload CAD files, prompts, or secrets.
 
-## 后续评估
+## Follow-up Evaluations
 
-1. 用独立 Worker 评估 `occt-import-js` 的 LGPL 组合方式，完成法务和发布包体积检查后再决定是否支持 STEP 浏览器预览。
-2. 对比 Online3DViewer 与当前 Three.js 组件的大模型加载时间、内存和移动窗口交互。
-3. 增加 DXF 图层、尺寸和图框结构化显示；复杂实体回退到 AutoCAD 原生 BMP/PNG 预览。
+1. Evaluate LGPL integration of `occt-import-js` in an isolated Worker; decide whether to enable browser-side STEP previews after legal and bundle-size checks.
+2. Benchmark Online3DViewer against the current Three.js component for large-model load time, memory usage, and mobile-viewport interaction.
+3. Add structured display of DXF layers, dimensions, and drawing frames; fall back to native AutoCAD BMP/PNG previews for complex entities.

@@ -1,43 +1,43 @@
-# 原生筋封装修复：SW2024回归证据
+# Native Rib Wrapper Fix: SW2024 Regression Evidence
 
-验证对象是`sw_part.rib()`的10参数调用、VOID返回后的新增特征识别和历史单双侧厚度标志。使用简单直角支架隔离封装问题，不采用特定拨叉的曲面接合几何。
+This verification covers the 10-argument call in `sw_part.rib()`, detection of newly added features after a `VOID` return, and legacy single-sided/two-sided thickness flags. A simple right-angle bracket is used to isolate the wrapper behavior without relying on specific shift-fork surface-blending geometry.
 
-## 环境与复现
+## Environment and Reproduction
 
-- Windows 11、SolidWorks 2024 SP0.1（Revision 32.0.1）。
-- 后端为 Python COM，版本化 ProgID 为 `SldWorks.Application.32`；执行前没有 CAD 进程，由测试启动本轮独占的可见实例。
-- 验证生产文件`scripts/sw_part.py`的SHA-256：`04f2d407b00d54357a3b9438bc4ce2f5f4a0a0c14ecb455297c4a21ad7db3423`。
-- 脚本：[tests/manual_rib_regression.py](../tests/manual_rib_regression.py)。在没有其他SolidWorks进程的环境运行，输出目录须为新目录：
+- Windows 11, SolidWorks 2024 SP0.1 (Revision 32.0.1).
+- Backend is Python COM with versioned ProgID `SldWorks.Application.32`; no CAD process was running beforehand, and the test launched an exclusive visible instance for the run.
+- Verified production file `scripts/sw_part.py` SHA-256: `04f2d407b00d54357a3b9438bc4ce2f5f4a0a0c14ecb455297c4a21ad7db3423`.
+- Script: [tests/manual_rib_regression.py](../tests/manual_rib_regression.py). Run in an environment with no other SolidWorks processes; the output directory must be new:
 
 ```text
 python tests/manual_rib_regression.py --version 2024 --output ./output/rib-native-r01
 ```
 
-脚本启动可见会话，仅操作本轮新建文档；成功后保存关闭这些文档，保留应用窗口。已有进程或输出目录存在时拒绝开始。脚本输出`native-report.json`、独立原生零件及预览，结果仍需按报告标志进行目视复核。
+The script launches a visible session and operates only on documents newly created during the run; on success it saves and closes those documents while leaving the application window open. It refuses to start if an existing process or the output directory already exists. The script outputs `native-report.json`, standalone native parts, and previews; results still require visual inspection per the report flags.
 
-## 实际结果
+## Actual Results
 
-支架由80×10×40毫米基座和10×50×40毫米立板组成，基体积52000立方毫米。筋的截面为底40、高30的直角三角形，厚6毫米时预期新增体积为3600立方毫米。
+The bracket consists of an 80×10×40 mm base and a 10×50×40 mm upright plate, with a base volume of 52,000 mm³. The rib profile is a right triangle with a 40 mm base and 30 mm height, giving an expected added volume of 3,600 mm³ at 6 mm thickness.
 
-| 检查 | 实际结果 |
+| Check | Actual Result |
 |---|---|
-| 默认双侧，厚6毫米 | 原生Rib定义`IsTwoSided=True`，两侧面Z为−3、+3毫米，新增体积约3600立方毫米 |
-| 显式单侧，厚6毫米 | `IsTwoSided=False`，两侧面Z为0、6毫米，新增体积3600立方毫米 |
-| 真实草图选择 | 使用封装的草图引用和实际选择路径，未替换`_ensure_sketch_selected`；草图通过完全定义检查 |
-| VOID返回后的识别 | 返回本次真实新增的Rib；不是COM调用的空返回 |
-| 已有筋时创建第二个筋 | 在Z=12毫米平面创建厚4毫米的第二筋，返回新特征，原筋仍存在；实际侧面Z为10、14毫米 |
-| 第二筋的几何与持久化 | 新增体积2400立方毫米；保存关闭重开后仍有两个Rib，总体积58000立方毫米，厚度定义及侧面位置保留 |
-| 不相交失败 | 筋草图平面移至Z=100毫米，封装返回None，原有筋未被误返回，筋数量和实体体积不变 |
-| 正常模型健康与收尾 | 单实体，重建后特征无错误、警告或未知状态；模型预览已目视检查；结束时打开文档数0 |
+| Default two-sided, 6 mm thick | Native Rib definition `IsTwoSided=True`, side faces at Z = −3 and +3 mm, added volume ~3,600 mm³ |
+| Explicit single-sided, 6 mm thick | `IsTwoSided=False`, side faces at Z = 0 and 6 mm, added volume 3,600 mm³ |
+| Real sketch selection | Used wrapper sketch reference and actual selection path without replacing `_ensure_sketch_selected`; sketch passed fully defined check |
+| Detection after VOID return | Returned the newly created Rib feature rather than an empty COM return |
+| Creating a second rib on a part with an existing rib | Created a 4 mm thick second rib on the Z = 12 mm plane, returned the new feature, preserved the original rib; actual side faces at Z = 10 and 14 mm |
+| Second rib geometry and persistence | Added volume 2,400 mm³; after save, close, and reopen, both Ribs remained, total volume 58,000 mm³, thickness definitions and side-face positions preserved |
+| Non-intersecting failure | Moved rib sketch plane to Z = 100 mm; wrapper returned `None`, existing ribs were not mistakenly returned, rib count and solid volume unchanged |
+| Normal model health and teardown | Single solid body, zero feature errors, warnings, or unknown states after rebuild; model previews visually inspected; 0 open documents at finish |
 
-完整手工回归最终一次执行约52.60秒。这只是已准备环境下的测试脚本时间，不是新题识图或端到端建模成绩。
+The final full manual regression run took approximately 52.60 seconds. This measures only the test script runtime in a prepared environment, not new-problem drawing interpretation or end-to-end modeling performance.
 
-## 边界
+## Boundaries
 
-这里只验证SW2024 SP0.1和上述常规支架的单双侧、既有筋及一种不相交失败场景，不声称覆盖所有失败状态或修复特定拨叉的几何问题。SW2026未实测，能力清单没有提升。正常保存重开与预览检查已完成；不相交案例保留了用于诊断的未消费草图，不作为合格成品交付。
+This verifies only SW2024 SP0.1 and the standard bracket scenarios above (single/two-sided, pre-existing rib, and one non-intersecting failure case); it does not claim to cover all failure states or fix geometry issues on a specific shift fork. SW2026 was not tested here, and the capability matrix was not promoted. Normal save-reopen and preview checks were completed; the non-intersecting case retains an unconsumed sketch for diagnostic purposes and is not delivered as a passing part.
 
-本次没有验证装配配合、装配干涉检测、自由拖动、连续扫掠、接触动力学、载荷、Motion Study 或制造放行；单实体筋特征结果不能作为这些能力的证据。测试文档全部保存关闭，保留本轮启动的可见应用实例供观察，不声称退出后没有 CAD 进程。本机原生检查也不代表上游 CI 已通过。
+This run did not verify assembly mates, assembly interference detection, free dragging, continuous sweep, contact dynamics, loads, Motion Study, or manufacturing release; single-body rib feature results cannot serve as evidence for those capabilities. All test documents were saved and closed while keeping the run-launched visible application instance open for observation; this does not claim zero remaining CAD processes after exit. Local native checks also do not indicate that upstream CI has passed.
 
-后续规范修订只补充手工脚本的中文文档字符串与本说明，脚本去除文档字符串后的 AST 保持一致，生产文件哈希不变；上述真机记录继续有效，没有为说明文字变更重复运行 CAD。
+Subsequent documentation revisions only added docstrings to the manual script and this note; the script's AST with docstrings stripped remained identical and the production file hash remained unchanged, so the live-machine record above remains valid without re-running CAD for text-only edits.
 
-原生文件、原始报告及预览保留在本地测试输出，未纳入提交。此文只保留不含本机身份、路径、进程号或私人模型的结果摘要。
+Native files, raw reports, and previews remain in local test output and are not committed. This document retains only a sanitized result summary without local identities, paths, PIDs, or private models.

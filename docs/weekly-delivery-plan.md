@@ -1,114 +1,114 @@
-# CAD Studio 周阶段交付计划
+# CAD Studio Weekly Delivery Plan
 
-每周只承诺可构建、可测试、可回滚的一组能力。未通过真实 CAD 复核的功能继续标为 `pilot`、`reference_only` 或 `not_implemented`。
+Each week commits only to a buildable, testable, and rollback-safe set of capabilities. Features that have not passed real CAD review remain marked as `pilot`, `reference_only`, or `not_implemented`.
 
-| 阶段 | 目标 | 验收出口 |
+| Phase | Goal | Acceptance Exit |
 |---|---|---|
-| 第 1 周 | 本机安装发现、可靠性诊断、STL/GLB/OBJ/DXF 预览底座 | 两套 CAD 正确识别；Python/Rust/前端测试通过；预览非空像素和窄窗口截图通过 |
-| 第 2 周 | 项目/对话/任务/文件/复核模块拆分，减少 `App.tsx` 体积 | 项目切换 P95 < 150 ms；迁移数量一致；项目删除不删 CAD 交付文件 |
-| 第 3 周 | SolidWorks 参数修改、批量导出、属性/BOM、Pack and Go | 黄金工作流真实回归；产物账本不接受旧文件 |
-| 第 4 周 | 工程图视图/孔标注、AutoCAD 图层/尺寸/图框检查、DXF 图层预览 | DXF 无头检查通过；AutoCAD 2024 ActiveX 原生绘图真机回归当前为 `blocked`，不得伪报通过 |
-| 第 5 周 | 装配检查、配置族试点、交付物版本比较和重新生成 | 能力门禁、错误码、重试和人工复核证据完整 |
-| 第 6 周 | 20 次稳定性回归、Windows 自托管 CI、安装包回归、v0.4 发布 | 无重复 CAD 实例或遗留 Worker；黄金工作流首轮成功率达到 90% |
+| Week 1 | Local installation discovery, reliability diagnostics, STL/GLB/OBJ/DXF preview foundation | Both CAD suites detected accurately; Python/Rust/frontend tests pass; non-empty preview pixel and narrow-viewport screenshot checks pass |
+| Week 2 | Split project/chat/job/file/review modules to reduce `App.tsx` size | Project switching P95 < 150 ms; migration counts match; deleting a project does not delete CAD deliverables |
+| Week 3 | SolidWorks parameter modification, batch export, properties/BOM, Pack and Go | Golden workflow live regression passes; artifact ledger rejects stale files |
+| Week 4 | Drawing views/hole callouts, AutoCAD layer/dimension/frame checks, DXF layer preview | Headless DXF check passes; AutoCAD 2024 ActiveX native drawing live regression is currently `blocked` and must not be falsely reported as passing |
+| Week 5 | Assembly checks, configuration family pilot, deliverable version diffing and regeneration | Capability gates, error codes, retries, and human review evidence complete |
+| Week 6 | 20-run stability regression, Windows self-hosted CI, installer regression, v0.4 release | Zero duplicate CAD instances or orphan workers; golden workflow first-pass success rate reaches 90% |
 
-## 第 1 周结果
+## Week 1 Results
 
-- 已识别本机 `E:\Solidworks\SOLIDWORKS\SLDWORKS.exe` 与 `D:\AutoCAD 2024\acad.exe`；公共桌面快捷方式和 COM 注册纳入统一发现。
-- `cad-studio doctor` 输出产品、版本、来源和路径；导出诊断包时路径只保留文件名。
-- Three.js 按需加载 STL、GLB/GLTF、OBJ，DXF 只读覆盖 `LINE`、`CIRCLE`、`LWPOLYLINE`。
-- STEP/IGES 和 DWG 暂不在浏览器内直接解析，继续由 SolidWorks/AutoCAD 原生导出预览图；不以占位图冒充真实几何。
+- Detected local `E:\Solidworks\SOLIDWORKS\SLDWORKS.exe` and `D:\AutoCAD 2024\acad.exe`; public desktop shortcuts and COM registrations unified into discovery.
+- `cad-studio doctor` outputs product, version, source, and path; exported diagnostic bundles retain filenames only for path redaction.
+- Three.js loads STL, GLB/GLTF, and OBJ on demand; read-only DXF covers `LINE`, `CIRCLE`, and `LWPOLYLINE`.
+- STEP/IGES and DWG are not yet parsed directly in the browser and continue to rely on native preview exports from SolidWorks/AutoCAD; placeholders are never presented as real geometry.
 
-## 第 2 周结果
+## Week 2 Results
 
-- `App.tsx` 从 3968 行降至约 3479 行；项目、任务、对话、复核和交付文件分别进入组件/领域模块，后续 CAD 工作流不再继续堆叠到单文件。
-- 左上角项目入口支持项目搜索、归档/恢复、复制项目、重命名和二次确认删除；复制只复制项目元数据与目录引用，不复制任务、对话或 CAD 交付文件。
-- 侧栏任务序列支持终态任务批量清理；排队、执行中和待审批任务始终不能被批量删除。
-- SQLite 保留旧 `app_state` 快照，同时建立项目、对话、消息和任务实体索引；首次打开自动迁移，`app_store_migration_status` 返回源数据与索引数量是否一致。
-- 项目切换在 Playwright 1440×900 / 900×700 验收中无控制台错误，实测 `performance.measure("cad-studio.project-switch")` 为约 18 ms，低于 150 ms 目标。
-- 验证结果：前端构建通过，Rust 15 项通过，Python 118 项通过；真实 SolidWorks/AutoCAD 产物能力仍按能力清单和人工复核门禁处理。
+- `App.tsx` reduced from 3,968 lines to ~3,479 lines; project, job, chat, review, and deliverable views moved into dedicated component/domain modules so future CAD workflows no longer pile into a single file.
+- Top-left project menu supports project search, archive/restore, duplicate project, rename, and double-confirmed deletion; duplication copies only project metadata and folder references, not jobs, chats, or CAD deliverables.
+- Sidebar task queue supports bulk cleanup of terminal jobs; queued, running, and approval-pending jobs can never be bulk-deleted.
+- SQLite preserves the legacy `app_state` snapshot while adding entity indexes for projects, conversations, messages, and jobs; automatic migration runs on first launch and `app_store_migration_status` reports whether source and index counts match.
+- Project switching passed Playwright 1440×900 / 900×700 acceptance with zero console errors; measured `performance.measure("cad-studio.project-switch")` was ~18 ms, well below the 150 ms target.
+- Verification results: frontend build passed, 15 Rust tests passed, 118 Python tests passed; real SolidWorks/AutoCAD artifact capabilities remain governed by the capability manifest and human review gates.
 
-## 第 3 周补充结果
+## Week 3 Supplemental Results
 
-- SolidWorks 2024 零件、尺寸修改、属性回读、装配体、BOM 和批量导出已通过真实回归。
-- SW2024 早期回归中 Pack and Go 原生枚举只返回顶层装配体，封装因此保留依赖审计和回退门禁，禁止把不完整包标为交付成功。
+- SolidWorks 2024 part modeling, dimension modification, property readback, assemblies, BOM, and batch export passed live regressions.
+- In early SW2024 regressions, native Pack and Go enumeration returned only the top-level assembly; the wrapper therefore retains dependency auditing and a fallback gate, prohibiting incomplete packages from being marked as successful deliveries.
 
-## SolidWorks 2026 SP01.1 升级回归结果
+## SolidWorks 2026 SP01.1 Upgrade Regression Results
 
-- 本机安装发现与 COM 类型库已适配 `E:\SolidWroks2026\SOLIDWORKS\SLDWORKS.exe`，识别修订号 `34.1.1`、`sldworks.tlb`、Motion 和 Routing 类型库。
-- 工程图回归连续三次生成 3 个真实视图和 6 个真实尺寸实体，SLDPRT、SLDDRW、PDF 与非空预览均来自本轮任务。
-- Pack and Go 最终代码连续三次原生通过；每轮均输出 1 个 SLDASM 和 2 个 SLDPRT，`document_count=3`、状态码 `[0,0,0]`、`missing_dependencies=[]`，且未使用暂存回退。
-- `comtypes` 回退优先附着活动实例，只退出本轮明确创建的实例；最终两轮和收尾轮结束后均无遗留 `SLDWORKS.exe`。
-- `pack_and_go` 总等级仍为 `pilot`：复杂外部引用、Toolbox、配置、压缩组件和关联工程图尚未形成连续回归矩阵。
+- Local installation discovery and COM type libraries adapted to `E:\SolidWroks2026\SOLIDWORKS\SLDWORKS.exe`, recognizing revision `34.1.1`, `sldworks.tlb`, and Motion and Routing type libraries.
+- Drawing regression generated 3 real views and 6 real dimension entities across three consecutive runs, with SLDPRT, SLDDRW, PDF, and non-empty previews all produced by the current run.
+- Final Pack and Go code passed natively across three consecutive runs; each run output 1 SLDASM and 2 SLDPRTs, `document_count=3`, status codes `[0,0,0]`, `missing_dependencies=[]`, without using the staging fallback.
+- `comtypes` fallback prefers attaching to an active instance and only exits instances explicitly created by the current run; zero orphan `SLDWORKS.exe` processes remained after the final two runs and teardown run.
+- Overall `pack_and_go` maturity remains `pilot`: complex external references, Toolbox, configurations, suppressed components, and associated drawings do not yet have a consecutive regression matrix.
 
-## 第 4 周补充结果
+## Week 4 Supplemental Results
 
-- DXF 结构审查 schema 2.0 已覆盖实体类型、图层、包围盒、真实 DIMENSION、孔中心/直径、图框和标题栏候选；渲染结果要求 PNG 像素非空。
-- AutoCAD 2024 已成功完成 COM 版本识别，但 `Documents.Count`、`Documents.Add`、`Layers` 和 `SelectionSets.Add` 动态代理仍不稳定。原生 DWG 绘图能力在 `capabilities.yaml` 标记为 `not_implemented`，只保留交互排障模式；DXF 无头后端标记为 `pilot`。
+- DXF structural inspection schema 2.0 covers entity types, layers, bounding boxes, real `DIMENSION` entities, hole centers/diameters, drawing frames, and title-block candidates; rendered PNG outputs require non-empty pixels.
+- AutoCAD 2024 completed COM version detection, but dynamic proxies for `Documents.Count`, `Documents.Add`, `Layers`, and `SelectionSets.Add` remain unstable. Native DWG drafting is marked `not_implemented` in `capabilities.yaml` (retaining interactive troubleshooting mode only); the headless DXF backend is marked `pilot`.
 
-## 第 5 周结果
+## Week 5 Results
 
-- 装配干涉检查返回 `pass/warn/blocked` 结构化报告，包含数量、条目和人工复核门禁。
-- 配置读取试点返回配置清单、当前配置和限制；尚未开放设计表批量修改。
-- 交付物使用 SHA-256 快照比较 added/removed/changed/unchanged；重新生成请求保留旧产物、禁止覆盖并要求复核。
+- Assembly interference check returns a structured `pass/warn/blocked` report with counts, items, and human review gates.
+- Configuration-reading pilot returns the configuration list, active configuration, and limitations; batch modification of design tables is not yet enabled.
+- Deliverables use SHA-256 snapshots to compare `added`/`removed`/`changed`/`unchanged`; regeneration requests preserve prior artifacts, prohibit overwriting, and require review.
 
-## 第 6 周结果
+## Week 6 Results
 
-- 新增 `scripts/stability_regression.py`，以 20 次生命周期模拟验证连接、取消和仅退出本次启动实例的约束。
-- 新增 `scripts/release_check.py`，发布前校验 UI/Tauri/Cargo 版本一致、能力 ID 唯一和必需文件完整。
-- 新增 `.github/workflows/windows-cad-regression.yml`，仅在预装 SolidWorks/AutoCAD 的 Windows 自托管机运行真实回归；公共 GitHub runner 不会伪造 CAD 通过结果。
+- Added `scripts/stability_regression.py` to validate connection, cancellation, and exit-ownership constraints across 20 simulated lifecycle runs.
+- Added `scripts/release_check.py` for pre-release validation of UI/Tauri/Cargo version parity, unique capability IDs, and required file completeness.
+- Added `.github/workflows/windows-cad-regression.yml` to run live regressions exclusively on self-hosted Windows runners with SolidWorks/AutoCAD preinstalled; public GitHub runners never fabricate CAD pass results.
 
-## 下一阶段四周拓展结果
+## Next-Phase 4-Week Expansion Results
 
-- 工程图结构审查返回图纸、视图、真实尺寸、表格、图框模板和人工复核字段；BOM 增加模型/工程图/复核报告追溯关系。
-- Automation Job 2.0 支持 `drawingEvidence`、`bomEvidence`、`reviewFindings` 和 `artifactRelations`，worker 会根据领域证据正确落为 `blocked`、`failed` 或 `review_required`。
-- 交付页按模型、工程图、BOM、预览和复核报告分组显示；旧 Job 1.0 仍按原字段读取。
-- AutoCAD 后端状态保持独立：DXF 无头 `pilot`、白名单脚本 `pilot`、COM 当前 `blocked`；.NET SDK 8 已安装到当前用户目录，AutoCAD 2024 白名单插件已通过 `NETLOAD`、真实 DWG 保存重开、PDF/PNG 和实体/图层/尺寸真机复核，因此 .NET 后端提升为 `pilot`。
-- .NET 回归只允许 `CADSTUDIOPROBE/CADSTUDIOCREATE` 固定命令，不提供任意 AutoLISP、SCR 或 C# 执行；AutoCAD 2025–2026 和桌面签名插件部署仍需后续验证。
-- 新增综合回归 `tests/cad_studio_weekly_regression.py` 和 SolidWorks 工程图真机回归 `tests/solidworks_week4_drawing_regression.py`；真实 CAD 只能显式使用 `--real-cad` 或自托管 CI 运行。
+- Drawing structural review returns sheets, views, real dimensions, tables, drawing-frame templates, and human review fields; BOM adds traceability links across models, drawings, and review reports.
+- Automation Job 2.0 supports `drawingEvidence`, `bomEvidence`, `reviewFindings`, and `artifactRelations`; the worker maps domain evidence accurately to `blocked`, `failed`, or `review_required`.
+- The Delivery page groups artifacts by models, drawings, BOM, previews, and review reports; legacy Job 1.0 records continue to read via original fields.
+- AutoCAD backend statuses remain independent: headless DXF `pilot`, allowlisted scripts `pilot`, COM currently `blocked`; .NET SDK 8 was installed in the current user directory and the AutoCAD 2024 allowlisted plugin passed live verification via `NETLOAD`, real DWG save-and-reopen, PDF/PNG export, and entity/layer/dimension inspection, promoting the .NET backend to `pilot`.
+- .NET regression permits only fixed commands `CADSTUDIOPROBE/CADSTUDIOCREATE` and does not expose arbitrary AutoLISP, SCR, or C# execution; AutoCAD 2025–2026 and signed desktop plugin deployment require subsequent verification.
+- Added comprehensive regression `tests/cad_studio_weekly_regression.py` and SolidWorks live drawing regression `tests/solidworks_week4_drawing_regression.py`; real CAD runs only when explicitly invoked with `--real-cad` or on self-hosted CI.
 
-## 后续第 1 阶段结果：版本化重试与交付门禁
+## Follow-up Phase 1 Results: Versioned Retry and Delivery Gate
 
-- 终态任务重新执行前保存只读 `runHistory` 快照，最多保留最近 20 轮；旧产物、错误、工程图/BOM 证据和复核记录不会在应用内消失，也不会递归复制历史。
-- `retryPolicy` 明确记录上一轮 ID、重跑起点、仅执行失败阶段及后继、保留旧产物和禁止覆盖；worker 会复用上一轮工程 DAG，执行 Prompt 同步强制版本化输出。
-- 交付中心使用本轮产物、领域证据、人工复核和阻断原因统一判定 `ready/review_required/blocked/failed/incomplete`，不再把文件存在或侧栏“已完成”直接等同于可交付。
-- 交付页新增本轮有效产物数、版本记录、SHA-256 变化摘要、产物追溯和 AutoCAD 后端诊断；模型、图纸、BOM 等分组共用一个预览，避免窄窗口重复渲染大预览。
-- `ai_team/delivery-gate-e2e.cjs` 在真实 Chromium 中验证 1440×900 待复核状态和 760×900 已批准状态，无横向溢出、无重复预览，并确保只有人工批准后显示“本轮可交付”。
+- Before re-running a terminal job, a read-only `runHistory` snapshot is saved (retaining up to the latest 20 runs); prior artifacts, errors, drawing/BOM evidence, and review records remain visible in-app and are never recursively copied.
+- `retryPolicy` explicitly records the previous run ID, restart point, running only the failed stage and downstream stages, preserving old artifacts, and forbidding overwrites; the worker reuses the prior engineering DAG and enforces versioned output in the execution prompt.
+- The Delivery Center determines `ready/review_required/blocked/failed/incomplete` uniformly from current-run artifacts, domain evidence, human review, and blocking reasons, no longer equating file existence or a sidebar "Completed" badge with delivery readiness.
+- The Delivery page adds valid current-run artifact count, version history, SHA-256 change summary, artifact traceability, and AutoCAD backend diagnostics; model, drawing, and BOM groups share a single preview pane to prevent duplicate heavy renders on narrow windows.
+- `ai_team/delivery-gate-e2e.cjs` verifies the 1440×900 pending-review state and 760×900 approved state in real Chromium with no horizontal overflow, no duplicate previews, and ensures "Ready for Delivery" appears only after human approval.
 
-## 第 7–8 周结果：无头几何双后端
+## Weeks 7–8 Results: Dual-Backend Headless Geometry
 
-- `scripts/headless_occt_service.py` 以独立子进程调用 OCP，真实写入 STEP、IGES、BREP、STL、OBJ、GLB，并回读有效性、体积、包围盒和拓扑统计；当前黄金样例为盒体、圆柱、布尔合并和圆柱孔切除。
-- `scripts/headless_cad_writer.py` 保留 `.cadstudio.json`、版本化输出、SHA-256 和 `producedThisRun` 账本；缺少 OCP 或遇到未支持特征时返回 `pilot/blocked`，不写部分网格冒充完整实体。
-- 7 项 OCP/开放格式回归和版本化不覆盖回归通过；复杂曲面、钣金、焊件和参数化特征仍未实现。
+- `scripts/headless_occt_service.py` invokes OCP in an isolated subprocess to genuinely write STEP, IGES, BREP, STL, OBJ, and GLB and read back validity, volume, bounding box, and topology statistics; current golden samples cover box, cylinder, boolean union, and cylindrical hole cut.
+- `scripts/headless_cad_writer.py` preserves `.cadstudio.json`, versioned outputs, SHA-256 hashes, and the `producedThisRun` ledger; missing OCP or unsupported features return `pilot/blocked` rather than writing partial meshes masquerading as complete solids.
+- 7 OCP/open-format regressions and versioned no-overwrite regressions passed; complex surfaces, sheet metal, weldments, and parametric features remain unimplemented.
 
-## 第 9–12 周结果：无头二维写入
+## Weeks 9–12 Results: Headless 2D Writing
 
-- DXF 写入现在包含 `OUTLINE/HOLES/CENTER/DIMENSION/FRAME/TITLE/TEXT` 图层、真实线性/直径 DIMENSION、孔中心线和可选 A4/A3/A2/A1 GB/T 风格图框及标题栏字段。
-- SVG、PDF、PNG 默认从同一份 DXF 通过 ezdxf/matplotlib 渲染，依赖缺失时使用明确标注的简化回退；不写入 DWG。
-- 10 项二维写入、DXF 审查和 PreviewScene 回归通过；图框布局、中文字体和最终制造性仍需工程师目视复核，能力保持 `pilot`。
+- DXF writing now includes `OUTLINE/HOLES/CENTER/DIMENSION/FRAME/TITLE/TEXT` layers, real linear/diameter `DIMENSION` entities, hole centerlines, and optional A4/A3/A2/A1 drawing-frame and title-block fields (this localized edition prioritizes **TCVN (Vietnamese Standards) and ISO**, while retaining `GB/T`-style layouts as a secondary reference).
+- SVG, PDF, and PNG render by default from the same DXF via `ezdxf`/`matplotlib`, falling back to a clearly labeled simplified renderer when dependencies are missing; DWG is not written.
+- 10 regressions covering 2D writing, DXF inspection, and `PreviewScene` passed; frame layout, font rendering, and final manufacturability still require visual review by an engineer, keeping the capability at `pilot`.
 
-## 第 13–16 周结果：JS 预览第一版
+## Weeks 13–16 Results: JS Preview v1
 
-- `ModelViewport` 支持 GLB/GLTF/STL/OBJ 的按需 Three.js 加载、标准视图、正交/透视、选择、按需渲染和资源释放；WebGL 不可用或模型解码失败时切换 Manifest 的 PNG 回退。
-- `DxfViewport` 使用 Worker 解析 DXF/PreviewScene，支持图层开关、实体选择、尺寸/文字和 Evidence 引用；`.scene.json` 已纳入前端格式路由。
-- 真实 Chromium E2E 覆盖桌面、760px 窄窗和 390px 移动窗口，检查 Canvas 像素、无横向溢出、来源标记和回退图；尚未完成 20 MB/30 FPS 的独立性能基准，不宣称达到该指标。
+- `ModelViewport` supports on-demand Three.js loading for GLB/GLTF/STL/OBJ, standard views, orthographic/perspective toggle, selection, on-demand rendering, and resource disposal; switches to manifest PNG fallbacks when WebGL is unavailable or model decoding fails.
+- `DxfViewport` parses DXF/`PreviewScene` in a Worker with layer toggles, entity selection, dimensions/text, and Evidence references; `.scene.json` is integrated into frontend format routing.
+- Real Chromium E2E covers desktop, 760px narrow, and 390px mobile viewports, verifying canvas pixels, zero horizontal overflow, source badges, and fallback images; an independent 20 MB / 30 FPS performance benchmark has not yet been completed and is not claimed.
 
-## 第 17–20 周结果：DXF 检视台与演示边界
+## Weeks 17–20 Results: DXF Inspector and Demo Boundaries
 
-- 新增 `scripts/dxf_preview_scene.py`，只读白名单解析 LINE/CIRCLE/ARC/LWPOLYLINE/POLYLINE/TEXT/MTEXT/DIMENSION，限制 50 MB 和 200,000 实体；不支持实体只记录 warnings，不执行脚本。
-- CLI 新增 `cad-studio preview-dxf`，MCP 新增 `cadstudio_build_dxf_preview_scene`；输出必须是新建 `.scene.json`，拒绝覆盖旧文件。
-- 帮助页加入七个固定演示场景（安装板、带孔支架、CPU 外壳、小型装配体、GB/T 图框、FEA 云图示例、Routing 路径示例），全部标记 `demo-showcase/isDemo`，不会进入交付判断。
-- E2E 同时验证后端 Scene JSON、原始 DXF Worker、七个演示样例和 WebGL PNG 回退；FEA 云图和 Routing 路径只是教学演示，真实求解/原生 Routing 必须走新门禁，未满足依赖时返回 `blocked`。
+- Added `scripts/dxf_preview_scene.py` for read-only allowlisted parsing of `LINE/CIRCLE/ARC/LWPOLYLINE/POLYLINE/TEXT/MTEXT/DIMENSION`, capped at 50 MB and 200,000 entities; unsupported entities log warnings only and never execute scripts.
+- Added CLI command `cad-studio preview-dxf` and MCP tool `cadstudio_build_dxf_preview_scene`; output must be a new `.scene.json` file and refuses to overwrite existing files.
+- The Help page includes seven fixed demo scenarios (mounting plate, bracket with holes, CPU enclosure, small assembly, standard drawing frame — prioritizing TCVN/ISO with `GB/T` as secondary reference, sample FEA contour, and sample Routing path), all tagged `demo-showcase/isDemo` and excluded from delivery decisions.
+- E2E verifies backend Scene JSON, raw DXF Worker, all seven demo scenarios, and WebGL PNG fallback; the FEA contour and Routing path are educational demos only—real solving and native Routing must pass the new gates and return `blocked` when dependencies are unmet.
 
-## 第 21 周补强：DFM、Routing、FEA 与复杂几何门禁
+## Week 21 Hardening: DFM, Routing, FEA, and Complex Geometry Gates
 
-- DFM 增加供应商 profile、单位归一、B-Rep 证据绑定和防伪检查；规则通过仍为 `review_required`。
-- Routing 增加中性端点/分段/长度/弯曲半径/碰撞间隙/支撑间距/Routing BOM 复核；SW2026 可发现 Routing 类型库但无加载项或许可证证据时原生写入保持 `blocked`。
-- FEA 增加 FEA 1.0 Schema、CalculiX/Elmer 前置和 CalculiX 白名单输入；CalculiX 2.23 已真实完成受限线性静力样件求解并解析位移、应力和收敛证据。
-- 复杂曲面/模具增加结构化门禁；OCP 7.9.3.1.1 已真实生成并重开受限封闭直纹 Loft 的 STEP/BREP，平滑 Loft、连续性和模具仍未完成。
-- CLI/MCP 均新增白名单入口：`check-routing`、`routing-preflight`、`fea-preflight`、`prepare-fea`、`run-fea`、`review-advanced-geometry`、`create-ocp-loft`，并纳入协议验证。
+- DFM adds vendor profiles, unit normalization, B-Rep evidence binding, and anti-spoofing checks; passing rules still yields `review_required`.
+- Routing adds neutral review of endpoints/segments/lengths/bend radii/collision clearances/support spacing/Routing BOM; SW2026 detects the Routing type library, but native writing remains `blocked` without add-in and license evidence.
+- FEA adds FEA 1.0 Schema, CalculiX/Elmer preflight checks, and allowlisted CalculiX inputs; CalculiX 2.23 genuinely solved a constrained linear-static sample and parsed displacement, stress, and convergence evidence.
+- Complex surfacing/molding adds structured gates; OCP 7.9.3.1.1 genuinely generated and reopened STEP/BREP for a constrained closed ruled Loft, while smooth Lofts, surface continuity, and mold tooling remain incomplete.
+- Both CLI and MCP added allowlisted entry points (`check-routing`, `routing-preflight`, `fea-preflight`, `prepare-fea`, `run-fea`, `review-advanced-geometry`, `create-ocp-loft`) included in protocol validation.
 
-## 1–20 周审计结论
+## Weeks 1–20 Audit Conclusion
 
-- 已有真实代码和自动化证据的范围：项目/交付门禁、开放格式几何、基础二维工程图结构、Preview Manifest/Scene、桌面/Skill/CLI/MCP 双入口、浏览器预览回退、DFM profile/B-Rep 证据、Routing 中性复核、CalculiX 受限线性静力求解，以及 OCP 受限封闭直纹 Loft。
-- 仍需真实 CAD 自托管机或人工复核的范围：SolidWorks 工程图/BOM 最终视觉质量、AutoCAD 原生 DWG、平滑/连续复杂曲面、FEA 网格收敛与安全复核、SOLIDWORKS Routing 原生写入，以及 20 MB/30 FPS 性能指标。
-- 未通过上述回归的能力不会显示为已完成，也不会被交付门禁当作本轮产物。
+- Scope backed by real code and automated evidence: project/delivery gates, open-format geometry, basic 2D drawing structure, Preview Manifest/Scene, dual desktop/Skill/CLI/MCP entry points, browser preview fallbacks, DFM profiles/B-Rep evidence, neutral Routing review, constrained CalculiX linear-static solving, and constrained OCP closed ruled Loft.
+- Scope still requiring self-hosted live CAD or human review: final visual quality of SolidWorks drawings/BOM, native AutoCAD DWG, smooth/continuous complex surfaces, FEA mesh convergence and safety sign-off, native SOLIDWORKS Routing writes, and the 20 MB / 30 FPS performance target.
+- Capabilities that have not passed these regressions are never shown as completed and are never accepted by the delivery gate as current-run artifacts.

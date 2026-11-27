@@ -1,146 +1,123 @@
-# V2 Evaluation —— Golden Workflow Reliability Eval
+# V2 Evaluation — Golden Workflow Reliability Eval
 
-## 1. 为什么需要 Eval
+## 1. Why Eval Is Needed
 
-V2 的目标是「让已有能力执行得更可靠」。要做到这一点，不能只靠主观判断，而需要一套
-**可重复、可量化、可 CI** 的可靠性基准，回答：
+V2 aims to make existing capabilities execute more reliably. Achieving this requires more than subjective judgment—it requires a **repeatable, quantifiable, CI-safe** reliability benchmark answering:
 
-1. 正常任务到底成功了多少？（Nominal Task Success Rate）
-2. 有多少正常任务第一次就成功？（Nominal First Pass Success Rate）
-3. 失败以后能不能恢复？（Recovery Success Rate）
-4. 系统能不能正确识别注入的故障？（Failure Detection / Expected Outcome Accuracy）
-5. 有没有「Tool 说成功但 Verification 失败，最终却仍被当作成功」的**假成功泄漏**？（Escaped False Completion Rate）
+1. How many nominal tasks succeed? (`Nominal Task Success Rate`)
+2. How many nominal tasks succeed on the first attempt? (`Nominal First Pass Success Rate`)
+3. Can failures recover cleanly? (`Recovery Success Rate`)
+4. Does the system reliably detect injected faults? (`Failure Detection / Expected Outcome Accuracy`)
+5. Are there any **escaped false completions** where a tool reports success, Verification fails, yet the task is still marked completed? (`Escaped False Completion Rate`)
 
-这些数字可信，因为它来自 **deterministic 的 Execution Core + Fake Handler/Reviewer**，
-不受模型随机性、网络、真机 CAD 环境影响。
+These metrics are trustworthy because they come from the **deterministic Execution Core + Fake Handler/Reviewer**, unaffected by LLM variance, networking, or live CAD host state.
 
-## 2. Golden Workflow 是什么
+## 2. What Golden Workflows Are
 
-`golden-workflows.yaml` 是 Golden Workflow 的**唯一真源**（`schema_version: 1.0`），
-包含 `target_first_pass_rate` 与 10 个 workflow。Eval **直接从该文件派生场景**，不复制
-内容、不新增第二份配置。现有字段继续工作。
+`golden-workflows.yaml` is the **sole source of truth** for Golden Workflows (`schema_version: 1.0`), containing `target_first_pass_rate` and the workflow definitions (originally 10 workflows, now 12). Eval **derives scenarios directly from this file** without duplicating definitions or adding a second config, preserving full compatibility with existing fields.
 
-## 3. Scenario 分类（benchmark_group）
+## 3. Scenario Categories (`benchmark_group`)
 
-Eval 场景必须按**口径**拆分，绝不能把故意失败的 Scenario 与正常业务 Scenario 混在
-同一个分母里。分类由 scenario type **deterministic** 确定：
+Eval scenarios must be separated by **metric scope**—deliberately failing scenarios must never be mixed into the same denominator as nominal workflows. Classification is **deterministic** by scenario type:
 
-| category | scenario types | 用途 |
+| category | scenario types | Purpose |
 |---|---|---|
-| `nominal` | happy | 正常业务，用于 first-pass target 比较 |
-| `recovery` | transient_recovery、backend_fallback | 失败后脚本化恢复 |
-| `fault_injection` | verification_failure、reviewer_blocked、retry_exhausted | 故意注入故障，验证检测能力 |
-| `guardrail` | warning、policy_block、user_action_required、capability_gap | 验证门禁/人工复核阻断正确性 |
+| `nominal` | `happy` | Normal business tasks, compared against `target_first_pass_rate` |
+| `recovery` | `transient_recovery`, `backend_fallback` | Scripted recovery after failure |
+| `fault_injection` | `verification_failure`, `reviewer_blocked`, `retry_exhausted` | Deliberately injected faults testing detection |
+| `guardrail` | `warning`, `policy_block`, `user_action_required`, `capability_gap` | Verifies gating and human-review blocking accuracy |
 
-## 4. Metrics 定义
+## 4. Metric Definitions
 
-### Nominal（只针对 nominal scenarios）
+### Nominal (Nominal Scenarios Only)
 
-| 指标 | 定义 |
+| Metric | Definition |
 |---|---|
-| nominal_task_success_rate | nominal 中 `terminal == completed` 的比例 |
-| nominal_first_pass_success_rate | nominal 中 `completed` 且 1 次 attempt 且无 recovery 的比例 |
-| nominal_average_tool_calls / duration | nominal 子集的均值 |
+| `nominal_task_success_rate` | Fraction of nominal scenarios ending in `terminal == completed` |
+| `nominal_first_pass_success_rate` | Fraction of nominal scenarios ending in `completed` on attempt 1 with zero recovery |
+| `nominal_average_tool_calls` / `duration` | Mean values over the nominal subset |
 
-`target_first_pass_rate`（0.90）**只与 nominal_first_pass_success_rate 比较**。
+`target_first_pass_rate` (`0.90`) is compared **exclusively against `nominal_first_pass_success_rate`**.
 
-### Robustness（recovery / fault_injection / guardrail）
+### Robustness (`recovery` / `fault_injection` / `guardrail`)
 
-| 指标 | 定义 |
+| Metric | Definition |
 |---|---|
-| expected_outcome_accuracy | `terminal == expected_terminal_status` 的比例（Robustness 最重要的指标） |
-| recovery_success_rate | recovery 类别中 `completed` 的比例 |
-| failure_detection_rate | fault_injection 中 `terminal != completed` 的比例（正确检测出注入的失败） |
-| policy_block_accuracy | policy_block 中 `terminal == blocked` 的比例 |
-| capability_gap_detection_rate | capability_gap 中 `terminal == failed` 的比例 |
-| backend_fallback_decision_accuracy | backend_fallback 中 `terminal == completed` 的比例 |
-| reviewer_block_detection_rate | reviewer_blocked 中 `terminal == blocked` 的比例 |
-| retry_exhaustion_accuracy | retry_exhausted 中 `terminal == failed` 的比例 |
+| `expected_outcome_accuracy` | Fraction where `terminal == expected_terminal_status` (primary robustness metric) |
+| `recovery_success_rate` | Fraction of `recovery` scenarios ending in `completed` |
+| `failure_detection_rate` | Fraction of `fault_injection` scenarios where `terminal != completed` |
+| `policy_block_accuracy` | Fraction of `policy_block` scenarios ending in `blocked` |
+| `capability_gap_detection_rate` | Fraction of `capability_gap` scenarios ending in `failed` |
+| `backend_fallback_decision_accuracy` | Fraction of `backend_fallback` scenarios ending in `completed` |
+| `reviewer_block_detection_rate` | Fraction of `reviewer_blocked` scenarios ending in `blocked` |
+| `retry_exhaustion_accuracy` | Fraction of `retry_exhausted` scenarios ending in `failed` |
 
-注意：**policy block 的正确结果就是 BLOCKED，capability gap 的正确结果就是 FAIL/REPLAN**，
-它们**不是 task failure**，而是「正确处理」。因此 Robustness 用 `expected_outcome_accuracy`
-而非 `task success` 衡量。
+Note: **The correct outcome of a policy block is `BLOCKED`, and the correct outcome of a capability gap is `FAIL/REPLAN`**—these are **not task failures**, but proper handling. Robustness therefore uses `expected_outcome_accuracy` rather than task success.
 
-### Safety（假成功）
+### Safety (False Completions)
 
-| 指标 | 定义 |
+| Metric | Definition |
 |---|---|
-| raw_false_completion_incidence | Handler 报 success 且 Verification FAIL/BLOCKED / Handler 报 success 数。**可以高**，因为 fault-injection 故意制造这种情况。 |
-| false_completion_detection_rate | 被 Verification 正确拦截的注入假成功候选 / 注入的假成功候选总数。目标趋近 100%。 |
-| escaped_false_completion_rate | Handler 报 success 且 Verification FAIL/BLOCKED 且最终仍 `completed` 的比例。目标 **0**。 |
+| `raw_false_completion_incidence` | Cases where Handler reports success while Verification returns `FAIL`/`BLOCKED`, divided by Handler-success runs. **Expected to be high** because fault-injection deliberately manufactures these candidates. |
+| `false_completion_detection_rate` | Injected false-completion candidates properly intercepted by Verification divided by total injected candidates. Target approaches 100%. |
+| `escaped_false_completion_rate` | Cases where Handler reports success, Verification returns `FAIL`/`BLOCKED`, yet final status still reaches `completed`. Target **0**. |
 
-### Overall（诊断，不用于 target）
+### Overall (Diagnostic Only, Never Compared to Target)
 
-| 指标 | 定义 |
+| Metric | Definition |
 |---|---|
-| overall_scenario_count | 总场景数 |
-| overall_raw_task_completion_rate | 全量 `terminal == completed` 比例（仅诊断） |
+| `overall_scenario_count` | Total number of scenarios |
+| `overall_raw_task_completion_rate` | Overall `terminal == completed` ratio (diagnostic only) |
 
-## 5. False Completion 精确定义（修正后）
+## 5. Precise False Completion Definition (Corrected)
 
-严格区分三层：
+Strictly separate three distinct layers:
 
-- **raw false positive**（Handler 假阳性）= `handler_success AND verification ∈ {FAIL, BLOCKED}`。
-  这是「底层执行产生了假成功候选」的**发生率**，fault-injection 场景天然偏高，**不是系统的假成功泄漏率**。
-- **detection rate**（检测率）= 注入的假成功候选中被 Verification 正确拦截的比例。**高 = Verification 有效**。
-- **escaped rate**（泄漏率）= 假成功候选最终仍被当作 `completed` 的比例。**这才是真正的假成功泄漏**，目标为 0。
+- **Raw false positive** (Handler false positive) = `handler_success AND verification ∈ {FAIL, BLOCKED}`. This measures how often underlying execution produces false-success candidates (naturally high in fault-injection suites) and is **not the system's false-completion leak rate**.
+- **Detection rate** = fraction of injected false-success candidates intercepted by Verification. **High = effective Verification**.
+- **Escaped rate** = fraction of false-success candidates that still reach `completed`. **This is the true false-completion leak**, targeted at 0.
 
-旧版把这三者混为一个 `false_completion_rate`（33.3%），会把「Verification 正确拦截了
-11 个假成功候选」误读成「系统有 33.3% 假成功泄漏」。
+The legacy metric conflated all three into one `false_completion_rate` (`33.3%`), making "Verification correctly caught 11 injected false-success candidates" look like "the system leaks 33.3% false completions".
 
-## 6. 旧算法问题（为什么 59.5% / 29.7% / 33.3% 失真）
+## 6. Legacy Calculation Flaw (Why 59.5% / 29.7% / 33.3% Were Distorted)
 
-Phase 6 的旧算法把 37 个场景（10 happy + 10 verification_failure + 10 transient_recovery
-+ 7 跨切面）**混在同一个分母**里算 first-pass 与 false completion：
+Phase 6's original formula mixed all 37 scenarios (10 `happy` + 10 `verification_failure` + 10 `transient_recovery` + 7 cross-cutting) **into one denominator** for first-pass and false completion:
 
-- **29.7% first-pass**：10 个 happy + 1 个 warning 首次成功，除以全部 37（含故意失败场景），
-  因此远低于真实业务首通率，且被拿去与 90% target 比较 → 误报 BELOW_TARGET。
-- **33.3% false completion**：10 verification_failure + 1 reviewer_blocked 是**人为注入**的
-  假成功候选，被 Verification 正确拦截；旧算法把它算成「假成功发生率」而非「泄漏率」，
-  实际 escaped（泄漏）为 **0%**。
+- **29.7% first-pass**: 10 `happy` + 1 `warning` passing on attempt 1 divided by all 37 scenarios (including intentional failures), artificially depressing first-pass rate and causing a false `BELOW_TARGET` against 90%.
+- **33.3% false completion**: 10 `verification_failure` + 1 `reviewer_blocked` were **deliberately injected** false-success candidates properly caught by Verification; the old formula counted incidence instead of leakage, whereas actual escaped leakage was **0%**.
 
-当前基线 **v4**（2026-10-27 由实际运行核对）：`golden-workflows.yaml` 有 12 个 workflow，
-派生 **43 个 scenario**（12 nominal + 31 robustness）。warning 归入人工复核 guardrail，不能宣称任务完成。
-`nominal_first_pass = 100%`（12/12）→ 与 90% target 比较 → **PASS**；
-`escaped_false_completion = 0%` → 无假成功泄漏。
-43 场景的原始完成比例为 25/43（58.1%），只供诊断；此前 21/37（56.8%）、11/11 与 59.5% 均为历史口径。
+Current baseline **v4** (verified by live run on 2026-10-27): `golden-workflows.yaml` contains 12 workflows deriving **43 scenarios** (12 nominal + 31 robustness). `warning` is classified under the human-review guardrail and can no longer be claimed as task completion. `nominal_first_pass = 100%` (12/12) vs. 90% target → **PASS**; `escaped_false_completion = 0%` → zero false-completion leaks. Overall raw completion across 43 scenarios is 25/43 (`58.1%`, diagnostic only); earlier figures (`21/37` / `56.8%`, `11/11`, `59.5%`) are historical scopes.
 
-> **历史口径注记**：本节上文"37 个场景（10 happy + 10 verification_failure + 10 transient_recovery + 7 跨切面）"
-> 描述的是 Phase 6 当时的场景集，保留原文以便对照当时结论。当前场景集已扩为 43 个，
-> 旧的分母数字（21/37、56.8%、29.7%、33.3%）不得再用作当前指标。
+> **Historical Scope Note**: References above to "37 scenarios (10 happy + 10 verification_failure + 10 transient_recovery + 7 cross-cutting)"
+> describe the Phase 6 scenario set and are retained for historical comparison. The suite has expanded to 43 scenarios;
+> legacy denominator figures (`21/37`, `56.8%`, `29.7%`, `33.3%`) must no longer be cited as current metrics.
 
-## 7. deterministic fixture 设计
+## 7. Deterministic Fixture Design
 
-不调用 LLM / Web / 真机。Fake Handler（`success_handler`/`fail_handler`）、Fake Reviewer
-（`pass/warn/fail/blocked/crash_reviewer`）、Fake Capability Facade、与
-`core.recovery._EXCEPTION_KIND` 对齐的异常类型。Recovery 后续结果通过脚本化多 attempt
-模拟（不修改生产 Worker 自动 retry）。
+Makes zero LLM, web, or live CAD calls. Uses Fake Handlers (`success_handler`/`fail_handler`), Fake Reviewers (`pass`/`warn`/`fail`/`blocked`/`crash_reviewer`), Fake Capability Facade, and exception classes aligned with `core.recovery._EXCEPTION_KIND`. Post-recovery steps are simulated via scripted multi-attempt sequences without turning on auto-retry in production Worker.
 
-## 8. 如何运行 Eval
+## 8. Running Eval
 
 ```powershell
 python tests/evals/runner.py
 ```
 
-输出 `eval_report.json` + `eval_report.md`（默认 `tests/evals/reports/`，已 gitignore）。
+Outputs `eval_report.json` and `eval_report.md` (defaulting to gitignored `tests/evals/reports/`).
 
-## 9. 如何读报告
+## 9. Reading the Report
 
-报告分四块：Nominal Reliability（正常业务成功率 + target 比较）、Robustness（正确处理率 +
-检测率）、Safety（假成功 incidence/detection/escaped）、Overall Diagnostic（仅诊断）。
+The report has four sections: Nominal Reliability (business pass rate + target check), Robustness (expected-outcome accuracy + detection rates), Safety (false-completion incidence/detection/escaped), and Overall Diagnostic (diagnostic only).
 
-- `Nominal First Pass Success Rate` vs `Target` → `PASS/BELOW_TARGET`。
-- `Escaped False Completion Rate` → 必须 0。
-- `Expected Outcome Accuracy` → Robustness 正确处理的综合指标。
+- `Nominal First Pass Success Rate` vs. `Target` → `PASS` / `BELOW_TARGET`.
+- `Escaped False Completion Rate` → must equal `0`.
+- `Expected Outcome Accuracy` → composite robustness indicator.
 
-## 10. 当前 Eval 不覆盖什么
+## 10. What Current Eval Does Not Cover
 
-- 真实 SolidWorks / AutoCAD 执行（由真机回归覆盖）。
-- 真实 LLM Planning / Tool Calling 质量、模型对比、token 成本、LLM judge。
-- 网络 / 外部 API。
+- Live SolidWorks / AutoCAD execution (covered by live-machine regressions).
+- Real LLM planning/tool-calling quality, model comparisons, token cost, or LLM-as-a-judge.
+- Network / external APIs.
 
-## 11. 未来 Live Agent Eval 如何扩展
+## 11. Extending to Live Agent Eval Later
 
-Phase 6/7.5 只测 **Execution Reliability**（deterministic）。未来可加 Live Agent Eval
-（真实 Codex/Claude 走真实 Skill + Worker），复用同一套 `EvalRecord` / `metrics` /
-`EvalReport`，只替换 `run_scenario` 的 handler 为真实 Agent 调用。
+Phase 6 / 7.5 benchmarks **Execution Reliability** deterministically. A future Live Agent Eval (running real Codex/Claude through real Skill + Worker) can reuse the exact same `EvalRecord` / `metrics` / `EvalReport` pipeline simply by swapping `run_scenario`'s handler for a live agent call.

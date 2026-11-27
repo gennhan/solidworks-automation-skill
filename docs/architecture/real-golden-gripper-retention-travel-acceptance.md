@@ -1,95 +1,78 @@
-# P0-2.1：夹爪机械保持、公差及静态全行程验收
+# P0-2.1: Gripper Mechanical Retention, Tolerances, and Static Full-Travel Acceptance
 
-本阶段在 P0-2 上新增独立 Golden `parallel_gripper_retention_travel`。原 P0-1、P0-2 用例及其历史证据不改写。
-工作分支 `test/p0-real-gripper-retention-travel-2026`，堆叠 Base 为 `e5c242175c0a1d7e0fa4fabc90839f6d9fbc74ac`，
-Draft PR 目标为 `test/p0-real-assembly-gripper-2026`。不合并 #39/#42，不修改 main、生产 Review、Verification、
-Execution Core 或 GitHub 安全设置。Core 仍只验证终态适配。
+This stage adds an independent Golden case `parallel_gripper_retention_travel` on top of P0-2 without altering original P0-1 or P0-2 cases or their historical evidence.
+Working branch: `test/p0-real-gripper-retention-travel-2026`, stacked base `e5c242175c0a1d7e0fa4fabc90839f6d9fbc74ac`,
+Draft PR targeting `test/p0-real-assembly-gripper-2026`. Neither #39 nor #42 is merged, and `main`, production Review, Verification,
+Execution Core, and GitHub security settings are untouched. Core continues verifying terminal adaptation only.
 
-## 原结构审计及最小机械改动
+## Original Structure Audit and Minimal Mechanical Changes
 
-P0-2 有双导杆同心配合和两个独立 Z 平移，但 Ø8 导杆、Ø8.1 滑块孔、Ø8.02 支撑孔仅为名义几何，
-没有公差带；支撑/底座和手指/滑块仅有 Mate，未建紧固接口；无限行程会越出导杆。
+P0-2 had dual guide-rod concentric mates and two independent Z translations, but the Ø8 guide rods, Ø8.1 slider bores, and Ø8.02 support bores were nominal geometry only
+without tolerance bands; support/base and finger/slider relied solely on Mates without fastening interfaces; and unbounded travel could slide off the guide rods.
 
-P0-2.1 保留双导杆、两滑块、独立手指、两端支撑的拓扑，新增以下功能实体和接口：
+P0-2.1 retains the dual-rod, dual-slider, independent-finger, dual-end-support topology while adding the following functional solids and interfaces:
 
-| 部件 | 原生数量 | 改动及功能（mm） |
+| Component | Native Qty | Changes and Function (mm) |
 | --- | --- | --- |
-| 底座 | 1 | 60×12×116，Y=-38..-26、Z=-58..58；集成 52×36×8 中央挡块，Y=-26..10、Z=-4..4 |
-| 支撑 | 2 | 60×46×12，Y=-38..8；Z=-70..-58 与 58..70，内端面同时为外侧行程止挡 |
-| 导杆 | 2 | 建模直径 7.9905，长度 139.8，Z=-69.9..69.9；两根轴 X=±18、Y=0 |
-| 滑块 | 2 | 52×20×18；保留双导向孔，补两个沿 Y 的 Ø3.2 连接孔 |
-| 手指 | 2 | 12×30×18，Y=10..40；补与对应滑块同轴的两个连接孔 |
-| 端部挡板 | 2 | 60×46×4；Z=-74..-70 与 70..74，封住导杆轴向出口 |
-| 拉铆杆 | 2 | Ø4×148 杆段，Z=-74..74；两端 Ø8×3 成形头，贯穿端板/支撑/底座的真实接口 |
-| 手指铆钉 | 4 | Ø3×50 杆段，Y=-10..40；两端 Ø5.5×3 成形头；同侧头部净距 0.5，每个手指用两根不同轴铆钉保持 |
+| Base | 1 | 60×12×116, Y=-38..-26, Z=-58..58; integrated 52×36×8 center stop block, Y=-26..10, Z=-4..4 |
+| Support | 2 | 60×46×12, Y=-38..8; Z=-70..-58 and 58..70; inner end faces also act as outer travel stops |
+| Guide rod | 2 | Modeled diameter 7.9905, length 139.8, Z=-69.9..69.9; two axes at X=±18, Y=0 |
+| Slider | 2 | 52×20×18; retains dual guide bores, adds two Ø3.2 connecting holes along Y |
+| Finger | 2 | 12×30×18, Y=10..40; adds two connecting holes coaxial with the corresponding slider |
+| End retainer plate | 2 | 60×46×4; Z=-74..-70 and 70..74, closing axial guide-rod exits |
+| Tie rivet rod | 2 | Ø4×148 shank, Z=-74..74; Ø8×3 formed heads at both ends, real interface through end plates/supports/base |
+| Finger rivet | 4 | Ø3×50 shank, Y=-10..40; Ø5.5×3 formed heads at both ends; 0.5 nominal clearance between adjacent same-side heads; two non-coaxial rivets retain each finger |
 
-共八种原生 SLDPRT、十七个实例。铆钉是装配后成形状态的真实双头实体，配有贯穿孔和头部贴合面，
-不是螺栓、装饰性几何或已认证标准件。装配顺序需先穿入杆/铆钉再成形末端；成形工艺、可达性、夹紧预载、
-头部尺寸和强度必须由工程师审核。本阶段不证明铆接工艺或承载能力，不宣称可直接制造。
+Eight native SLDPRT files and 17 component instances in total. Rivets are modeled as genuine double-headed post-forming solids with through-holes and seated head faces—not bolts, cosmetic geometry, or certified standard fasteners. Assembly sequence requires inserting shanks/rivets before forming the tail head; forming process, tool accessibility, clamping preload, head sizing, and strength must be reviewed by an engineer. This stage proves neither riveting manufacturability nor load capacity, and does not claim production readiness.
 
-导杆与挡板名义轴向间隙各 0.1，总轴向浮动 0.2；止挡面使整个滑块在端点仍位于导杆有效长度内。
-轴向叠加公差尚未放行，因此 0.2 是设计间隙，不是制造后保证值。
+Nominal axial clearance between each guide rod and end plate is 0.1 mm (0.2 mm total axial float); travel stops keep the entire slider within the effective guide-rod length at both endpoints. Axial tolerance stack-up has not been signed off, so 0.2 mm is a nominal design clearance rather than a manufactured guarantee.
 
-## 孔与定位明细
+## Hole and Locating Schedule
 
-下表全部为原生切除，不以标记点代替。位置来自统一 Golden 规格，不允许运行配置更改。
+All items below are native cuts, never cosmetic marks. Locations come from the unified Golden specification and cannot be overridden by runtime config.
 
-| 零件 / 接口 | 数量 | 轴向、规格及定位基准 |
+| Part / Interface | Qty | Axis, Size, and Locating Datum |
 | --- | --- | --- |
-| 底座集成挡块 / 导向 | 2 | 沿 Z，建模 Ø8.0075；X=±18、Y=0，贯穿挡块 8；底座局部 Z=54..62 |
-| 支撑 / 导杆 | 每件 2 | 沿 Z，建模 Ø8.0075；X=±18、Y=0，贯穿 12 |
-| 滑块 / 导杆 | 每件 2 | 沿 Z，建模 Ø8.0075；X=±18、Y=0，贯穿 18 |
-| 底座、支撑、端板 / 拉铆杆 | 每件 2 | 沿 Z，Ø4.1；X=±22、Y=-32，分别贯穿 116 / 12 / 4 |
-| 底座 / 外部安装 | 4 | 沿 Y，Ø4.5；X=±12、世界 Z=±40（底座局部 Z=18/98），贯穿底座 12 |
-| 滑块及手指 / 铆钉 | 每件 2 | 沿 Y，Ø3.2；X=±3、零件局部 Z=9，贯穿滑块 20 / 手指 30 |
+| Base integrated stop / guide | 2 | Along Z, modeled Ø8.0075; X=±18, Y=0, through stop 8; local base Z=54..62 |
+| Support / guide rod | 2 each | Along Z, modeled Ø8.0075; X=±18, Y=0, through 12 |
+| Slider / guide rod | 2 each | Along Z, modeled Ø8.0075; X=±18, Y=0, through 18 |
+| Base, support, end plate / tie rivet | 2 each | Along Z, Ø4.1; X=±22, Y=-32, through 116 / 12 / 4 respectively |
+| Base / external mounting | 4 | Along Y, Ø4.5; X=±12, world Z=±40 (local base Z=18/98), through base 12 |
+| Slider & finger / rivets | 2 each | Along Y, Ø3.2; X=±3, local part Z=9, through slider 20 / finger 30 |
 
-除导向孔/轴配合外，上述安装孔及铆钉尺寸公差为**工程提案、待确认**。外部安装配对设备及其紧固件未建模，
-不能宣称已完成整机安装。铆杆穿过底座与支撑的功能连接、双头保持与手指铆钉接触均需原生几何回读。
+Aside from the guide bore/shaft fit, tolerances on the mounting holes and rivets above are **engineering proposals pending confirmation**. External mating hardware and fasteners are unmodeled, so complete system mounting is not claimed. Functional penetration of tie rods through base/supports, double-head retention, and finger-rivet seating must all be verified via native geometry readback.
 
-## 公差依据及适用边界
+## Tolerance Basis and Scope Boundaries
 
-建议基本尺寸 Ø8 H7/g6。原厂资料：
+Proposed nominal fit: Ø8 H7/g6. Manufacturer references:
 
-- [MISUMI 线性轴 g6 推荐表](https://sg.misumi-ec.com/pdf/fa/2013/p226.pdf)：Ø8/10 的 g6 为 -0.005/-0.014 mm。
-- [MISUMI H7 轴配件原厂表](https://jp.misumi-ec.com/vona2/detail/110300223240/?HissuCode=ADKR8-10)：Ø8 H7 为 0/+0.015 mm。
-- [MISUMI 配合技术资料](https://pt.misumi-ec.com/pdf/fa/2014/P1_2287-2288_F80_EN.pdf)：孔轴公差带与配合分类。
+- [MISUMI linear shaft g6 chart](https://sg.misumi-ec.com/pdf/fa/2013/p226.pdf): g6 for Ø8/10 is -0.005/-0.014 mm.
+- [MISUMI H7 shaft accessory datasheet](https://jp.misumi-ec.com/vona2/detail/110300223240/?HissuCode=ADKR8-10): Ø8 H7 is 0/+0.015 mm.
+- [MISUMI fits technical reference](https://pt.misumi-ec.com/pdf/fa/2014/P1_2287-2288_F80_EN.pdf): hole/shaft tolerance zones and fit classes.
 
-由此得到轴 7.986..7.995、孔 8.000..8.015，直径间隙最小 0.005、最大 0.029 mm。CAD 采用公差带中值
-7.9905 / 8.0075，名义建模直径间隙 0.017 mm，便于把间隙与有意端面接触分开；不把中值写成基本标称尺寸。
-实际配合尺寸仍需图纸与检测。没有在本阶段声称满足完整 ISO/GB 制造标准。
+This yields shaft 7.986..7.995 mm and bore 8.000..8.015 mm (diametral clearance 0.005..0.029 mm). CAD uses mid-band values 7.9905 / 8.0075 mm (nominal modeled diametral clearance 0.017 mm) so running clearances remain separable from intentional end-face contact; mid-band dimensions are never mislabeled as basic nominal sizes. Actual mating dimensions still require drawings and inspection. This stage does not claim full compliance with ISO/TCVN (or secondary `GB/T`) manufacturing standards.
 
-双导杆孔位置度、平行度、同轴度、粗糙度、润滑/磨损/热膨胀及轴向叠加公差仍待确认；单独的 H7/g6
-不能证明双导杆不会卡滞。导杆及铆件的库材料提案为 AISI 1020，其余为
-6061-T6 (SS)；这些是 CAD 属性，不是热处理、硬度、材料证书或铆接性能认证。
+Dual-rod bore position, parallelism, coaxiality, surface finish, lubrication/wear/thermal expansion, and axial stack-up remain open; H7/g6 alone cannot guarantee freedom from binding on dual rods. Library material proposals are `AISI 1020` for rods/rivets and `6061-T6 (SS)` for remaining parts; these are CAD properties only, not heat-treatment, hardness, material certification, or riveting performance qualification.
 
-## 行程与真实计算契约
+## Travel and Native Computation Contract
 
-- 左滑块原点 Z 最小/中间/最大为 -58/-40/-22；右滑块为 4/22/40；每侧独立行程 36。
-- 最外侧端点贴合支撑内端面；最内侧端点贴合底座集成中央挡块。没有把必要接触删除或人为留缝以获得零干涉。
-- 48 个原生 Mate（含两条真实距离上下限）；左侧相对左端板为 16..52，右侧相对底座为 62..98。
-  读取限位 FeatureData 的 IsAdvancedMate、Distance、MinimumDistance、MaximumDistance。
-- 对两组三位置执行 3×3 共九工况；每次发送真实编组并回读，再通过原生 Mate 当前距离及 ModifyDefinition
-  持久化该静态工况，重建后检查全部组件、Mate、引用、当前距离和上下限。不是直接写矩阵模拟配合。
-- 每工况用 InterferenceDetectionManager.GetInterferences 实际计算一次体积干涉，再以 TreatCoincidenceAsInterference=True
-  单独计算有意接触，读取后才 Done。缺失、未知、接口异常或未计算均失败；不使用包围盒作为碰撞结论。
-- 静态连接头部接触和端点止挡接触均必须真实检出；体积穿透单独判定，不把所有非零“接触条目”误作穿透。
-- 保留四次不提交 Mate 当前值的变换请求，必须回读到有效位姿，不能以请求成功冒充行程到达。
-- 另增加四次真实越限扩界/穿透注入：每侧分别越出上下界 2 mm，必须同时检出相应支撑/中央挡块的原生体积干涉和正常规则拒绝，逐项恢复。
-  独立执行限位 Mate 抑制及滑块/中央挡块穿透控制，必须检出并恢复。正常文件只在恢复后保存。
-- 保存关闭原生装配和引用后重开，回读十七个实例的身份/位置、Mate/上下限/引用、BOM；STEP 在 SW 中重新导入逐体验证。
+- Left slider origin Z min/mid/max: -58 / -40 / -22; right slider: 4 / 22 / 40; independent travel per side: 36 mm.
+- Outermost endpoints seat against support inner end faces; innermost endpoints seat against the base's integrated center stop. Required contacts are neither removed nor artificially gapped to fake zero interference.
+- 48 native Mates (including two real limit-distance Mates): left side 16..52 relative to left end plate, right side 62..98 relative to base. Reads back `IsAdvancedMate`, `Distance`, `MinimumDistance`, and `MaximumDistance` from limit `FeatureData`.
+- Executes all 3×3 = 9 static poses across the two three-position sets; each pose sends a real transform readback and persists the static state via native Mate current distance + `ModifyDefinition`, verifying all components, Mates, references, current distances, and min/max limits after rebuild—never simulating mates by raw matrix writes.
+- Each pose runs `InterferenceDetectionManager.GetInterferences` once for volumetric interference and a second pass with `TreatCoincidenceAsInterference=True` for intentional contacts, calling `Done` only after reading results. Missing, unknown, API-error, or uncomputed results fail; bounding boxes are never used as collision evidence.
+- Static fastener head contacts and endpoint stop contacts must both be genuinely detected; volumetric penetration is judged separately rather than conflating non-zero contact counts with penetration.
+- Retains four transform requests that do not commit Mate current distances; valid poses must be read back without treating a successful API call as proof of reaching the target travel.
+- Adds four real over-travel / bound-expansion penetration injections: 2 mm past each min/max limit on both sides, verifying both native volumetric interference with the corresponding support/center stop and normal-rule rejection, followed by restoration of each case. Independently tests limit-Mate suppression and slider/center-stop penetration controls, requiring detection and restoration. Normal files are saved only after restoration.
+- Saves, closes, and reopens the native assembly and references, verifying identities/poses of all 17 instances, Mates/limits/references, and BOM; re-imports STEP in SolidWorks to verify every body individually.
 
-九静态组合覆盖用户规定的端点和中位组合；不等于连续扫掠碰撞求解或 Motion Study，不宣称同步运动。
-无电机、丝杠、同步带、动力传递或载荷结论。
+The 9 static combinations cover the requested endpoints and midpoints; they do not equate to continuous swept collision checking or Motion Study, and make no claim of synchronized actuation. No motor, leadscrew, timing belt, power transmission, or load claims are made.
 
-真机已发现，未提交原生限位配合的当前距离时，变换请求虽可返回成功，重建仍回到起始距离；直接拖动、
-从动尺寸、SetTransformAndSolve3 或仅换用 CreateMate 均不足以证明持久化运动。故本用例验证的是以真实
-Mate 参数控制的静态工况，不宣称新装配已验证自由拖动或原生接触动力学，亦不扩大 P0-2 的自由度认证范围。
-修改 Distance 还可能使 SolidWorks 自动扩界，因此正常入口仅允许不可配置的合法工况，回读上下限必须保持一致；
-扩界及实际越限穿透作为必须被拒绝的故障注入。不能声称 CAD 求解器本身会自动模拟机械止挡。
+Live testing revealed that without committing a native limit Mate's current distance, transform requests may return success while rebuild reverts to the initial distance; free dragging, driven dimensions, `SetTransformAndSolve3`, or switching to `CreateMate` alone cannot prove persistent motion. Accordingly, this case validates static poses controlled by real Mate parameters and claims neither free dragging nor native contact dynamics, nor does it expand P0-2's DOF certification scope. Modifying `Distance` can also cause SolidWorks to auto-expand limits; therefore normal entry points permit only non-configurable valid poses and assert unchanged min/max limits, while limit expansion and actual over-travel penetration are tested as mandatory rejected fault injections. The CAD solver itself is not claimed to simulate physical stops automatically.
 
-## 运行与双状态
+## Execution and Dual-Status Semantics
 
-在当前仓库根目录执行，输出目录必须不存在：
+Run from the repository root with a non-existent output directory:
 
 ```powershell
 $env:PYTHONUTF8 = '1'
@@ -99,149 +82,95 @@ node --test tests/test_cad_ci_guard.cjs
 python tests/solidworks_golden_workflow.py --case parallel_gripper_retention_travel --output output/p0-2-1-real-unique --runs 5 --expected-terminal blocked --runtime-config config/runtime.example.json
 ```
 
-受控 runtime 配置只允许现有模板、材料库路径和有界超时。`config/runtime.example.json` 是入库的可移植模板
-（路径为 `null` 时自动探测）；正式验收当时使用的是本机 `output/p0-2-1-runtime.json`（含本机绝对路径，未入库）。
-执行前环境诊断、已有进程拒绝、每轮独立目录/UUID trace、
-Session 所有权、PID 与创建时间核验、清理失败即停止后续实例、全文件 SHA-256、Artifact Ledger 和 Core trace 均沿用 P0-2。
-仅所有规则通过且唯一阻塞是原始 Review 的人工复核时 acceptance_status=passed、task_status=blocked、
-manual_review_required=true。默认 completed 模式仍严格失败。远程 CAD CI 继承前置安全配置 BLOCKED，本阶段不更改或宣称验证。
+Controlled runtime config permits only existing templates, material library paths, and bounded timeouts. `config/runtime.example.json` is the committed portable template (`null` paths trigger auto-discovery); formal acceptance used local `output/p0-2-1-runtime.json` (with local absolute paths, uncommitted). Pre-run environment diagnostics, rejection of existing processes, per-run isolated directories/UUID traces, Session ownership, PID + creation-time checks, halting subsequent runs on cleanup failure, full-file SHA-256, Artifact Ledger, and Core trace all inherit P0-2 rules. Only when every rule passes and the sole block is human review from raw Review does the run report `acceptance_status=passed`, `task_status=blocked`, and `manual_review_required=true`. Default `completed` mode remains strictly failing. Remote CAD CI inherits prior security configuration `BLOCKED` status and is neither altered nor claimed verified here.
 
-## API 核查
+## API Verification References
 
-- [FeatureExtrusion3 的起点偏移](https://help.solidworks.com/2024/english/api/sldworksapi/solidworks.interop.sldworks~solidworks.interop.sldworks.ifeaturemanager~featureextrusion3.html)：
-  T0/StartOffset/FlipStartOffset；本机 SW2026 原厂枚举 swStartOffset=3。
-- [FeatureCut4 的双向切除](https://help.solidworks.com/2024/english/api/sldworksapi/solidworks.interop.sldworks~solidworks.interop.sldworks.ifeaturemanager~featurecut4.html)：
-  Sd=False、两方向各用原生 ThroughAll，避免定深孔冒充贯穿。
-- [距离 Mate FeatureData](https://help.solidworks.com/2025/English/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IDistanceMateFeatureData_members.html)：
-  IsAdvancedMate、MinimumDistance、MaximumDistance 原始回读。
-- [原生距离配合创建与 ModifyDefinition 示例](https://help.solidworks.com/2022/english/api/sldworksapi/Create_Limit_Distance_Mate_Example_CSharp.htm)：
-  当前距离持久化时显式回读并验证 Advanced、Distance 和上下限，不能只相信 ModifyDefinition 返回值。
-- [原生有意接触开关](https://help.solidworks.com/2025/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IInterferenceDetectionMgr~TreatCoincidenceAsInterference.html)：
-  开关仅当前管理器有效，每次明确设置，不假设保存后继承。
+- [FeatureExtrusion3 start offset](https://help.solidworks.com/2024/english/api/sldworksapi/solidworks.interop.sldworks~solidworks.interop.sldworks.ifeaturemanager~featureextrusion3.html): `T0`/`StartOffset`/`FlipStartOffset`; local SW2026 enum `swStartOffset=3`.
+- [FeatureCut4 bidirectional cut](https://help.solidworks.com/2024/english/api/sldworksapi/solidworks.interop.sldworks~solidworks.interop.sldworks.ifeaturemanager~featurecut4.html): `Sd=False` with native `ThroughAll` in both directions so blind cuts never masquerade as through-holes.
+- [Distance Mate FeatureData](https://help.solidworks.com/2025/English/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IDistanceMateFeatureData_members.html): raw readback of `IsAdvancedMate`, `MinimumDistance`, and `MaximumDistance`.
+- [Limit Distance Mate creation and ModifyDefinition example](https://help.solidworks.com/2022/english/api/sldworksapi/Create_Limit_Distance_Mate_Example_CSharp.htm): explicitly read back and verify `Advanced`, `Distance`, and limits after persisting current distance rather than trusting `ModifyDefinition`'s return code alone.
+- [Intentional contact toggle](https://help.solidworks.com/2025/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IInterferenceDetectionMgr~TreatCoincidenceAsInterference.html): applies only to the active manager instance; set explicitly every time rather than assuming persistence.
 
-## 实际执行记录
+## Actual Execution Log
 
-本节在真实执行后记录结果；上述为验收合同，不是已通过声明。所有失败保留，离线合成与真机统计分开。
+This section logs actual execution outcomes; the sections above define the acceptance contract rather than a pass claim. All failures are preserved, and offline synthetic tests are kept separate from live-machine counts.
 
-1. 首次真机套件 `p0-2-1-real-five-01/run-01`（源码 4aeccde、PID 41276）在导杆材料处失败，退出 1，未启动后续轮次。
-   底座和支撑保存重开通过；导杆几何通过但材料为空、密度 1000。全部日志/快照与已生成 CAD 保留，清理通过。
-   该轮导杆验证失败发生在保存前，因此没有伪称存在失败导杆原生文件；后续增加失败原生副本保留。
-2. 独立真实材料 API 诊断不计 Golden 轮次。1045、1100-O 及 Alloy Steel 名称的应用未成功，可能保留先前材料；
-   6061-T6 和 AISI 1020 正确回读。只凭 XML 中有名称不能算材料应用成功。改用可回读 AISI 1020，并按库值检查
-   7900 kg/m³；铝件为 2700 kg/m³。材料适用性仍为工程提案，不能把该替代宣称为已认证等效材料。
-3. 实施复核同时将同侧铆钉头径由 6 改为 5.5，避免名义相切；头部尺寸及成形工具可达性仍需人工审核。
-4. 第二个真机套件 `p0-2-1-real-five-02/run-01`（源码 bebfe83、PID 5436）八种零件通过，但九工况的滑块
-   重建后均回中位，铆钉因反向平面距离落到滑块另一侧。原生穿透为 0、Review PASS，位姿/接触/STEP 规则
-   仍按预期判 failed；完整 CAD/STEP/BOM/预览、日志和哈希保留，清理通过，没有继续第二轮。
-5. 独立装配诊断复制 SLDASM，仅只读历史零件，并在结束后核对全部历史输入哈希；从动尺寸、CreateMate、
-   SetTransformAndSolve3 及隔离 Mate 都保留原始结果。第一项拖动诊断的退出码 0 仅表示 API 执行完毕，
-   未校验重建后运动；第六项仅校验合法位置、未校验扩界，亦退出 0。两者都不属于 Golden，不计验收通过。
-   随后诊断加入严格位姿/范围退出码检查；扩界诊断明确失败。正式 Golden 入口始终保持严格规则与非零失败退出。
-6. 修正铆钉反向法向的距离符号，并增加对应故障回归。合法九工况改为原生 Mate 当前值控制，原有变换请求
-   检查保留，另加四次真实机械越限干涉故障控制；没有删除位置、接触、Mate、上下限或清理检查。
-7. 装配诊断 `assembly-probe-08` 复用八个已真实验证零件的副本，完整通过新建装配、九工况、四个真实越限穿透、
-   抑制/中央穿透、恢复、保存重开、STEP、Review 和清理；退出 0，历史输入哈希未改变。四视角已目视复核。
-   每个越限 2 mm 的原生穿透数量为 1，外侧体积 1670.560902、内侧体积 1878.560902 mm³。
-   该诊断没有从零重建零件，因此不计入正式五轮；正常九工况的穿透全部 0，原生零体积接触条目为 18–22，分类见下文。
-8. 冻结源码 `359959610a996b42066fc98e4bf313ddb0485aae` 的正式套件 `p0-2-1-real-five-03` 前四轮完整通过；
-   第五轮在创建左滑块限位 Mate 前发生 COM 断连，未完成装配及清理接口回读，套件按原始事实退出 1。
-   用户于 2026-10-27 确认该次断连由手动退出 SolidWorks 引起。保留人工中断的失败/未知记录，不补记通过，
-   不把这次事件称为已证明的 CAD 崩溃或建模缺陷。事后无残留进程也不替代当轮文档清理验证。
-   随后增加组件插入后、限位创建前及全部 Mate 创建后的三个独立 SLDASM 检查点与逐 Mate 进度记录，
-   同时补充断连不能通过验收的故障测试。检查点不是恢复、成功或清理证明；没有新增异常自动重试或放宽门禁。
-9. 另发现 `p0-2-1-real-five-04/run-01` 已有部分原始证据，含八个零件及九工况报告，但没有终态报告、清理证明或套件汇总。
-   该次未封口执行的具体中断原因未确认，不计通过。2026-10-27 一次复用该目录的启动被原入口拒绝，未启动 CAD；
-   外层 Tee 命令覆盖了旧的外围控制台日志，这是实施操作缺陷，该日志原内容无法恢复。目录内原始 `run.log`、CAD 和快照未修改。
-   新生成的 `five-04-exitcode.txt` 只表示本次重复目录拒绝，不能用来推断旧执行终态。
-   后续启动在进入 Tee 之前同时检查目录、控制台日志和退出码文件不存在，并改用 `five-05`。
+1. First live suite `p0-2-1-real-five-01/run-01` (commit `4aeccde`, PID 41276) failed at guide-rod material assignment, exited 1, and launched no subsequent runs. Base and supports passed save-and-reopen; guide-rod geometry passed but material read back empty with density 1000. All logs, snapshots, and generated CAD were preserved and cleanup passed. Because failure occurred before saving the guide rod, no nonexistent failed native part was claimed; failed native copy retention was added afterward.
+2. Standalone live material API diagnostics are excluded from Golden counts. Applying `1045`, `1100-O`, and `Alloy Steel` failed and could leave prior material intact; `6061-T6` and `AISI 1020` read back cleanly. Mere presence of a name in XML does not prove material application. Switched to verifiable `AISI 1020` (7900 kg/m³ library density; aluminum parts 2700 kg/m³). Material suitability remains an engineering proposal rather than a certified equivalent.
+3. Implementation review also reduced same-side rivet head diameter from 6 to 5.5 mm to avoid nominal tangency; head sizing and forming-tool accessibility remain subject to human review.
+4. Second live suite `p0-2-1-real-five-02/run-01` (commit `bebfe83`, PID 5436) passed all eight parts, but all nine slider poses reverted to midpoint on rebuild and rivets landed on the opposite side of the slider due to reversed plane-distance sign. Despite zero native penetration and Review PASS, pose/contact/STEP rules failed as expected; full CAD/STEP/BOM/previews, logs, and hashes were preserved, cleanup passed, and run-02 was not launched.
+5. Standalone assembly diagnostics copied SLDASM while opening historical parts read-only and verified all historical input hashes afterward; driven dimensions, `CreateMate`, `SetTransformAndSolve3`, and isolated Mates preserved raw outcomes. Probe #1's exit code 0 meant only API completion without checking post-rebuild motion; Probe #6 checked valid poses without checking bound expansion and also exited 0. Neither belongs to Golden or counts toward acceptance. Subsequent probes enforced strict pose/range exit checks, and the bound-expansion probe failed explicitly. The official Golden entry point always enforces strict rules and non-zero failure exits.
+6. Corrected the reversed-normal distance sign for rivets and added a corresponding fault regression. Switched the 9 valid poses to native Mate current-distance control, retained original transform-request checks, and added four real mechanical over-travel interference fault controls without removing any pose, contact, Mate, limit, or cleanup check.
+7. Assembly probe `assembly-probe-08` reused copies of the eight verified parts and passed assembly build, 9 poses, 4 over-travel penetrations, suppression/center penetration, restoration, save-and-reopen, STEP, Review, and cleanup with exit code 0 and unchanged input hashes. Four views were visually reviewed. Each 2 mm over-travel produced 1 native penetration (outer volume 1670.560902 mm³, inner volume 1878.560902 mm³). Because it did not rebuild parts from scratch, it does not count toward the official five-run suite; all 9 valid poses had 0 penetration and 18–22 native zero-volume contact entries (classified below).
+8. Official suite `p0-2-1-real-five-03` on frozen commit `359959610a996b42066fc98e4bf313ddb0485aae` passed runs 1–4 cleanly; run 5 suffered COM disconnection right before creating the left slider limit Mate, leaving assembly and cleanup readback incomplete, and exited 1 truthfully. On 2026-10-27 the user confirmed this disconnect was caused by manually closing SolidWorks. The manually interrupted failure/unknown record is retained without retroactively marking it passed and without mislabeling it as a proven CAD crash or modeling bug. Zero residual processes afterward do not substitute for in-run document cleanup verification. Added three independent SLDASM checkpoints (post-insert, pre-limit, post-all-mates), per-Mate progress logging, and a fault test ensuring disconnects cannot pass acceptance. Checkpoints do not constitute recovery, success, or cleanup proof; no automatic exception retry or gate relaxation was added.
+9. Discovered partial prior evidence in `p0-2-1-real-five-04/run-01` containing eight parts and a nine-pose report, but missing a terminal report, cleanup proof, and suite summary. The exact interruption cause of that unclosed run is unconfirmed and it is not counted as passed. A 2026-10-27 attempt reusing that directory was rejected by the entry point without launching CAD; however, an outer `Tee` command overwrote the old outer console log—an operational mistake whose prior content cannot be recovered. Original `run.log`, CAD files, and snapshots inside the directory remained untouched. The newly written `five-04-exitcode.txt` reflects only the duplicate-directory rejection and cannot be used to infer the prior run's terminal state. Subsequent launches verify that the directory, console log, and exit-code file are all absent before invoking `Tee`, and switched to `five-05`.
 
-## 2026-10-27 冻结源码五轮结果
+## 2026-10-27 Five-Run Results on Frozen Source
 
-运行源码为 `df4d4c9a4143602d5af7077a7be7b19cee4850c2`，SolidWorks 2026 SP01.1 / revision 34.1.1，
-Python 3.12.10 / Windows 11。五轮均从零生成八种零件，在新实例及独立目录内完成全部流程。
-不是复制已完成 CAD、确定性 Mock、OCCT 或复用辅助装配诊断。实际命令如下，重跑必须更换尚不存在的输出目录：
+Source commit: `df4d4c9a4143602d5af7077a7be7b19cee4850c2`, SolidWorks 2026 SP01.1 / revision 34.1.1, Python 3.12.10 / Windows 11. All five runs generated all eight parts from scratch in fresh instances and isolated directories—not copying finished CAD, deterministic mocks, OCCT, or reusing assembly diagnostics. Actual command executed (reruns must use a new non-existent output directory):
 
 ```powershell
 python -u tests/solidworks_golden_workflow.py --case parallel_gripper_retention_travel --output output/p0-2-1-real-five-05 --runs 5 --expected-terminal blocked --runtime-config output/p0-2-1-runtime.json
 ```
 
-> 上面是**当时实际执行**的命令，其中 `output/p0-2-1-runtime.json` 是本机配置（含本机绝对路径，被 `.gitignore` 排除，未入库）。
-> 外部复现请改用入库模板 `config/runtime.example.json`（自动探测），并更换一个尚不存在的 `--output` 目录。
+> The command above is the **exact command run at the time**, where `output/p0-2-1-runtime.json` was a local config (containing local absolute paths, excluded by `.gitignore` and uncommitted).
+> For external reproduction, use the committed template `config/runtime.example.json` (auto-discovery) and specify a new non-existent `--output` directory.
 
-| 轮次 | 独立 PID | 原生几何、装配及交付 | Test Acceptance | Task Status | 自有文档 / 主进程清理 |
+| Run | Dedicated PID | Native Geometry, Assembly & Delivery | Test Acceptance | Task Status | Owned Docs / Process Cleanup |
 | --- | --- | --- | --- | --- | --- |
-| 01 | 35168 | PASS | passed | blocked | PASS / 0 残留 |
-| 02 | 25560 | PASS | passed | blocked | PASS / 0 残留 |
-| 03 | 35628 | PASS | passed | blocked | PASS / 0 残留 |
-| 04 | 39064 | PASS | passed | blocked | PASS / 0 残留 |
-| 05 | 16088 | PASS | passed | blocked | PASS / 0 残留 |
+| 01 | 35168 | PASS | passed | blocked | PASS / 0 residual |
+| 02 | 25560 | PASS | passed | blocked | PASS / 0 residual |
+| 03 | 35628 | PASS | passed | blocked | PASS / 0 residual |
+| 04 | 39064 | PASS | passed | blocked | PASS / 0 residual |
+| 05 | 16088 | PASS | passed | blocked | PASS / 0 residual |
 
-每轮均八种 SLDPRT、十七组件、四十八 Mate：十四重合、六同心、二平行、二十六距离，其中两条为真实限位。
-组件 ID/名称/路径在保存关闭重开后保持一致；每个实体及 STEP 回读均匹配体积、质心、孔轴圆柱尺寸/位置/面积。
-原生与 STEP 总实体体积约 **244414.832633 mm³**，BOM 八行、数量合计十七。五轮四视角共二十张均已目视复核。
-每轮原始 Review 为 PASS / 100，`manual_review_required=true`；Core 实际终态及 trace 均为 blocked。
+Each run built 8 SLDPRTs, 17 component instances, and 48 Mates (14 coincident, 6 concentric, 2 parallel, 26 distance including 2 real limit Mates). Component IDs/names/paths remained identical after save, close, and reopen; every solid body and re-imported STEP matched volume, center of mass, and cylindrical bore/shaft size, location, and area. Total native and STEP solid volume was ~**244,414.832633 mm³**; BOM contained 8 rows totaling quantity 17. All 20 four-view previews across five runs were visually reviewed. Every raw Review scored PASS / 100 with `manual_review_required=true`, and Core actual terminal status and trace were `blocked`.
 
-正常组合在每一轮均实际计算并通过，表内为体积穿透数量（每格独立复测五次）：
+All normal combinations were computed and passed in every run; table shows volumetric penetration counts (independently verified 5 times per cell):
 
-| 左滑块 Z / 右滑块 Z（mm） | 4 | 22 | 40 |
+| Left Slider Z / Right Slider Z (mm) | 4 | 22 | 40 |
 | --- | --- | --- | --- |
-| -58 | 0，5/5 | 0，5/5 | 0，5/5 |
-| -40 | 0，5/5 | 0，5/5 | 0，5/5 |
-| -22 | 0，5/5 | 0，5/5 | 0，5/5 |
+| -58 | 0, 5/5 | 0, 5/5 | 0, 5/5 |
+| -40 | 0, 5/5 | 0, 5/5 | 0, 5/5 |
+| -22 | 0, 5/5 | 0, 5/5 | 0, 5/5 |
 
-四十五个正常工况原生体积穿透均为 0，体积均为 0 mm³。零体积接触条目按上述行序为
-`21, 19, 20, 20, 18, 19, 22, 20, 21`。十八项名义连接接触与端点止挡接触分别保留；
-内侧极限还存在手指与中央挡块上缘的**共边接触**，不能把它称为制造间隙或已批准的承载接触，倒角和公差仍待审。
+All 45 normal poses had 0 volumetric penetrations and 0 mm³ penetration volume. Zero-volume contact counts in row-major order were `21, 19, 20, 20, 18, 19, 22, 20, 21`. The 18 nominal fastener contacts and endpoint stop contacts are tracked separately; at the inner limit, **co-edge contact** also occurs between the finger and the upper edge of the center stop—this must not be called a manufacturing clearance or approved bearing contact, and chamfers/tolerances remain under review.
 
-从实际变换、已保存零件 D1 及已核对的止挡 B-Rep 平面派生：各工况两根导杆对每个滑块的覆盖均为十八，
-止挡间隙不小于零，指间开口为八至八十，导杆轴向端隙各约 0.1 mm。
-原生圆柱面回读轴径 7.9905、底座/支撑/滑块孔径 8.0075，名义直径间隙 0.017 mm。
-这些是名义几何派生值，碰撞结论仍来自单独执行的原生 Interference Detection；不是包围盒碰撞或制造公差合格证明。
+Derived from actual transforms, saved part D1, and verified B-Rep stop planes: both guide rods maintain 18 mm engagement on each slider across all poses, stop clearances are >= 0, finger jaw opening spans 8 to 80 mm, and axial rod end clearances are ~0.1 mm each. Native cylindrical face readback measured shaft Ø7.9905 and base/support/slider bores Ø8.0075 (nominal diametral clearance 0.017 mm). These are nominal geometric derivations; collision verdicts still come exclusively from native Interference Detection rather than bounding boxes or manufacturing tolerance certification.
 
-| 每轮真实故障控制 | 原生穿透条目 | 穿透体积（mm³） | 五轮检出及恢复 |
+| Live Fault Control (Per Run) | Native Penetration Entries | Penetration Volume (mm³) | Detected & Restored (5 Runs) |
 | --- | --- | --- | --- |
-| 左侧越外限 -60 | 1，滑块 / 左支撑 | 1670.560902 | 5/5 |
-| 左侧越内限 -20 | 1，滑块 / 中央挡块 | 1878.560902 | 5/5 |
-| 右侧越内限 2 | 1，滑块 / 中央挡块 | 1878.560902 | 5/5 |
-| 右侧越外限 42 | 1，滑块 / 右支撑 | 1670.560902 | 5/5 |
-| 左侧中央穿透 -3 | 3，原始组件/体积明细保存在报告 | 见原始报告 | 5/5 |
-| 限位 Mate 抑制 | 正常验收器拒绝抑制状态 | 不以零干涉替代配合检查 | 5/5 |
+| Left past outer limit -60 | 1, slider / left support | 1670.560902 | 5/5 |
+| Left past inner limit -20 | 1, slider / center stop | 1878.560902 | 5/5 |
+| Right past inner limit 2 | 1, slider / center stop | 1878.560902 | 5/5 |
+| Right past outer limit 42 | 1, slider / right support | 1670.560902 | 5/5 |
+| Left center penetration -3 | 3, raw component/volume details in report | See raw report | 5/5 |
+| Limit Mate suppression | Normal acceptor rejects suppressed state | Zero interference never replaces Mate checks | 5/5 |
 
-套件退出码 **0**：真实几何/装配成功率 5/5，预期门禁正确率 5/5，Test Acceptance=5，Task Completion=0，
-False Completion=0，清理成功率 5/5。同一批真实证据在严格 completed 模式下重判为 failed，不计新增 CAD 轮次。
-保留历史累计九次完整通过（旧源码四次、新源码五次）、两次开发失败、一次人工中断和一次未封口执行；
-两次开发失败、人工中断和未封口执行均没有补记通过，辅助诊断不计 Golden 成功轮次。
+Suite exit code **0**: live geometry/assembly pass rate 5/5, expected-gate accuracy 5/5, Test Acceptance=5, Task Completion=0, False Completion=0, cleanup pass rate 5/5. Re-evaluating the same live evidence in strict `completed` mode yields `failed` without counting extra CAD runs. Cumulative history retains 9 full passes (4 on old source, 5 on new source), 2 development failures, 1 manual interruption, and 1 unclosed run; none of the failed/interrupted/unclosed runs were retroactively marked passed, and auxiliary diagnostics do not count as Golden runs.
 
-## 离线回归、证据与实施后审查
+## Offline Regression, Evidence, and Post-Implementation Audit
 
-- 全量离线 **1034 passed / 1 skipped（128.19 s）**，新增用例三十五项测试包含限位缺失、错误行程、Mate 失效、
-  错误间隙、失去止挡接触、全行程穿透、扩界、错误 BOM/STEP、Review WARN/FAIL、证据篡改、清理失败和 COM 断连。
-  跳过项仍为桌面内嵌 Skill 发布包未生成检查。日志为 `output/p0-2-1-offline/pytest-full-05.log`。
-- 四十三个 deterministic mock 场景（十二名义、三十一鲁棒）符合预期，逃逸假完成率 0；
-  二十六项 CI 准入策略合成测试通过，均单列，不是真机或远程 Runner 验收。
-- 五轮全部产物共 **190 项逐轮哈希**、Artifact Ledger 和实际 Core trace 重新回读一致。
-  实施后审查确认生产门禁、CI 及原有安装板/夹爪用例的八个保护文件 Git blob 与 Base 相同；
-  原用例保留并通过全量离线，本阶段真机复测针对新增用例。
-- 结束后只读检查主实例、监测子进程和测试入口无残留；五轮文档清零。
-  运行前已存在的 `sldworks_fs.exe`（PID 27760，09:19:25 创建）按 PID+创建时间核对保留，未终止任何未知或用户进程。
-- [机器可读证据索引](evidence/p0-2-1-real-gripper-travel-2026-10-27.json) 包含各轮配置/资产哈希、trace ID、
-  Mate 合同、实际位置、接触、覆盖、间隙、故障、清理以及历史失败和日志覆盖限制。
+- Full offline suite: **1034 passed / 1 skipped (128.19 s)**; 35 new tests cover missing limits, wrong travel, broken Mates, wrong clearances, lost stop contacts, full-travel penetration, bound expansion, bad BOM/STEP, Review WARN/FAIL, evidence tampering, cleanup failure, and COM disconnect. The sole skipped item remains the unbuilt desktop bundled-skill package check. Log: `output/p0-2-1-offline/pytest-full-05.log`.
+- 43 deterministic mock scenarios (12 nominal, 31 robustness) matched expectations with 0 escaped false completions; 26 synthetic CI admission policy tests passed—both listed separately and distinct from live-machine or remote runner acceptance.
+- All **190 per-run hashes**, Artifact Ledgers, and Core traces across five runs re-verified consistently. Post-implementation audit confirmed that the eight protected files covering production gates, CI, and prior mounting-bracket/gripper cases share identical Git blobs with Base; original cases remain intact and passed full offline regression while live re-verification targeted the new case.
+- Post-run read-only checks confirmed zero residual main instances, monitored child processes, or test entry points; document count returned to zero across all five runs. Pre-existing `sldworks_fs.exe` (PID 27760, created 09:19:25) matched by PID + creation time was left untouched without terminating any unknown or user process.
+- The [machine-readable evidence index](evidence/p0-2-1-real-gripper-travel-2026-10-27.json) records per-run config/asset hashes, trace IDs, Mate contracts, actual poses, contacts, engagement, clearances, faults, cleanup, and historical failure/log-overwrite limitations.
 
-本机归档包含五轮、历史失败/未封口数据、诊断及离线记录，549 项，26,746,788 字节；未上传远程附件：
+Local archive contains the five runs, historical failures/unclosed data, diagnostics, and offline logs (549 items, 26,746,788 bytes; not uploaded as a remote attachment):
 
 ```text
 output/p0-2-1-evidence-20261027.zip        （相对仓库根目录）
 SHA-256: 16a5e33383dd326d033ef316d4610c450a42676dbaed1758a963f2d612e8f3b4
 ```
 
-> 该 ZIP 未入库（26.7 MB，`.gitignore` 排除 `output/`），只在维护者本机保留。
-> 外部复核者只能验证公开的清单与哈希，**不能独立重放原始证据**。
+> This ZIP is uncommitted (26.7 MB; `output/` is excluded by `.gitignore`) and retained locally on the maintainer's machine only.
+> External reviewers can verify the published manifest and hashes, but **cannot independently replay raw binary evidence**.
 
-ZIP CRC、整包 SHA-256、全部清单文件磁盘/归档字节对比均通过；Python 与 PowerShell SHA-256 一致。
-独立复核结果为 `output/p0-2-1-independent-seal-verification.json`，逐文件清单为
-`output/p0-2-1-evidence-sha256.json`。整包自身及其 sidecar 不参与循环自哈希。
+ZIP CRC, whole-archive SHA-256, and disk-vs-archive byte comparisons across all manifest files passed; Python and PowerShell SHA-256 hashes matched. Independent seal verification is recorded in `output/p0-2-1-independent-seal-verification.json` with per-file manifest `output/p0-2-1-evidence-sha256.json`. Neither the archive itself nor its sidecar participates in circular self-hashing.
 
-本阶段相对 P0-2 Base 的七个项目文件：
+The seven project files changed relative to P0-2 Base:
 
 ```text
 golden-workflows.yaml
@@ -253,18 +182,10 @@ docs/architecture/real-golden-gripper-retention-travel-acceptance.md
 docs/architecture/evidence/p0-2-1-real-gripper-travel-2026-10-27.json
 ```
 
-`sw_part.py` 仅增加默认行为兼容的凸台起点偏移及双向切除选项，未重复开发 COM 框架。
-辅助诊断、检查点、进程审计和封存脚本随本机证据保留，不改生产架构。
+`sw_part.py` adds only backward-compatible boss start-offset and bidirectional cut options without duplicating COM infrastructure. Auxiliary diagnostic, checkpoint, process-audit, and sealing scripts remain with local evidence without altering production architecture.
 
-## 尚未放行与后续工程审核
+## Unreleased Scope and Pending Engineering Review
 
-本机静态 Golden Test Acceptance 为 passed；业务 Task Status 仍为 blocked，制造放行及合并就绪性保持 **BLOCKED**。
-[堆叠 Draft PR #43](https://github.com/wzyn20051216/solidworks-automation-skill/pull/43) 目标为 P0-2 分支，保持 Draft，不合并 main 或 #39/#42。
+Local static Golden Test Acceptance is `passed`, whereas business Task Status remains `blocked` and both manufacturing release and merge readiness remain **BLOCKED**. [Stacked Draft PR #43](https://github.com/wzyn20051216/solidworks-automation-skill/pull/43) targets the P0-2 branch, stays Draft, and does not merge into `main` or #39/#42.
 
-工程师仍需审核 H7/g6 在该材料与工况中的适用性、双导杆位置度/平行度、轴向公差链、磨损/润滑、
-内侧手指共边接触和倒角，以及 116 深 Ø4.1 孔的加工路线、铆接成形顺序/可达性、夹紧与强度。
-CAD 导杆姿态 Mate 不等于实体抗转或接头刚度认证；外部安装配对设备、材料证书及工程图制造放行未完成。
-没有验证新装配自由拖动、连续扫掠、接触动力学、驱动/同步、载荷或 Motion Study，亦未扩大原 P0-2 能力范围。
-Core 仅终态适配，逐步 CAD 调度及 COM 永久挂起/异常终止恢复未验证。
-跨机器解压后的引用重定位未验证；历史外围控制台覆盖是无法恢复的证据限制。
-远程 CAD CI 本阶段未运行或配置，前置安全配置没有在本阶段解除或验收；不可声称远程安全验收完成。
+Engineers must still review H7/g6 suitability for these materials and operating conditions, dual-rod position/parallelism, axial tolerance chains, wear/lubrication, inner finger co-edge contact and chamfers, machining feasibility of the 116 mm deep Ø4.1 holes, and rivet forming sequence, accessibility, clamping, and strength. CAD guide-rod orientation Mates do not certify physical anti-rotation or joint stiffness; external mating equipment, material certificates, and manufacturing drawing sign-off remain incomplete. Free dragging, continuous swept collision, contact dynamics, actuation/synchronization, loads, and Motion Study were not tested on the new assembly, nor was original P0-2 capability scope expanded. Core covers terminal adaptation only; step-by-step CAD scheduling and recovery from permanent COM hangs or abnormal termination remain unverified. Cross-machine reference relocation after archive extraction is unverified; the historical outer console log overwrite is an unrecoverable evidence limitation. Remote CAD CI was neither run nor configured in this stage, and prerequisite security configurations remain unresolved; remote security acceptance must not be claimed complete.

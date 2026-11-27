@@ -1,131 +1,98 @@
-# P0-1.2 合并前检查报告
+# P0-1.2 Pre-Merge Readiness Report
 
-> **PR 编号口径（2026-10-27）**：本文写于 P0-1.2 阶段，当时在途的是 **PR #39**。
-> 当前阶段为 P0-2.1，在途 PR 是 **#43**（Draft，base 为 P0-2 分支 `test/p0-real-assembly-gripper-2026`）。
-> 中间的 **#42** 是 P0-2 阶段。三者均为堆叠 Draft，均不合并 main。
-> 本文其他结论（BLOCKED、所需 GitHub 配置）对 #43 同样适用。
+> **PR Number Alignment (2026-10-27)**: This document was authored at P0-1.2 when **PR #39** was active.
+> The current stage is P0-2.1 with active **PR #43** (Draft, based on P0-2 branch `test/p0-real-assembly-gripper-2026`).
+> Intermediate **PR #42** represents P0-2. All three are stacked Drafts and none merge into `main`.
+> All other conclusions below (`BLOCKED`, required GitHub configuration) apply equally to #43.
 
-**合并就绪性：BLOCKED。保留 Draft PR #39，当前不建议合并 main。**
-代码层已移除一次性测试分支限制，但 GitHub 实际权限和环境保护尚不具备完整安全条件。
-本阶段没有创建 Environment、Secret、Runner，也未修改仓库设置或推送 main。
+**Merge readiness: BLOCKED. Keep Draft PR #39 open; merging into `main` is not recommended at this time.**
+One-off test-branch restrictions were removed in code, but actual GitHub permissions and environment protections do not yet meet full security prerequisites.
+No Environment, Secret, or Runner was created in this stage, and neither repository settings nor `main` were modified.
 
-## 治理标准调整记录（2026-10-27）
+## Governance Standard Adjustment Record (2026-10-27)
 
-本文件正文保留 P0-1.2 当时的原始要求，**未删除或改写历史条目**。但其中"至少一人审批""需要另一位有资格的审批人"等要求，已按项目实际治理模式正式调整，阅读下方准入条件时须结合本节。
+The main body preserves original P0-1.2 requirements **without deleting or rewriting historical items**. However, requirements such as "at least one approving reviewer" and "requires a second eligible approver" have been formally adjusted to match the project's real governance model; read the admission criteria below alongside this section.
 
-| 项 | 原要求（P0-1.2 时点） | 调整后（单人维护模式） |
+| Item | Original Requirement (P0-1.2) | Adjusted Standard (Single-Maintainer Mode) |
 | --- | --- | --- |
-| 分支规则 | ruleset 至少要求一人审批 + 必需状态检查 | ruleset 处于 active；**必须经 Pull Request** 进入 main；必需状态检查含 `test-and-build`；**`bypass_actors` 必须为空**（只读凭据读不到该字段，证据来自维护者离线签名证明）。审批数可为 0 |
-| 独立审查人 | Environment 需 Required reviewers + Prevent self-review，且必须由另一位有资格的人审批 | 不作为准入硬条件。缺失时记录为**剩余风险**，不得表述为"独立审批已通过" |
-| 治理定性 | 以双人复核为前提 | 单人核心维护 + 开放社区贡献；合并由 owner 决定，不声称具备双人复核能力 |
+| Branch rules | Ruleset requires >= 1 approval + required status checks | Ruleset `active`; **must enter `main` via Pull Request**; required status checks include `test-and-build`; **`bypass_actors` must be empty** (unreadable by read-only tokens; evidenced via maintainer offline signed attestation). Approval count may be `0` |
+| Independent reviewer | Environment requires Required reviewers + Prevent self-review with a second eligible human approver | Not a hard admission gate. Absence is recorded as a **residual risk** and must never be claimed as "independent approval passed" |
+| Governance posture | Assumed two-person review | Single core maintainer + open community contributions; owner decides merges without claiming two-person review |
 
-**调整理由**：仓库仅有单一维护者，外部贡献以 Fork + PR 形式进行。强制要求独立审批人会产生两种失败结果——保留维护者 bypass 则规则形同虚设（假合规），移除 bypass 且无第二审查人则任何 PR 都无法合并（死锁）。两者都不能带来真实安全增益。
+**Rationale**: The repository has a single maintainer, with external contributions arriving via Fork + PR. Mandating an independent approver produces two broken outcomes—either keeping maintainer bypass (rules become theater / false compliance) or removing bypass without a second reviewer (every PR deadlocks). Neither delivers real security value.
 
-**影响范围**：`scripts/ci/cad_ci_guard.cjs` 的准入检查已重构（`reviewed_ruleset` 拆为 `ruleset_active` + `pull_request_required` + `required_status_checks_present`；`independent_human_review` 由硬性检查改为 `governance.remaining_risks` 风险披露）。
+**Impact**: `scripts/ci/cad_ci_guard.cjs` refactored admission checks (`reviewed_ruleset` split into `ruleset_active` + `pull_request_required` + `required_status_checks_present`; `independent_human_review` moved from hard gate to `governance.remaining_risks` disclosure).
 
-**2026-10-27 补充（Phase 2.1.2）**：`bypass` 相关检查改名为 **`no_bypass_actors`**，语义定为**列表必须为空**（而非"仅禁止 owner"），代码、测试、本文档与 `CONTRIBUTING.md` 表述一致。原因是单人维护仓库不存在合理的常驻绕过者，且"仅禁止 owner"会漏掉后续新增的带 bypass 的第二位协作者。同时：
+**2026-10-27 Addendum (Phase 2.1.2)**: Renamed the bypass check to **`no_bypass_actors`** with semantics **list must be empty** (rather than "forbid owner only"), aligned across code, tests, this document, and `CONTRIBUTING.md`. A single-maintainer repo has no legitimate permanent bypass actor, and "forbid owner only" would miss a newly added collaborator with bypass rights. In addition:
 
-- 新增 `protected_ref_is_main`：`ref_protected` 只说明分支受保护，不保证它就是 `main`，故显式断言
-- `bypass_actors` 的证据改为**离线采集 + Ed25519 签名证明**，CI 只读验签与比对，不承担任何写权限；
-  该证明由维护者自签、信任根在仓库内，**不构成独立审计**，详见 [`governance-attestation.md`](governance-attestation.md)
+- Added `protected_ref_is_main`: `ref_protected` only confirms the branch is protected, not that it is specifically `main`, so `main` is asserted explicitly.
+- Switched `bypass_actors` evidence to **offline capture + Ed25519 signed attestation** verified read-only by CI with zero write permissions; because the attestation is self-signed by the maintainer with an in-repo trust root, it **does not constitute an independent audit** (see [`governance-attestation.md`](governance-attestation.md)).
 
-本文件第 3 条、第 5 条及「实际 GitHub 设置与人工配置条件」中的审批人描述均须按新标准阅读。
+Reviewer descriptions in Sections 3, 5, and "Actual GitHub Settings and Manual Prerequisites" below must be read under this updated standard.
 
-**2026-10-27 补充（全量收口 V2 / B1）**：治理链再收紧一轮，准入检查由 24 项增至 **28 项**：
+**2026-10-27 Addendum (Full Hardening V2 / B1)**: Tightened the governance chain further, expanding admission checks from 24 to **28**:
 
-- **信任锚点**：新增 `trust_root_anchor`，读取仓库变量 `GOVERNANCE_TRUST_ROOT_ANCHOR` 并与实际信任根比对。
-  它阻止"公钥 + 轮换日志 + 证明"被整体替换；缺失、格式非法或不匹配一律阻断。
-  局限：有仓库管理员权限者可连变量一起改，故仍**不是**独立可信根
-- **双摘要**：原单一 `config_digest` 拆为 `policy_digest`（规则内容，不含 bypass）与
-  `snapshot_digest`（含 bypass 与 `updated_at`）。**不得用前者未变声称完整配置未变**
-- **合规字段**：证明新增 `compliant` / `noncompliance_reasons` 并纳入签名载荷；采集工具在远端不合规时
-  **默认拒签**（不写文件、非零退出），校验侧严格要求 `compliant === true` 且与重算结果一致
-- **轮换日志**：退役密钥必须显式 `revoked_at`，缺失不视为已撤销；`KEYS` 与日志双向一致
-- **CODEOWNERS 降级**：新增 `.github/CODEOWNERS` 声明责任人，但 `require_code_owner_review` 维持 `false`。
-  **文件本身不构成强制门禁**，治理风险披露 `code_owner_review_not_enforced`
-- **漂移检测**：`check_governance_drift.cjs` 纳入 `test-and-build`，把治理代码/工作流/信任根/证明的改动
-  变成显式差异。它**不能阻止**有合并权者一并修改，故治理风险披露 `trusted_baseline_workflow_not_established`
+- **Trust anchor**: Added `trust_root_anchor`, reading repository variable `GOVERNANCE_TRUST_ROOT_ANCHOR` and comparing it against the computed trust root. Prevents atomic replacement of "public key + rotation log + attestation"; missing, malformed, or mismatched values unconditionally block. Limitation: a repository admin can modify the variable too, so it is still **not** an independent root of trust.
+- **Dual digests**: Split legacy single `config_digest` into `policy_digest` (rule definitions excluding bypass) and `snapshot_digest` (including bypass and `updated_at`). **Never use an unchanged `policy_digest` to claim the full configuration is unchanged.**
+- **Compliance fields**: Added `compliant` / `noncompliance_reasons` into the signed payload; capture refuses to sign by default when remote state is non-compliant (writes no file, exits non-zero), and verification strictly requires `compliant === true` matching recomputed compliance.
+- **Rotation log**: Retired keys must have an explicit `revoked_at` (omission is not treated as revoked); `KEYS` and the rotation log must match bidirectionally.
+- **CODEOWNERS downgrade**: Added `.github/CODEOWNERS` declaring ownership while keeping `require_code_owner_review = false`. **The file alone is not an enforced gate**, disclosed under governance risk `code_owner_review_not_enforced`.
+- **Drift detection**: Integrated `check_governance_drift.cjs` into `test-and-build` so edits to governance code/workflows/trust root/attestation surface as explicit diffs. Because it **cannot block** someone with merge rights from editing both together, governance risk discloses `trusted_baseline_workflow_not_established`.
 
-规格细节（字段、失效规则、轮换步骤）以 [`governance-attestation.md`](governance-attestation.md) 为唯一定义源。
+Specification details (fields, invalidation rules, rotation steps) are defined authoritatively in [`governance-attestation.md`](governance-attestation.md).
 
-**剩余风险（未消除，须书面接受）**：① 无独立复核，合并质量依赖维护者单点判断；② Environment 无第二审批人，部署审批实际不可由他人把关；③ 维护者作为管理员仍可临时修改 ruleset，任何 GitHub 配置都无法消除该固有权力；④ 外部 PR 审查在 GitHub 侧可能无 review 留痕，需靠流程约定或 `required_review_thread_resolution` 补足。
+**Residual risks (uneliminated, must be accepted in writing)**: (1) No independent review; merge quality relies on single-maintainer judgment. (2) No second Environment approver; deployment approval cannot be gated by another person. (3) As repository admin, the maintainer can still temporarily modify rulesets—no GitHub setting eliminates inherent admin authority. (4) External PR reviews may lack GitHub review trails unless reinforced by process or `required_review_thread_resolution`.
 
-**未变**：远程 CAD CI 的 Environment / Runner / Secret 前提与执行证据要求不变；本调整**不解除** B-01。
+**Unchanged**: Environment / Runner / Secret prerequisites and execution evidence requirements for remote CAD CI remain unchanged; this adjustment **does not clear** B-01.
 
-## PR 相对 main 的完整审计
+## Complete PR Audit Relative to `main`
 
-起点为 `b2dbd38f6405466ab5e0cc331bd4cb9c8ca39104`，main Base 为
-`f9d6efbecf297bcdfffc451de81ba3a7bdea6a0d`。
+Starting commit `b2dbd38f6405466ab5e0cc331bd4cb9c8ca39104`, `main` base `f9d6efbecf297bcdfffc451de81ba3a7bdea6a0d`.
 
-| PR 原有变更 | 审计结论与本阶段处理 |
+| Original PR Change | Audit Conclusion & Current Handling |
 | --- | --- |
-| golden-workflows.yaml | 仅为 mounting_bracket 增加固定真机规格；2026 和几何尺寸是已验证用例边界，不能由运行配置改成其它规格。 |
-| 安装板真机脚本 | 保留模型和生产接口；补充可移植配置、无副作用诊断、PID 创建时间、证据路径安全和严格 trace 关联。 |
-| 安装板离线测试 | 保留全部拒绝假成功用例；补充共用入口、配置、链接和重用 PID 等故障注入。合成输入不计真机统计。 |
-| Windows CAD Workflow | 原硬编码测试分支合并后不可运行；改为受保护分支、人员授权、环境核验及 Environment 人工审批。 |
-| 验收文档 | 旧章节保留为历史记录，当前规范以本文和 P0-1.2 章节为准。 |
-| 两份历史证据索引 | 绝对路径是当时的证据来源，不是执行依赖；不改写、迁移或重新宣称旧运行通过新协议。 |
+| `golden-workflows.yaml` | Adds fixed live-machine spec for `mounting_bracket` only; 2026 version and dimensions are verified case boundaries and cannot be overridden via runtime config. |
+| Mounting-bracket live script | Preserves model and production interfaces; adds portable config, side-effect-free diagnostics, PID creation timestamps, safe evidence paths, and strict trace correlation. |
+| Mounting-bracket offline tests | Retains all false-success rejection cases; adds shared entry, config, link, and PID-reuse fault injections. Synthetic inputs are excluded from live statistics. |
+| Windows CAD Workflow | Original hard-coded test branch could not run after merge; replaced with protected branch, actor authorization, environment checks, and Environment human approval. |
+| Acceptance docs | Older sections kept as historical records; current spec is defined by this document and P0-1.2 sections. |
+| Two historical evidence indexes | Absolute paths record historical provenance rather than execution dependencies; old runs are neither rewritten, migrated, nor claimed compliant with the new protocol. |
 
-生产 `scripts/sw_review.py`、`scripts/core/verification.py` 和 `scripts/core/execution.py`
-没有修改，也没有引入自动审批。Core 仍只在 CAD 及清理结束后做终态适配，不能声称
-真实建模步骤由 Core 调度。
+Production `scripts/sw_review.py`, `scripts/core/verification.py`, and `scripts/core/execution.py` were not modified and no auto-approval was introduced. Core continues performing terminal adaptation after CAD and cleanup finish and cannot be claimed to schedule live modeling steps.
 
-## 可维护的手动 CI 准入
+## Maintainable Manual CI Admission
 
-`windows-cad-regression.yml` 仅支持 workflow_dispatch，没有 PR 或 pull_request_target
-真机触发。第一阶段在 GitHub 托管 Ubuntu 上检验以下事实，未知/API 失败均阻断，
-不会分配自托管 CAD Runner：
+`windows-cad-regression.yml` supports `workflow_dispatch` only, with no PR or `pull_request_target` live triggers. Stage 1 runs on GitHub-hosted Ubuntu to verify the following facts—any unknown state or API failure blocks before any self-hosted CAD Runner is allocated:
 
-1. 仓库名称和不可变 ID 匹配可信仓库；必须为受保护分支，不接受 tag。
-2. GitHub API 确认分支保护且分支 HEAD 与触发 SHA 相同，拒绝已移动的分支。
-3. 有效 ruleset 至少要求一人审批及必需状态检查。（**2026-10-27 已调整**：单人维护模式下改为「ruleset active + 必须经 PR + 必需状态检查含 `test-and-build` + 维护者不在 bypass 列表」，审批数可为 0。见「治理标准调整记录」）
-4. 原触发者与重跑者均为该仓库 admin / maintain；普通 write/read 不足。
-5. `cad-validation` 已存在，有必需审批人、禁止自行审批，且仅允许受保护分支部署。（**2026-10-27 已调整**：Environment 存在与分支策略仍为硬条件；"必需审批人/禁止自行审批"在单人维护下不可达，改按风险披露，不再单独阻断。见「治理标准调整记录」）
-6. API 可见空闲、在线且标签匹配的 Windows CAD Runner。分页不完整也不假定通过。
+1. Repository name and immutable ID match the trusted repo; ref must be a protected branch (tags rejected).
+2. GitHub API confirms branch protection and that branch `HEAD` equals the triggered SHA, rejecting moved branches.
+3. Active ruleset requires at least one approval and required status checks. (**Adjusted 2026-10-27**: under single-maintainer mode, requires active ruleset + mandatory PR + required status check `test-and-build` + empty `bypass_actors`; approval count may be 0. See Governance Standard Adjustment Record.)
+4. Both triggering actor and rerunner hold `admin` or `maintain` permission; standard `write`/`read` is insufficient.
+5. `cad-validation` exists with Required reviewers, Prevent self-review, and protected-branch-only deployment. (**Adjusted 2026-10-27**: Environment existence and protected-branch policy remain hard gates; Required reviewers / Prevent self-review are unreachable in single-maintainer mode and disclosed as residual risks instead of standalone blocks. See Governance Standard Adjustment Record.)
+6. API shows an idle, online Windows CAD Runner with matching labels. Incomplete pagination is never assumed passing.
 
-仅核验通过后，CAD 作业进入 `environment: cad-validation` 的服务器端人工审批。
-不是“先调度自托管机，再在机上拒绝”。checkout 固定触发 SHA，不保留 Git 凭据，
-使用每个 run_id / run_attempt 的新目录；已有目录直接 BLOCKED，不清除用户文件。
-全量离线回归和 deterministic eval 先于真机，Python 父子进程统一 UTF-8。
-旧 SolidWorks / AutoCAD 回归保留为显式可选输入，默认 Golden 不依赖 AutoCAD。
-所有本工作流第三方 Action 固定已核对的完整 SHA，静态语法由 actionlint 校验。
+Only after admission passes does the CAD job enter server-side human approval in `environment: cad-validation`—never "schedule on the self-hosted runner first, then reject on-host". Checkout pins the trigger SHA with no persisted Git credentials and creates a fresh directory per `run_id`/`run_attempt`; pre-existing directories immediately `BLOCK` without deleting user files. Full offline regressions and deterministic eval run prior to live CAD with UTF-8 enforced across parent/child Python processes. Legacy SolidWorks/AutoCAD regressions remain opt-in inputs, and the default Golden case does not depend on AutoCAD. All third-party Actions in this workflow are pinned to verified full SHAs and validated with `actionlint`.
 
-准入结果只说明本工作流可以进入审批阶段，不证明整体 Runner 隔离已完成；报告
-始终明确 `scope=workflow_admission_only`、`safety_acceptance_complete=false`。
-不得把环境审核 PASS 或本地真机 PASS 写成远程安全验收完成。
+Admission passage confirms only that the workflow may enter approval—it does not prove complete runner isolation; reports always state `scope=workflow_admission_only` and `safety_acceptance_complete=false`. Neither an environment check PASS nor a local live PASS may be reported as completed remote security acceptance.
 
-## 实际 GitHub 设置与人工配置条件
+## Actual GitHub Settings and Manual Prerequisites
 
-只读审计发现仓库为公开的个人仓库，main 的规则集已启用，但审批人数为 0；
-`cad-validation` 不存在，Runner 数为 0，`CAD_CI_AUDIT_TOKEN` 未配置。
-因此当前准入应为 BLOCKED，远程 CAD CI 未执行。
+Read-only audit observed a public personal repository where `main`'s ruleset is active with 0 required approvals, `cad-validation` does not exist, runner count is 0, and `CAD_CI_AUDIT_TOKEN` is unconfigured. Admission is therefore `BLOCKED` and remote CAD CI has not executed.
 
-管理员必须完成并提供可复核证据：
+The administrator must complete and provide verifiable evidence for:
 
-- main 及允许真机运行的分支使用 ruleset，至少一人审批、必需 CI，限制强推和删除；
-  审核 bypass 列表，保护工作流、授权脚本和 CAD 测试来源。
-  （**2026-10-27 已调整**：审批人数要求取消，改为强制 PR + 必需 CI + **清空 bypass 列表**；限制强推和删除保持不变。见「治理标准调整记录」）
-- 创建 `cad-validation`：Required reviewers、Prevent self-review、仅受保护分支，
-  并在界面关闭管理员绕过保护。需要另一位有资格的审批人，不能只有触发者自己。
-  （**2026-10-27 已调整**：单人维护模式下不存在第二位审批人。Environment 存在与"仅受保护分支"仍为硬条件；
-  Required reviewers / Prevent self-review 改按风险披露。该冲突使远程 CAD CI 在本模式下**仍不可达**，
-  B-01 保持 BLOCKED，需人工选定处置路径。见「治理标准调整记录」）
-- 配置 `CAD_CI_AUDIT_TOKEN`：只选本仓库，Administration:read、Actions:read、
-  Metadata:read，无写权限，设置短有效期和轮换负责人。普通 GITHUB_TOKEN 没有
-  Runner 清单所需 Administration:read，不能假设它足够，也不能因此跳过核验。
-  凭据只进入托管准入脚本，不进入 CAD 作业、不写日志；本阶段未创建凭据。
-- 提供专用、隔离的 Windows CAD Runner，正确标签、64 位 Python、已授权的 SW2026、
-  模板、材料库及可用桌面；不要把用户日常桌面注册为长期公开仓库 Runner。
-- **跨工作流隔离必须单独解决**：本工作流的 if/Environment 不能约束另一个恶意
-  PR 新增的工作流。采用可限制指定仓库和工作流的 Runner group，或另行审查可信
-  私有控制仓库/隔离方案。当前个人公开仓库不能假定已有组织级 Runner group。
-  还需审核外部贡献者工作流审批、Runner 网络/凭据隔离和故障后的清理流程。
-- 最后用授权人员、受保护分支和独立审批实际运行远程流程，验证授权拒绝、审批阻止、
-  证据上传及异常清理，才能重新评估 READY。本地结果不能替代这一步。
+- Apply a ruleset to `main` and live-run branches requiring >= 1 approval, required CI, and restrictions on force-push and deletion; audit bypass lists and protect workflow, guard script, and CAD test sources.
+  (**Adjusted 2026-10-27**: approval count requirement removed in favor of mandatory PR + required CI + **empty bypass list**; force-push and deletion protections unchanged. See Governance Standard Adjustment Record.)
+- Create `cad-validation` with Required reviewers, Prevent self-review, protected-branch-only policy, and admin bypass disabled in UI, requiring a second eligible approver beyond the trigger actor.
+  (**Adjusted 2026-10-27**: no second approver exists in single-maintainer mode. Environment existence and protected-branch restriction remain hard gates; Required reviewers / Prevent self-review are disclosed as residual risks. Remote CAD CI remains **unreachable** under this posture, keeping B-01 `BLOCKED` pending manual disposition. See Governance Standard Adjustment Record.)
+- Configure `CAD_CI_AUDIT_TOKEN` scoped strictly to this repository with `Administration:read`, `Actions:read`, and `Metadata:read`, zero write permissions, short TTL, and a rotation owner. Standard `GITHUB_TOKEN` lacks `Administration:read` needed for runner listing—never assume it suffices or skip verification. The token enters only the hosted admission script, never the CAD job or logs; no token was created in this stage.
+- Provision a dedicated, isolated Windows CAD Runner with proper labels, 64-bit Python, licensed SW2026, templates, material libraries, and an interactive desktop; never register a daily-driver workstation as a persistent public-repo runner.
+- **Solve cross-workflow isolation independently**: `if` guards and Environments in this workflow cannot constrain a separate workflow added by a malicious PR. Use a Runner Group restricted to specific repositories and workflows, or review a trusted private control-repo / isolation design. Public personal repos cannot assume org-level Runner Groups exist. Also review external-contributor workflow approval, runner network/credential isolation, and post-failure cleanup procedures.
+- Finally, execute the remote workflow end-to-end with an authorized actor, protected branch, and independent approval—verifying unauthorized rejection, approval blocking, artifact upload, and failure cleanup—before re-evaluating `READY`. Local results cannot substitute for this step.
 
-无需为了本 PR 自动修改上述安全设置；这些是未完成的人工前置条件。
+Do not modify these security settings automatically for this PR; they are unfulfilled manual prerequisites.
 
-## 可复用入口、配置和证据协议
+## Reusable Entry Point, Configuration, and Evidence Protocol
 
 ```powershell
 $env:PYTHONUTF8 = '1'
@@ -135,39 +102,23 @@ python tests/evals/runner.py --output-dir output/offline-unique
 python tests/solidworks_golden_workflow.py --case mounting_bracket --output output/golden-unique --runs 5 --expected-terminal blocked
 ```
 
-共用入口只从 `CASE_REGISTRY` 分派已审核模块，不接受任意 Python 路径或其它后端。
-旧安装板入口兼容；新增用例需要注册契约、模型验收及对应故障证据，不自动继承验证等级。
-默认仍为严格 completed 模式；显式 blocked 模式要求五轮，只有人工复核是唯一阻塞时
-acceptance_status=passed，task_status=blocked，manual_review_required=true。
+The shared entry point dispatches only reviewed modules registered in `CASE_REGISTRY`, never arbitrary Python paths or alternate backends. The legacy mounting-bracket entry remains compatible; new cases must register contracts, model acceptance, and corresponding fault evidence rather than inheriting verification tiers automatically. Default mode remains strict `completed`; explicit `blocked` mode requires 5 runs and returns `acceptance_status=passed`, `task_status=blocked`, `manual_review_required=true` only when human review is the sole blocker.
 
-`--runtime-config` 可读 JSON，仅允许 `part_template`、`material_database`、
-`connect_timeout_seconds`（5..120）、`cleanup_timeout_seconds`（5..60）。路径相对配置文件
-解析；缺省模板复用现有模板发现，材料库从已诊断的安装目录查找英文/简体中文库。
-用例版本、材料条目、尺寸、容差、审批要求不能由配置覆盖。记录解析后的路径及 SHA-256，
-不把材料库 hash 当作材料认证。Windows、64 位 Python、COM 依赖缺失、配置不可读或
-文件不存在时保留明确 BLOCKED / acceptance failed 报告，不安装替代后端。
+`--runtime-config` reads JSON permitting only `part_template`, `material_database`, `connect_timeout_seconds` (5..120), and `cleanup_timeout_seconds` (5..60). Paths resolve relative to the config file; default templates reuse existing discovery, and material databases search English/Simplified Chinese libraries under the diagnosed install path. Case versions, material entries, dimensions, tolerances, and approval requirements cannot be overridden via config. Resolved paths and SHA-256 hashes are recorded without treating the library hash as material certification. Missing Windows/64-bit Python/COM dependencies, unreadable configs, or missing files emit explicit `BLOCKED` / `acceptance failed` reports without installing fallback backends.
 
-schema 1.2 在原有双状态、原始 Review、Core、Ledger、哈希及几何证据外，增加
-runtime_config.json、runtime_diagnostics.json、实例内核创建时间及全局唯一 trace_run_id。
-同名 run-01 也不能从其它套件复制 trace，Ledger 的 runId 与 Core 保持相同。PID 与创建时间共同
-识别实例，避免 Windows 重用 PID 造成假失败。Core trace 必须关联同一 run/step、
-验证副本一致、顺序正确且只有一个准确终态。符号链接、junction、硬链接和越界路径
-在哈希或写入前拒绝，报告写入失败的回退路径也不能覆盖外部文件。
+Schema 1.2 extends dual-status, raw Review, Core, Ledger, hashes, and geometry evidence with `runtime_config.json`, `runtime_diagnostics.json`, OS process creation timestamps, and a globally unique `trace_run_id`. Even identically named `run-01` folders cannot copy traces across suites, and Ledger `runId` matches Core. PID + creation time jointly identify instances to avoid false failures from Windows PID reuse. Core traces must share one run/step, match verification copies, follow valid event order, and emit exactly one terminal event. Symlinks, junctions, hard links, and out-of-bounds paths are rejected prior to hashing or writing, and fallback write paths on report-write failure cannot overwrite external files.
 
-输出目录必须不存在；重复运行直接拒绝，旧证据不覆盖。只关闭本轮拥有的文档，只有
-拥有进程且无未知文档时才请求退出，不全局杀进程。COM 单次调用永久挂起仍无法靠
-连接/清理超时彻底解决；异常后必须由操作者核查拥有关系，不将未知清理结果当作通过。
+The output directory must not exist; duplicate runs are rejected immediately without overwriting historical evidence. Teardown closes only documents owned by the current run and requests `ExitApp` only when the run owns the process and zero unknown documents remain—never killing processes globally. Permanent hangs inside a single COM call cannot be fully solved by connect/cleanup timeouts; operators must inspect ownership after aborts rather than treating unknown cleanup outcomes as passing.
 
-## 核查依据
+## Verification References
 
-- [GitHub Environment REST 与权限](https://docs.github.com/en/rest/deployments/environments)
-- [Runner 清单所需 Administration:read](https://docs.github.com/en/rest/actions/self-hosted-runners)
-- [Runner group 工作流访问限制与公开仓库风险](https://docs.github.com/en/actions/how-tos/manage-runners/self-hosted-runners/manage-access)
+- [GitHub Environments REST API and permissions](https://docs.github.com/en/rest/deployments/environments)
+- [`Administration:read` required for self-hosted runner listing](https://docs.github.com/en/rest/actions/self-hosted-runners)
+- [Runner group workflow access restrictions and public repository risks](https://docs.github.com/en/actions/how-tos/manage-runners/self-hosted-runners/manage-access)
 
-## 本阶段完整修改清单
+## Complete File Manifest for This Stage
 
-以下 12 个文件为 P0-1.2 变更；PR 相对 main 另外保留 golden-workflows.yaml 和两份历史证据索引，
-共 15 个文件。历史索引不参与本阶段新协议的通过统计。
+The 12 files below are P0-1.2 changes; relative to `main`, the PR also includes `golden-workflows.yaml` and two historical evidence indexes (15 files total). Historical indexes are excluded from this stage's new-protocol pass counts.
 
 ```text
 .github/actionlint.yaml
@@ -184,33 +135,25 @@ docs/architecture/real-golden-merge-readiness.md
 docs/architecture/evidence/p0-12-real-golden-2026-10-23.json
 ```
 
-## 失败及修复记录
+## Failure and Remediation Log
 
-- 新增“配置缺失”用例初次失败，暴露测试适配层把 `success=false` 和 `blocked` 同传后，
-  Core 按工具失败归类。修正为前置阻断仅传 `blocked`，不改生产 Core；该情况仍是
-  task blocked / acceptance failed，不能通过 expected-terminal 模式。
-- 首次全量为 6 failed / 956 passed / 1 skipped，六项旧 CLI 测试出现 Windows 父子进程
-  UTF-8 / GBK 解码不一致。统一 `PYTHONUTF8=1` 后全量通过；原失败日志保留。
-- 首次 actionlint 不认识自定义 CAD 标签，增加项目配置后通过；原失败日志保留。
-- 一次辅助进程查询误用不存在的 sw_api 模块，改用现有 scripts.sw_process；该查询没有
-  启动或关闭 CAD。开发阶段故障注入均为合成输入，不计入真实 CAD 统计。
+- New "missing config" test failed initially, exposing that the test adapter passed `success=false` alongside `blocked`, causing Core to classify it as a tool failure. Fixed pre-flight blocks to pass `blocked` only without modifying production Core; this case remains `task blocked` / `acceptance failed` and cannot pass `expected-terminal` mode.
+- First full run hit 6 failed / 956 passed / 1 skipped due to UTF-8 vs. GBK decoding mismatches across Windows parent/child processes in six legacy CLI tests. Enforcing `PYTHONUTF8=1` passed the full suite; original failure log preserved.
+- First `actionlint` run rejected custom CAD runner labels; adding project config resolved it, with the original failure log preserved.
+- One auxiliary process probe mistakenly imported a non-existent `sw_api` module and was switched to existing `scripts.sw_process`; the probe neither launched nor closed CAD. All development fault injections used synthetic inputs and are excluded from live CAD stats.
 
-补充回归覆盖链接及硬链接保护、跨套件 trace 互换、事件乱序、错误 step、多重终态、
-Verification 副本不一致、PID 重用、重复目录和越权配置。原有错误孔径、孔位、缺产物、
-Review WARN/FAIL、清理失败、Ledger/哈希及 CLI 非零退出回归全部保留。
+Added regressions cover symlink/hardlink guards, cross-suite trace swaps, out-of-order events, wrong step IDs, multiple terminal events, mismatched Verification copies, PID reuse, duplicate directories, and disallowed config keys. Existing regressions for wrong hole diameters/positions, missing artifacts, Review WARN/FAIL, cleanup failures, Ledger/hash checks, and non-zero CLI exits remain intact.
 
-## 实际验收结果（2026-10-23）
+## Actual Acceptance Results (2026-10-23)
 
-真实执行代码提交为 `bbdda7c00f077f58baeffe97e075666b078dfe7e`；随后提交仅补文档和证据索引。
+Live execution commit: `bbdda7c00f077f58baeffe97e075666b078dfe7e`; subsequent commits added only documentation and evidence indexes.
 
-- 离线全量：**963 passed / 1 skipped**（104.44 秒）。跳过项为尚未生成桌面内嵌 Skill 的
-  既有发布包检查，没有把它记作通过。
-- CI 策略：**26/26** 合成快照故障注入通过；actionlint 通过。这些不是远程授权执行记录。
-- deterministic mock eval：**37** 场景符合预期，escaped false completion 为 **0**，
-  单独存储于 offline/eval；不计入下面的真实 CAD 数据。
-- 本机真实 **SolidWorks 2026 SP01.1（34.1.1）** 五轮独立运行全部通过验收，命令退出码 **0**。
+- Full offline suite: **963 passed / 1 skipped** (104.44 s). The skipped item is the existing release check for unbuilt desktop bundled skills and was not counted as passing.
+- CI policy: **26/26** synthetic snapshot fault-injection tests passed; `actionlint` passed. These are not remote authorized execution records.
+- Deterministic mock eval: **37** scenarios matched expectations with **0** escaped false completions, stored separately under `offline/eval` and excluded from live CAD figures below.
+- Local live **SolidWorks 2026 SP01.1 (34.1.1)**: all five independent runs passed acceptance with command exit code **0**.
 
-| 轮次 | 实际 PID | 原生 / STEP 体积 mm³ | task_status | acceptance_status | 清理 |
+| Run | Actual PID | Native / STEP Volume (mm³) | `task_status` | `acceptance_status` | Cleanup |
 | --- | --- | --- | --- | --- | --- |
 | 1 | 48492 | 94460.6196 / 94460.6196 | blocked | passed | PASS |
 | 2 | 12520 | 94460.6196 / 94460.6196 | blocked | passed | PASS |
@@ -218,32 +161,23 @@ Review WARN/FAIL、清理失败、Ledger/哈希及 CLI 非零退出回归全部�
 | 4 | 47668 | 94460.6196 / 94460.6196 | blocked | passed | PASS |
 | 5 | 49280 | 94460.6196 / 94460.6196 | blocked | passed | PASS |
 
-五轮均验证真实尺寸 120×80×10 mm、四个 Ø7 贯穿孔和 ±48/±28 mm 孔位、材料回读及密度、
-两张完全定义草图、特征健康、SLDPRT 保存重开、STEP 导出回读和四视角预览。
-Review 规则均为 PASS / 100，`manual_review_required=true`；Core 验证均 PASS，实际终态均
-run.blocked、Recovery=user_action_required，唯一阻塞为 EXPECTED_MANUAL_REVIEW_REQUIRED。
+All five runs verified actual 120×80×10 mm dimensions, four Ø7 through-holes at ±48/±28 mm, material and density readback, two fully defined sketches, feature health, SLDPRT save-and-reopen, STEP re-import readback, and four-view previews. All Review rules scored PASS / 100 with `manual_review_required=true`; Core verification passed with terminal state `run.blocked`, `Recovery=user_action_required`, and sole blocker `EXPECTED_MANUAL_REVIEW_REQUIRED`.
 
-几何成功率 **5/5=100%**；预期门禁正确率 **5/5=100%**；Task Completion **0**；
-Test Acceptance **5**；False Completion **0**；清理成功率 **5/5=100%**。
-PID+创建时间及 trace_run_id 均独立，最终无 SolidWorks 测试文档或进程残留，未关闭用户已有实例。
-每轮 19 项文件，共 **95 项 SHA-256** 与 Ledger、原始 Review、快照和 Core trace 重新读取一致。
-五轮无真机失败；保留全部开发失败记录。用相同真实证据复核严格 completed 模式仍为
-acceptance failed / task blocked，未启动额外 CAD 或改写原报告。
+Geometry pass rate **5/5 (100%)**; expected-gate accuracy **5/5 (100%)**; Task Completion **0**; Test Acceptance **5**; False Completion **0**; cleanup pass rate **5/5 (100%)**. Each run had a distinct PID + creation time and `trace_run_id`, left zero residual SolidWorks test documents or processes, and did not close any existing user instance. All 19 files per run (**95 SHA-256 hashes** total) matched Ledger, raw Review, snapshots, and Core traces on re-read. Zero live-run failures occurred across the five runs; all development failure logs remain preserved. Re-evaluating the same live evidence under strict `completed` mode still yielded `acceptance failed` / `task blocked` without launching CAD or altering original reports.
 
-实际运行命令（工作目录为仓库根目录）：
+Actual command executed (working directory = repository root):
 
 ```powershell
 $env:PYTHONUTF8 = '1'
 python tests/solidworks_golden_workflow.py --case mounting_bracket --output output/p0-12-real-five-01 --runs 5 --expected-terminal blocked --runtime-config output/p0-12-runtime.json
 ```
 
-> 该命令为当时实际执行记录，`output/p0-12-runtime.json` 是未入库的本机配置。
-> 外部复现请改用 `config/runtime.example.json`（`null` 路径 = 自动探测），并更换尚不存在的输出目录。
+> This records the actual command executed at the time; `output/p0-12-runtime.json` is an uncommitted local config.
+> For external reproduction, use `config/runtime.example.json` (`null` paths = auto-discovery) and a new non-existent output directory.
 
-本次 JSON 配置显式指定本机已经安装的原厂材料库，模板自动发现；安装路径和库文件 hash
-记录在报告中，未写入代码默认值。此结果仅覆盖该 2026 安装和精确材料条目，不声称验证其它版本。
+The JSON config explicitly pointed to the locally installed stock material database while templates used auto-discovery; install paths and library hashes are logged in reports rather than hard-coded as defaults. Results cover only this 2026 installation and exact material entry, with no claim for other versions.
 
-证据目录：
+Evidence locations:
 
 ```text
 <worktree-p0-real-golden-2026>/output/p0-12-real-five-01
@@ -251,19 +185,14 @@ python tests/solidworks_golden_workflow.py --case mounting_bracket --output outp
 <worktree-p0-real-golden-2026>/output/p0-12-evidence-20261023.zip
 ```
 
-> 该批证据产生于 P0-1.2 阶段的独立 worktree（`p0-real-golden-2026`），路径随 worktree 所在磁盘位置变化，
-> 故以占位符表示。证据包未入库，只在维护者本机保留。
+> These artifacts were produced in a dedicated P0-1.2 worktree (`p0-real-golden-2026`); the path varies by local disk layout and is represented with a placeholder. The archive is uncommitted and retained locally by the maintainer.
 
-证据包共 121 个文件（含总哈希清单）；SHA-256：
+Evidence archive contains 121 files (including master hash manifest); SHA-256:
 
 ```text
 ce64a118beef1ac562641a61698b301fc793ef6a81084327988226f89a6af7ed
 ```
 
-[本阶段证据索引](evidence/p0-12-real-golden-2026-10-23.json) 记录各轮报告 hash、实例创建时间、
-唯一 trace、实际配置和 GitHub 设置快照。完整 CAD、预览及失败日志在本地证据包中；
-大文件没有加入 Git，也没有上传远程 CI。历史两阶段证据保持原样。
+The [stage evidence index](evidence/p0-12-real-golden-2026-10-23.json) records per-run report hashes, instance creation timestamps, unique traces, effective config, and GitHub settings snapshots. Complete CAD files, previews, and failure logs reside in the local archive; large binaries were neither committed to Git nor uploaded to remote CI. Both prior historical evidence stages remain untouched.
 
-**合并建议仍为 BLOCKED**：本机验收与代码回归已通过，但缺少受控远程执行所需的 GitHub
-配置、Runner 隔离证据和实际远程验收；请保持 Draft。另保留 Core 仅终态适配、COM 永久
-挂起恢复及无人复核自动审查均未验证的范围限制。
+**Merge recommendation remains BLOCKED**: local acceptance and code regressions passed, but required GitHub settings, runner isolation evidence, and live remote execution for controlled remote CI are still missing; keep the PR in Draft. Scope limitations also remain for Core terminal-adaptation-only coverage, permanent COM hang recovery, and unverified unattended automated review.

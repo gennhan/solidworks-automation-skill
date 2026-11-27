@@ -1,64 +1,64 @@
-# SolidWorks Automation Skill V2 架构审计报告
+# SolidWorks Automation Skill V2 Architecture Audit Report
 
-> 版本：Phase 1（架构审计）
-> 状态：**历史快照**。本报告是 Phase 1 的审计结论，Phase 2–8 已按其方案落地；
-> 文中"待确认后进入 Phase 2"等时点表述不再代表当前状态。
-> 当前能力状态以 `capabilities.yaml` 为准，发布就绪性以 PR #43 与发布阻断清单为准。
-> 范围：仓库 `wzyn20051216/solidworks-automation-skill` 主分支完整阅读
-> 原则：先审计、不修改代码；本文档只陈述事实与最小改造方案，不包含任何已落地代码。
-
----
-
-## 0. 审计范围与方法
-
-已完整阅读：
-
-- 顶层文档：`README.md`、`SKILL.md`、`SUBSKILLS.md`、`capabilities.yaml`、`golden-workflows.yaml`
-- 路由/能力：`scripts/capabilities.py`、`scripts/backend_router.py`、`references/language-backend-routing.md`
-- 审查/自检：`scripts/sw_review.py`、`scripts/sw_preflight.py`
-- 桌面运行时：`apps/desktop/cad_workbench/` 下 `queue_worker.py`、`reviewer_gate.py`、`artifact_ledger.py`、`worker_health.py`、`agent_contracts.py`、`agent_providers.py`、`knowledge_retrieval.py`、`engineering_orchestrator.py`、`core.py`
-- MCP：`mcp-server/server.py`（约 3500 行）、`mcp-server/README.md`
-- CLI：`scripts/cad_studio.py`
-- 文档：`docs/agent-framework/enterprise-agent-control-plane.md`、`docs/product-mvp-spec.md`、`docs/skill-map.md`
-- 测试：`tests/fakes.py`、`tests/test_cad_reliability.py`、`tests/test_workbench_queue_worker.py` 等测试目录全景
-- 打包/CI：`pyproject.toml`、`scripts/sync_bundled_skill.py`、`.github/workflows/windows-cad-regression.yml`
-
-审计结论：**本项目已经拥有远超一般 Skill 的可靠执行思想**——能力真源、后端路由、策略门禁、队列租约、心跳、stale 恢复、Artifact Ledger、Reviewer Gate、JSONL 事件流、几何证据都已存在，只是**分散在多个模块里，没有收敛成一个统一、可复用、可测试的 "Execution Core"**。V2 的本质是把这些已有能力**工程化为一个轻量执行可靠性层**，而不是重写、不是新增用户入口、更不是做通用 Agent Framework。
+> Version: Phase 1 (Architecture Audit)
+> Status: **Historical Snapshot**. This report records Phase 1 audit conclusions; Phases 2–8 have already been implemented following this plan,
+> so point-in-time phrases like "proceed to Phase 2 after confirmation" no longer reflect current status.
+> Refer to `capabilities.yaml` for current capability levels and PR #43 / the release blocker checklist for release readiness.
+> Scope: Full read of the `main` branch of `wzyn20051216/solidworks-automation-skill`
+> Principle: Audit first, modify no code; this document states facts and a minimal refactoring plan without containing implemented code.
 
 ---
 
-## 1. 当前真实架构
+## 0. Audit Scope and Methodology
 
-### 1.1 三个用户入口（已确认，保持不变）
+Read in full:
 
-| 入口 | 落点 | 用户操作 |
+- Top-level docs: `README.md`, `SKILL.md`, `SUBSKILLS.md`, `capabilities.yaml`, `golden-workflows.yaml`
+- Routing/Capabilities: `scripts/capabilities.py`, `scripts/backend_router.py`, `references/language-backend-routing.md`
+- Review/Preflight: `scripts/sw_review.py`, `scripts/sw_preflight.py`
+- Desktop runtime (`apps/desktop/cad_workbench/`): `queue_worker.py`, `reviewer_gate.py`, `artifact_ledger.py`, `worker_health.py`, `agent_contracts.py`, `agent_providers.py`, `knowledge_retrieval.py`, `engineering_orchestrator.py`, `core.py`
+- MCP: `mcp-server/server.py` (~3,500 lines), `mcp-server/README.md`
+- CLI: `scripts/cad_studio.py`
+- Docs: `docs/agent-framework/enterprise-agent-control-plane.md`, `docs/product-mvp-spec.md`, `docs/skill-map.md`
+- Tests: `tests/fakes.py`, `tests/test_cad_reliability.py`, `tests/test_workbench_queue_worker.py`, and full test tree overview
+- Packaging/CI: `pyproject.toml`, `scripts/sync_bundled_skill.py`, `.github/workflows/windows-cad-regression.yml`
+
+Audit conclusion: **This project already embodies reliable-execution principles far beyond a typical skill**—a capability source of truth, backend router, policy gate, queue leases, heartbeats, stale recovery, Artifact Ledger, Reviewer Gate, JSONL event stream, and geometric evidence all exist, yet remain **scattered across modules rather than consolidated into a unified, reusable, testable "Execution Core"**. The essence of V2 is to **engineer these existing capabilities into a lightweight execution reliability layer**—not a rewrite, not a new user entry point, and certainly not a generic Agent Framework.
+
+---
+
+## 1. Current Real Architecture
+
+### 1.1 Three User Entry Points (Confirmed, Kept Unchanged)
+
+| Entry Point | Location | User Interaction |
 |---|---|---|
-| **Skill** | `SKILL.md` + `scripts/` + `references/` + `subskills/` | 安装后对 Codex / Claude / Cursor / OpenClaw 说话，Agent 读 SOP 并调用脚本 |
-| **MCP** | `mcp-server/server.py`（FastMCP + Pydantic，stdio） | 安装后 Agent 自动 Tool Calling |
-| **CAD Studio** | `apps/workbench-ui/`（React+Tauri 前端）+ `apps/desktop/cad_workbench/`（Python worker）+ `scripts/cad_studio.py`（队列 CLI） | 图形界面提交任务 / CLI 操作队列 |
+| **Skill** | `SKILL.md` + `scripts/` + `references/` + `subskills/` | After installation, talk to Codex / Claude / Cursor / OpenClaw; the agent reads SOPs and runs scripts |
+| **MCP** | `mcp-server/server.py` (FastMCP + Pydantic, stdio) | Agent performs structured tool calling after installation |
+| **CAD Studio** | `apps/workbench-ui/` (React+Tauri frontend) + `apps/desktop/cad_workbench/` (Python worker) + `scripts/cad_studio.py` (queue CLI) | Submit jobs via desktop GUI or manage the queue via CLI |
 
-> 注意：`scripts/cad_studio.py` 的 `doctor/run/status/retry/cancel/...` 子命令是 **CAD Studio 的附属 CLI**，不是第四个用户入口。V2 的 debug/eval 命令（若需要）应挂在这里，而不是新建 CLI。
+> Note: Subcommands in `scripts/cad_studio.py` (`doctor`/`run`/`status`/`retry`/`cancel`/...) are **CAD Studio's companion CLI**, not a fourth user entry point. Any V2 debug/eval commands should live there instead of creating a new CLI.
 
-### 1.2 模块职责现状（与 V2 统一概念对照）
+### 1.2 Current Module Responsibilities vs. Unified V2 Concepts
 
-| V2 统一概念 | 当前实现 | 成熟度 |
+| Unified V2 Concept | Current Implementation | Maturity |
 |---|---|---|
-| Skill（知识/SOP/开放规则） | `SKILL.md`、`SUBSKILLS.md`、`subskills/*`、`references/*` | 强 |
-| MCP（协议） | `mcp-server/server.py`（约 60 工具，白名单、串行） | 强 |
-| Capability Registry | `capabilities.yaml` + `scripts/capabilities.py` | **强（唯一真源已存在）** |
-| Backend Router | `scripts/capabilities.py::resolve_operation_backend` + `backend_router.py` | **强（已存在）** |
-| Execution Core | **无独立模块**，逻辑散落在 `queue_worker.py` / `sw_review.py` / `reviewer_gate.py` | **缺失（V2 目标）** |
-| Worker | `queue_worker.py`（lease/heartbeat/cancel/stale/quarantine） | 强 |
-| Reviewer | `sw_review.py`（CAD 几何）+ `reviewer_gate.py`（文件事实）+ DFM/Routing/工程图证据 | 强 |
-| Artifact Ledger | `artifact_ledger.py`（SHA-256、producedThisRun） | 强 |
-| Trace | `queue_worker.py::append_event`（JSONL，job 级）+ stdout/stderr 日志 | 部分（job 级，无 run/step 统一模型） |
-| Golden Workflow Eval | `golden-workflows.yaml`（仅静态校验，无执行基准） | **缺失（V2 目标）** |
+| Skill (knowledge/SOP/open rules) | `SKILL.md`, `SUBSKILLS.md`, `subskills/*`, `references/*` | Strong |
+| MCP (protocol) | `mcp-server/server.py` (~60 tools, allowlisted, serialized) | Strong |
+| Capability Registry | `capabilities.yaml` + `scripts/capabilities.py` | **Strong (sole source of truth exists)** |
+| Backend Router | `scripts/capabilities.py::resolve_operation_backend` + `backend_router.py` | **Strong (already exists)** |
+| Execution Core | **No standalone module**; logic scattered across `queue_worker.py` / `sw_review.py` / `reviewer_gate.py` | **Missing (V2 target)** |
+| Worker | `queue_worker.py` (lease/heartbeat/cancel/stale/quarantine) | Strong |
+| Reviewer | `sw_review.py` (CAD geometry) + `reviewer_gate.py` (file facts) + DFM/Routing/Drawing evidence | Strong |
+| Artifact Ledger | `artifact_ledger.py` (SHA-256, `producedThisRun`) | Strong |
+| Trace | `queue_worker.py::append_event` (JSONL, job-level) + stdout/stderr logs | Partial (job-level; no unified run/step model) |
+| Golden Workflow Eval | `golden-workflows.yaml` (static validation only, no execution benchmark) | **Missing (V2 target)** |
 
 ---
 
-## 2. 当前真实调用链路
+## 2. Current Call Chains
 
-### 2.1 Skill 链路（Agent 直接执行脚本）
+### 2.1 Skill Path (Agent Invokes Scripts Directly)
 
 ```
 LLM Agent (Codex/Claude/OpenClaw)
@@ -71,9 +71,9 @@ LLM Agent (Codex/Claude/OpenClaw)
                  └─ 能力缺口：references/api-lookup.md → 官方 API Help/SDK → alternate backend → 最小实现 → 真机 → Review → 沉淀
 ```
 
-关键点：Skill 链路的执行由**上层 Agent 直接驱动**，没有本地 Runtime 拦截。可靠执行的约束主要靠 **SKILL.md 的规则文本**（"结果自审查""未封装 API 规则""不得只报告保存成功"）落到 Agent 行为上。这意味着 **Execution Core 无法直接改写 Skill 路径**，它只能作为 Worker / MCP 的底层公共能力逐步复用；Skill 路径继续靠 SOP 文本 + `sw_review.py` 作为 Reviewer 指令。
+Key point: Execution on the Skill path is driven **directly by the upper-layer agent** with no local runtime interceptor. Reliability constraints rest primarily on **SOP rules in `SKILL.md`** ("self-review results", "unwrapped API rules", "never report save-success alone"). Therefore **Execution Core cannot directly rewrite the Skill path**; it serves as a shared underlying layer reused incrementally by Worker and MCP, while the Skill path continues relying on SOP instructions plus `sw_review.py`.
 
-### 2.2 MCP 链路（串行白名单工具）
+### 2.2 MCP Path (Serialized Allowlisted Tools)
 
 ```
 Agent → MCP tool call
@@ -86,9 +86,9 @@ Agent → MCP tool call
                  └─ 异常 → _tool_error(结构化 status/error_type/message/suggestion)
 ```
 
-关键点：MCP 已经**严格串行 + 锁超时 + 结构化错误 + 惰性加载 + `solidworks_recover` 模态对话框诊断**。这是最稳定的模块，V2 明确**不动**。
+Key point: MCP already enforces **strict serialization, lock timeouts, structured errors, lazy loading, and modal-dialog diagnostics via `solidworks_recover`**. As the most stable module, V2 explicitly leaves it **untouched**.
 
-### 2.3 CAD Studio 链路（Worker + 门禁 + 账本 + 复核）
+### 2.3 CAD Studio Path (Worker + Gates + Ledger + Review)
 
 ```
 UI/CLI → 写 Job JSON 到 queue 目录
@@ -110,127 +110,127 @@ UI/CLI → 写 Job JSON 到 queue 目录
   └─ write_worker_health()
 ```
 
-关键点：**CAD Studio Worker 已经是事实上的 "Execution Runtime"**——它有 queue、policy gate、capability gate、ledger、reviewer gate、heartbeat、stale recovery、JSONL 事件流。V2 的 Execution Core 应作为这一链路里 "handler → verification → recovery decision" 的**统一抽象**，而不是另起炉灶替代 Queue/Worker/Ledger。
+Key point: **CAD Studio Worker is already a de facto "Execution Runtime"** with queue, policy gate, capability gate, ledger, reviewer gate, heartbeats, stale recovery, and JSONL event streaming. V2's Execution Core should serve as the **unified abstraction** for `handler → verification → recovery decision` inside this pipeline rather than replacing Queue, Worker, or Ledger.
 
 ---
 
-## 3. 已存在且可直接复用的能力盘点
+## 3. Inventory of Existing Reusable Capabilities
 
-### 3.1 Retry（分散、非统一）
+### 3.1 Retry (Scattered, Non-Uniform)
 
-| 位置 | 机制 |
+| Location | Mechanism |
 |---|---|
-| `scripts/sw_macro_guard.py` | VBA 宏校验失败重试 1–2 次 + 本地模板兜底（立方体/圆柱/拉伸/草图） |
-| `scripts/sw_assembly.py::add_component` | `AddComponent4` 失败 → `AddComponent5` 重试（SW2024 中文版） |
-| `scripts/sw_connect.py` / `sw_part.py` | 中英文基准面名称兜底切换 |
-| `queue_worker.py` | `QUEUE_WRITE_RETRIES=24` 原子文件替换退避（Windows 文件锁） |
-| `engineering_orchestrator.py::RetryPolicy` | 阶段级 `max_attempts/strategy/retryable_failures/fallback`（**规划层，非执行层**） |
+| `scripts/sw_macro_guard.py` | Retries failed VBA macro validation 1–2 times + local template fallbacks (cube/cylinder/extrude/sketch) |
+| `scripts/sw_assembly.py::add_component` | `AddComponent4` failure → retry via `AddComponent5` (SW2024 localized) |
+| `scripts/sw_connect.py` / `sw_part.py` | Localized/English reference plane name fallback |
+| `queue_worker.py` | `QUEUE_WRITE_RETRIES=24` atomic file-replace backoff (Windows file locks) |
+| `engineering_orchestrator.py::RetryPolicy` | Stage-level `max_attempts/strategy/retryable_failures/fallback` (**planning layer, not execution layer**) |
 
-结论：重试思想已存在，但**没有结构化错误分类驱动的执行层重试**。V2 的 Recovery Engine 要把它统一为「分类 → 决策」，而不是再写一个 `try/except/retry 3`。
+Conclusion: Retry concepts exist, but there is **no structured error-classification-driven execution retry layer**. V2's Recovery Engine unifies this as "classify → decide" instead of adding yet another `try/except/retry 3`.
 
-### 3.2 Review / Verification（强，双层级互补）
+### 3.2 Review / Verification (Strong, Dual-Layer Complementary)
 
-- **CAD 几何层**：`scripts/sw_review.py` — `run_review` / `evaluate_review_report` / `collect_geometry_measurements` / `validate_hole_positions` / `inspect_pdf_text_layout` / `review_drawing_layout`；输出 `pass/warn/fail` + `manual_review_required` + `retryable`。
-- **文件事实层**：`reviewer_gate.py::evaluate_ledger` — 文件存在/非空/SHA-256/格式特征（STEP/STL/DXF/PDF/DWG 头标记）+ 规格一致性（外形三元尺寸、孔径）。
-- **领域证据层**：`dfm_review.py`、`routing_review.py`、`sw_drawing_review.py`、FEA 证据、工程图子技能 `drawing_review.py`。
+- **CAD geometry layer**: `scripts/sw_review.py` — `run_review` / `evaluate_review_report` / `collect_geometry_measurements` / `validate_hole_positions` / `inspect_pdf_text_layout` / `review_drawing_layout`; outputs `pass/warn/fail` + `manual_review_required` + `retryable`.
+- **File-fact layer**: `reviewer_gate.py::evaluate_ledger` — existence, non-empty size, SHA-256, format headers (STEP/STL/DXF/PDF/DWG), and spec consistency (3D bounding dimensions, hole diameters).
+- **Domain evidence layer**: `dfm_review.py`, `routing_review.py`, `sw_drawing_review.py`, FEA evidence, and drawing subskill `drawing_review.py`.
 
-结论：**Reviewer 已经很强，严禁重造。** Execution Core 的 Verification Adapter 只做「调用现有 Review + 解释结果 + 决定状态」。
+Conclusion: **Reviewers are already strong—do not rebuild them.** Execution Core's Verification Adapter solely "invokes existing reviews, interprets outcomes, and determines status".
 
-### 3.3 Routing（强，唯一真源已存在）
+### 3.3 Routing (Strong, Sole Source of Truth Exists)
 
-`scripts/capabilities.py` 已提供：`load_capabilities`、`capability_index`、`backend_index`、`operation_route_index`、`resolve_operation_backend`、`capability_level`、`unattended_allowed`、`capability_snapshot`、`backend_route_snapshot`。
+`scripts/capabilities.py` already provides `load_capabilities`, `capability_index`, `backend_index`, `operation_route_index`, `resolve_operation_backend`, `capability_level`, `unattended_allowed`, `capability_snapshot`, and `backend_route_snapshot`.
 
-`resolve_operation_backend` 已实现：语义过滤（automation_equivalent/exact_native...）、版本 blocker（`KNOWN_HOST_REVISION_BLOCKER`）、加载项/许可证要求（`MISSING_RUNTIME_REQUIREMENT`）、候选优先级、`unavailable`（无兼容后端）。
+`resolve_operation_backend` already implements semantic filtering (`automation_equivalent`/`exact_native`...), revision blockers (`KNOWN_HOST_REVISION_BLOCKER`), add-in/license requirements (`MISSING_RUNTIME_REQUIREMENT`), candidate prioritization, and `unavailable` (no compatible backend).
 
-结论：**Backend Router 已完整。** `scripts/core/capability.py` 只能是 Adapter/Facade，绝不能复制这套逻辑。
+Conclusion: **Backend Router is complete.** `scripts/core/capability.py` must strictly be an Adapter/Facade and never duplicate this logic.
 
-### 3.4 Trace / Logs（job 级 JSONL 已存在）
+### 3.4 Trace / Logs (Job-Level JSONL Already Exists)
 
-`queue_worker.py` 已有：
-- `append_event()` → `queue/events/{job_id}.jsonl`，事件名如 `run.claimed` / `step.started` / `run.heartbeat` / `run.blocked` / `run.failed` / `run.passed` / `policy.approval_required` / `artifact.ledger_written` / `review.gate_completed`。
-- `logs/{job_id}.stdout.log` / `.stderr.log`。
+`queue_worker.py` already provides:
+- `append_event()` → `queue/events/{job_id}.jsonl`, with events such as `run.claimed`, `step.started`, `run.heartbeat`, `run.blocked`, `run.failed`, `run.passed`, `policy.approval_required`, `artifact.ledger_written`, and `review.gate_completed`.
+- `logs/{job_id}.stdout.log` / `.stderr.log`.
 
-结论：JSONL 事件流已存在，但**是 job 维度、无统一 `run_id/trace_id/step_id/parent_step_id` 模型**，且与 Artifact Ledger 的职责边界在文档上未固化。V2 Trace 复用现有 `queue/` 目录与 JSONL 追加语义，补上统一 step 维度。
+Conclusion: JSONL event streaming exists, but is **job-scoped without a unified `run_id/trace_id/step_id/parent_step_id` model**, and its boundary vs. Artifact Ledger is not yet codified in documentation. V2 Trace reuses `queue/` and append-only JSONL semantics while adding unified step-level metadata.
 
-### 3.5 Queue State / Worker Health（强）
+### 3.5 Queue State / Worker Health (Strong)
 
-`queue_worker.py`：`read_job/write_job`（原子）、`acquire_lock/release_lock`（OS 文件锁 + lease）、`recover_stale_jobs`、`quarantine_bad_job`、`mark_job_claimed`、`refresh_job_heartbeat`、`request_cancel`、取消标记、`watch_queue`。
-`worker_health.py`：`write_worker_health`、`count_jobs`、`health_level`（healthy/attention/warning/error）。
+`queue_worker.py`: `read_job/write_job` (atomic), `acquire_lock/release_lock` (OS file lock + lease), `recover_stale_jobs`, `quarantine_bad_job`, `mark_job_claimed`, `refresh_job_heartbeat`, `request_cancel`, cancellation flags, `watch_queue`.
+`worker_health.py`: `write_worker_health`, `count_jobs`, `health_level` (`healthy`/`attention`/`warning`/`error`).
 
-Job 终态：`passed / review_required / failed / cancelled / blocked`；非可执行态：`approval_required`。
+Job terminal states: `passed / review_required / failed / cancelled / blocked`; non-runnable state: `approval_required`.
 
-结论：**Queue 与 Worker 是稳定的、不可替代的。** Execution Core 不替代它们。
+Conclusion: **Queue and Worker are stable and irreplaceable.** Execution Core does not replace them.
 
-### 3.6 Artifact Ledger（强）
+### 3.6 Artifact Ledger (Strong)
 
-`artifact_ledger.py`：`sha256_file`、`collect_artifact_paths`、`describe_artifact`（exists/size/sha256/**producedThisRun** via baseline snapshot）、`build_artifact_ledger`、`write_artifact_ledger`。
+`artifact_ledger.py`: `sha256_file`, `collect_artifact_paths`, `describe_artifact` (exists/size/sha256/**`producedThisRun`** via baseline snapshot), `build_artifact_ledger`, `write_artifact_ledger`.
 
-结论：**Artifact Ledger = 交付事实**，已完整。Trace 不许复制它。
+Conclusion: **Artifact Ledger = delivery facts** and is complete. Trace must never duplicate it.
 
-### 3.7 Error Handling（弱，无结构化分类）
+### 3.7 Error Handling (Weak, Lacks Structured Classification)
 
-现状：`sw_preflight` 有 `DependencyInstallDeclined`/`SolidWorksNotInstalledError`；MCP 有 `_tool_error` 结构化 payload；`queue_worker` 有 `JobCancelled`/`JobBlocked`/兜底 `except Exception → failed`。
+Current state: `sw_preflight` has `DependencyInstallDeclined`/`SolidWorksNotInstalledError`; MCP has structured `_tool_error` payloads; `queue_worker` has `JobCancelled`/`JobBlocked` and fallback `except Exception → failed`.
 
-缺失：**没有 `TRANSIENT/INVALID_ARGUMENT/ENVIRONMENT_MISSING/TOOL_UNAVAILABLE/BACKEND_UNAVAILABLE/VERIFICATION_FAILED/USER_ACTION_REQUIRED/POLICY_BLOCKED/CAPABILITY_GAP/FATAL` 分类**，也没有对应的统一 `RecoveryDecision`。
+Gap: **No structured `TRANSIENT/INVALID_ARGUMENT/ENVIRONMENT_MISSING/TOOL_UNAVAILABLE/BACKEND_UNAVAILABLE/VERIFICATION_FAILED/USER_ACTION_REQUIRED/POLICY_BLOCKED/CAPABILITY_GAP/FATAL` taxonomy**, nor a unified `RecoveryDecision`.
 
-### 3.8 Policy Gate（强）
+### 3.8 Policy Gate (Strong)
 
-`agent_contracts.py`：`DANGEROUS_CAPABILITIES`、`policy_reasons`、`require_policy_approval`、`is_policy_approved`（批准范围复核：批准后原因变化会重新拦截）。
+`agent_contracts.py`: `DANGEROUS_CAPABILITIES`, `policy_reasons`, `require_policy_approval`, `is_policy_approved` (approval-scope re-check intercepts again if risk reasons change post-approval).
 
-结论：Policy Gate 已权威。Execution Core 的 `POLICY_BLOCKED` 分类只能尊重它，**Runtime 不得绕过**。
+Conclusion: Policy Gate is authoritative. Execution Core's `POLICY_BLOCKED` classification must strictly honor it; **Runtime may never bypass Policy Gate**.
 
-### 3.9 Capability Gap 开放机制（Skill 层已有，代码层缺失）
+### 3.9 Open Capability Gap Mechanism (Exists in Skill Docs, Missing in Code)
 
-现状：**完全在 SKILL.md / references 文本层**：
-- `SKILL.md` "未封装 API 规则"：现有能力不足 → 查 `references/api-lookup.md` → 官方 API Help / 本地 SDK → `references/language-backend-routing.md` 找 alternate backend → 最小实现 → 真机运行 → `sw_review.py` → 沉淀。
-- `references/api-lookup.md` 给出查证模板、最小验证脚本要求、沉淀规则。
+Current state: **Purely text-based in `SKILL.md` / `references/`**:
+- `SKILL.md` "Unwrapped API rules": insufficient capability → check `references/api-lookup.md` → official API Help / local SDK → `references/language-backend-routing.md` for alternate backend → minimal implementation → live run → `sw_review.py` → codify.
+- `references/api-lookup.md` provides lookup templates, minimal verification script rules, and codification rules.
 
-缺失：**没有结构化的 `CAPABILITY_GAP` 返回值**。`resolve_operation_backend` 返回的是 `blocked/UNKNOWN_OPERATION_ROUTE` 或 `unavailable/NO_COMPATIBLE_BACKEND_AVAILABLE`，语义接近但不等价于「这是能力缺口、交还上层 Agent 解决」。
-
----
-
-## 4. capabilities.yaml 当前承担职责（唯一真源）
-
-`capabilities.yaml`（`schema_version: 1.0`）实际承担 **四类职责**：
-
-1. **能力成熟度清单**（`capabilities[]`，29 项）：`id/level/backends/verified_versions/dependencies/limitations/allowed_modes`（部分含 `skills`/`mcp_tools`）。level ∈ {verified, pilot, reference_only, not_implemented}。
-2. **后端目录**（`backend_catalog`，10 项）：`language/runtime/suitable_for/limitations`。
-3. **原子操作路由**（`operation_routes`，14 项）：`id/capability_ids/candidates[{backend,semantics,priority}]/review_required/blocked_revisions/requires/notes/blocked_reason`。
-4. **版本矩阵事实**（`verified_versions.solidworks/autocad`）。
-
-**关键结论：`capabilities.yaml` 已经是 Capability 的唯一真源，且承担了「能力门禁 + 后端路由 + 版本矩阵」三重职责。** V2 严禁新增 `tool_registry.yaml` 等重复配置。若要扩展，只允许加**可选**字段（`risk_level / review_required / preferred_backend / fallback_backends / retry_policy / timeout / side_effects`），且 `scripts/capabilities.py::load_capabilities` 的校验必须对缺失字段保持向后兼容。
+Gap: **No structured `CAPABILITY_GAP` return value.** `resolve_operation_backend` returns `blocked/UNKNOWN_OPERATION_ROUTE` or `unavailable/NO_COMPATIBLE_BACKEND_AVAILABLE`, which is close in meaning but does not explicitly signal "this is a capability gap; hand control back to the upper-layer agent".
 
 ---
 
-## 5. 重复风险与过度设计风险
+## 4. Current Responsibilities of `capabilities.yaml` (Sole Source of Truth)
 
-### 5.1 已存在的重复（V2 不得再复制）
+`capabilities.yaml` (`schema_version: 1.0`) currently serves **four distinct roles**:
 
-1. **能力表重复**：`engineering_orchestrator.py::CAPABILITIES` 内嵌了一份能力映射（含 `CapabilityLevel`/skills/mcp_tools），与 `capabilities.yaml` 有重叠。这是历史存在的事实，**V2 不去重构它**，但新增代码不得再造第三份能力表。
-2. **`resolve_operation_backend` 已实现路由**：任何「重新实现后端选择」都是重复造轮子。
+1. **Capability maturity catalog** (`capabilities[]`, 29 entries): `id/level/backends/verified_versions/dependencies/limitations/allowed_modes` (some with `skills`/`mcp_tools`), where `level ∈ {verified, pilot, reference_only, not_implemented}`.
+2. **Backend catalog** (`backend_catalog`, 10 entries): `language/runtime/suitable_for/limitations`.
+3. **Atomic operation routing** (`operation_routes`, 14 entries): `id/capability_ids/candidates[{backend,semantics,priority}]/review_required/blocked_revisions/requires/notes/blocked_reason`.
+4. **Version matrix facts** (`verified_versions.solidworks/autocad`).
 
-### 5.2 V2 必须避免的重复
-
-1. 再造 `tool_registry.yaml / runtime_capabilities.yaml / agent_capabilities.json`。
-2. 再造一套 Reviewer（`sw_review.py` + `reviewer_gate.py` 已够）。
-3. 再造一套 Artifact Ledger（Trace 只记录过程，不记录交付事实）。
-4. 再造一套 Fake/Mock 系统（`tests/fakes.py` 已有统一 COM 替身，Eval 应复用/邻接）。
-5. 再造一套 Golden Workflow（`golden-workflows.yaml` 已存在，只缺执行基准）。
-
-### 5.3 过度设计风险（重点提醒）
-
-1. **做成通用 Agent Framework**：Planner/Executor/Reviewer/Manager/Supervisor 多 Agent 套娃。本项目上层 Agent 已负责 Planning，Execution Core 只做 Execute/Observe/Verify/Recover/Trace。
-2. **复杂状态机**：RunStatus/StepStatus 用轻量 Enum 即可，不要搞 DAG 状态机/事件溯源。
-3. **独立 Trace Server / Runtime daemon**：Trace 是 append-only JSONL 落到现有 `queue/`，绝不启动额外服务。
-4. **Runtime 自己联网**：第一版 V2 不做 Web/API Discovery；能力缺口交还上层 Agent。
-5. **MCP 全量重包装**：60+ 工具、COM 锁、Pydantic schema 都是稳定的，Execution Core 作为底层能力逐步复用，绝不反向重写。
-6. **命名造词**：只用「Execution Core」一个词，禁止 Runtime Engine / Orchestrator / Workflow Engine / Agent Engine 等近义词混用。
+**Key conclusion: `capabilities.yaml` is already the single source of truth for capabilities, fulfilling three roles simultaneously (capability gating + backend routing + version matrix).** V2 strictly prohibits adding duplicate config files like `tool_registry.yaml`. Any future extensions may add **optional** fields only (`risk_level / review_required / preferred_backend / fallback_backends / retry_policy / timeout / side_effects`), keeping `scripts/capabilities.py::load_capabilities` backward-compatible when omitted.
 
 ---
 
-## 6. V2 最小改造方案
+## 5. Duplication and Over-Engineering Risks
 
-### 6.1 新增内部模块（`scripts/core/`，不是用户入口）
+### 5.1 Pre-Existing Duplication (V2 Must Not Replicate)
+
+1. **Duplicate capability map**: `engineering_orchestrator.py::CAPABILITIES` embeds an internal capability map (`CapabilityLevel`/skills/mcp_tools) overlapping `capabilities.yaml`. This is historical; **V2 will not refactor it**, but new code must never create a third capability map.
+2. **`resolve_operation_backend` already performs routing**: reimplementing backend selection anywhere else is wheel-reinvention.
+
+### 5.2 Duplication V2 Must Avoid
+
+1. Creating `tool_registry.yaml / runtime_capabilities.yaml / agent_capabilities.json`.
+2. Rebuilding Reviewers (`sw_review.py` + `reviewer_gate.py` suffice).
+3. Rebuilding Artifact Ledger (Trace logs process only, never delivery facts).
+4. Rebuilding Fake/Mock suites (`tests/fakes.py` already provides COM fakes; Eval should reuse or sit adjacent to it).
+5. Rebuilding Golden Workflows (`golden-workflows.yaml` already exists and only lacks an execution benchmark).
+
+### 5.3 Over-Engineering Risks (Critical Watchouts)
+
+1. **Building a generic Agent Framework**: multi-agent Planner/Executor/Reviewer/Manager/Supervisor nesting. Upper-layer agents already own Planning; Execution Core handles Execute/Observe/Verify/Recover/Trace only.
+2. **Complex state machines**: lightweight `RunStatus`/`StepStatus` enums suffice; avoid DAG state engines or event sourcing.
+3. **Standalone Trace Server / Runtime daemon**: Trace writes append-only JSONL under existing `queue/`; never launch extra services.
+4. **Self-networking Runtime**: V2 v1 does no Web/API discovery; capability gaps return to the upper-layer agent.
+5. **Re-wrapping MCP wholesale**: 60+ tools, COM lock, and Pydantic schemas are stable; Execution Core is adopted incrementally underneath without rewriting MCP.
+6. **Terminology proliferation**: use **Execution Core** consistently; avoid mixing synonyms like Runtime Engine / Orchestrator / Workflow Engine / Agent Engine.
+
+---
+
+## 6. Minimal V2 Refactoring Plan
+
+### 6.1 New Internal Module (`scripts/core/`, Not a User Entry Point)
 
 ```
 scripts/core/
@@ -242,119 +242,119 @@ scripts/core/
 └── execution.py    # Execution Core facade：Execute → Observe → Verify → Recover → Trace
 ```
 
-`sync_bundled_skill.py` 已按整个 `scripts/` 目录同步，新增 `scripts/core/` 会自动进入桌面 bundle，无需改打包脚本。
+`sync_bundled_skill.py` already synchronizes the entire `scripts/` tree, so adding `scripts/core/` automatically flows into the desktop bundle without editing packaging scripts.
 
-### 6.2 各模块要点
+### 6.2 Module Highlights
 
 **`state.py`**
-- `RunStatus`：CREATED / RUNNING / VERIFYING / RETRYING / BLOCKED / FAILED / COMPLETED
-- `StepStatus`：PENDING / RUNNING / SUCCESS / FAILED / VERIFYING / RETRYING / BLOCKED
-- `RunContext`（run_id/trace_id/goal/status/started_at/finished_at/current_step/steps/artifacts/evidence/errors/retry_count/metadata）
-- `StepRecord`（step_id/parent_step_id/tool_name/capability_id/backend/status/started_at/finished_at/duration_ms/arguments_summary/result_summary/error_code/retryable/artifacts/evidence/verification）
+- `RunStatus`: `CREATED` / `RUNNING` / `VERIFYING` / `RETRYING` / `BLOCKED` / `FAILED` / `COMPLETED`
+- `StepStatus`: `PENDING` / `RUNNING` / `SUCCESS` / `FAILED` / `VERIFYING` / `RETRYING` / `BLOCKED`
+- `RunContext` (`run_id`/`trace_id`/`goal`/`status`/`started_at`/`finished_at`/`current_step`/`steps`/`artifacts`/`evidence`/`errors`/`retry_count`/`metadata`)
+- `StepRecord` (`step_id`/`parent_step_id`/`tool_name`/`capability_id`/`backend`/`status`/`started_at`/`finished_at`/`duration_ms`/`arguments_summary`/`result_summary`/`error_code`/`retryable`/`artifacts`/`evidence`/`verification`)
 - `ExecutionResult` / `VerificationResult` / `RecoveryDecision`
-- 约束：JSON 可序列化；schema 有 version；**不与 CAD Studio Queue Schema 强绑定**；可被 Worker/MCP/CLI 复用；**不复制现有 Job 对象**；不存 API Key/完整 Prompt/秘密/无必要绝对路径。
+- Constraints: JSON-serializable, versioned schema, **decoupled from CAD Studio Queue Schema**, reusable across Worker/MCP/CLI, **never duplicates Job objects**, never stores API keys, full prompts, secrets, or unnecessary absolute paths.
 
-**`capability.py`（Facade）**
-- 提供：`get_capability` / `get_operation_route` / `resolve_backend` / `requires_review` / `get_capability_status` / `get_backend_candidates`
-- 全部委托 `scripts/capabilities.py`，零逻辑复制。
+**`capability.py` (Facade)**
+- Exposes `get_capability` / `get_operation_route` / `resolve_backend` / `requires_review` / `get_capability_status` / `get_backend_candidates`
+- Delegates completely to `scripts/capabilities.py` with zero logic duplication.
 
 **`trace.py`**
-- 追加 JSONL；事件：`run.created / step.started / tool.called / tool.succeeded / tool.failed / verification.started / verification.passed / verification.failed / recovery.retry / recovery.backend_fallback / capability.gap / run.blocked / run.failed / run.completed`
-- 复用现有 `queue/` 运行目录（优先 `queue/events/` 或新增 `queue/trace/`，Phase 2 定，倾向复用 events 目录避免新概念）；**禁止写仓库根目录**。
+- Append-only JSONL; events: `run.created` / `step.started` / `tool.called` / `tool.succeeded` / `tool.failed` / `verification.started` / `verification.passed` / `verification.failed` / `recovery.retry` / `recovery.backend_fallback` / `capability.gap` / `run.blocked` / `run.failed` / `run.completed`
+- Reuses existing `queue/` runtime directory (preferring `queue/events/` over adding `queue/trace/` to avoid new top-level concepts); **never writes to the repository root**.
 
 **`recovery.py`**
-- `ErrorKind`：TRANSIENT / INVALID_ARGUMENT / ENVIRONMENT_MISSING / TOOL_UNAVAILABLE / BACKEND_UNAVAILABLE / VERIFICATION_FAILED / USER_ACTION_REQUIRED / POLICY_BLOCKED / CAPABILITY_GAP / FATAL
-- `RecoveryDecision`：RETRY / FALLBACK_BACKEND / REPLAN_REQUIRED / USER_ACTION_REQUIRED / BLOCK / FAIL
-- 规则：TRANSIENT→有限 retry；INVALID_ARGUMENT→交还上层 Agent；BACKEND_UNAVAILABLE→backend_router fallback；ENVIRONMENT_MISSING→有合法 fallback 才 fallback 否则 blocked；VERIFICATION_FAILED→禁止 success→repair/replan；USER_ACTION_REQUIRED→blocked；POLICY_BLOCKED→尊重 Policy Gate 不可绕过；FATAL→failed。
-- retry 必须有上限、可追踪、可测试、防死循环。
+- `ErrorKind`: `TRANSIENT` / `INVALID_ARGUMENT` / `ENVIRONMENT_MISSING` / `TOOL_UNAVAILABLE` / `BACKEND_UNAVAILABLE` / `VERIFICATION_FAILED` / `USER_ACTION_REQUIRED` / `POLICY_BLOCKED` / `CAPABILITY_GAP` / `FATAL`
+- `RecoveryDecision`: `RETRY` / `FALLBACK_BACKEND` / `REPLAN_REQUIRED` / `USER_ACTION_REQUIRED` / `BLOCK` / `FAIL`
+- Rules: `TRANSIENT` → bounded retry; `INVALID_ARGUMENT` → return to upper-layer agent; `BACKEND_UNAVAILABLE` → backend_router fallback; `ENVIRONMENT_MISSING` → fallback only if valid fallback exists, else `blocked`; `VERIFICATION_FAILED` → forbid `success` → repair/replan; `USER_ACTION_REQUIRED` → `blocked`; `POLICY_BLOCKED` → honor Policy Gate without bypass; `FATAL` → `failed`.
+- Retries must be bounded, traceable, testable, and loop-proof.
 
-**`execution.py`（核心门禁）**
-- 确立「Tool Success != Task Success」：`requires_review` 的能力必须 Execute→Verification→PASS→COMPLETED；Verification FAIL 禁止 COMPLETED，必须进入 Recovery/Replan/Blocked/Failed 之一。
-- 只做多 Step 执行 + 统一 Trace + 状态决策，不写复杂 Planner。
+**`execution.py` (Core Gate)**
+- Enforces "Tool Success != Task Success": `requires_review` capabilities must complete `Execute → Verification → PASS → COMPLETED`; `Verification FAIL` forbids `COMPLETED` and must route to Recovery/Replan/Blocked/Failed.
+- Handles multi-step execution, unified tracing, and status decisions only—no complex Planner.
 
-### 6.3 Golden Workflow Eval（`tests/evals/`）
+### 6.3 Golden Workflow Eval (`tests/evals/`)
 
-- 复用 `golden-workflows.yaml`（保持 `target_first_pass_rate` 兼容），可选新增 `must_review/max_retries/max_tool_calls/expected_capabilities/required_artifacts`。
-- 三类测试：Happy Path / Failure Path（Tool success→Artifact 缺失→Verification Fail→禁止 Completed）/ Recovery Path（Primary Backend Fail→Fallback→Success→Verification Pass）；额外 Capability Gap。
-- 统计：Task Success Rate / First Pass Success Rate / Retry Rate / Recovery Success Rate / **False Completion Rate**（执行层报成功但 Verifier 判失败的比例）/ Average Tool Calls / Average Duration。
-- 输出：`eval_report.json` + `eval_report.md`。
-- CI 不要求真实 SolidWorks；用 Fake Backend / Mock Tool / Mock Reviewer（复用/邻接 `tests/fakes.py`）。
+- Reuses `golden-workflows.yaml` (preserving `target_first_pass_rate` compatibility), optionally adding `must_review/max_retries/max_tool_calls/expected_capabilities/required_artifacts`.
+- Three test classes: Happy Path, Failure Path (Tool success → missing artifact → Verification Fail → forbid Completed), Recovery Path (Primary Backend Fail → Fallback → Success → Verification Pass), plus Capability Gap.
+- Metrics: Task Success Rate, First Pass Success Rate, Retry Rate, Recovery Success Rate, **False Completion Rate** (cases where execution reports success but Verifier fails), Average Tool Calls, Average Duration.
+- Outputs: `eval_report.json` + `eval_report.md`.
+- CI requires no real SolidWorks; uses Fake Backends / Mock Tools / Mock Reviewers (reusing or adjacent to `tests/fakes.py`).
 
 ---
 
-## 7. 计划修改文件
+## 7. Planned File Changes
 
-| 文件 | 改动 | 阶段 |
+| File | Change | Phase |
 |---|---|---|
-| `docs/architecture/v2-audit.md` | 本审计报告（新增） | Phase 1 ✅ |
-| `scripts/core/__init__.py` | 新增 | Phase 2 |
-| `scripts/core/state.py` | 新增状态模型 | Phase 2 |
-| `scripts/core/capability.py` | 新增 Facade | Phase 2 |
-| `scripts/core/trace.py` | 新增 JSONL Trace | Phase 2 |
-| `scripts/core/recovery.py` | 新增错误分类与恢复决策 | Phase 4 |
-| `scripts/core/execution.py` | 新增 Execution Core facade | Phase 3–4 |
-| `scripts/core/verification.py`（如独立）或并入 execution.py | Verification Adapter（复用 sw_review + reviewer_gate） | Phase 3 |
-| `tests/test_core_state.py` 等 | 状态转换/Retry 上限/fallback/POLICY_BLOCKED/CAPABILITY_GAP/Trace JSONL 等单测 | Phase 2–4 |
-| `tests/evals/runner.py`（当时拟名 `golden_workflow_eval.py`） | Golden Workflow Eval + eval_report 输出；实际落地为 `runner.py` + `metrics.py` + `baseline.json` | Phase 6 |
-| `golden-workflows.yaml` | 仅追加**可选**字段（must_review/max_retries/...），旧 workflow 不改 | Phase 6 |
-| `apps/desktop/cad_workbench/queue_worker.py` | 最小侵入：在 handler 与 ledger/reviewer 之间接入 Execution Context + Verification + Recovery Decision，**不重写** | Phase 5 |
-| `scripts/cad_studio.py` | （可选）挂 `inspect-trace` / `eval` 到 debug 子命令；非必需可跳过 | Phase 8 |
-| `capabilities.yaml` | （可选）仅追加可选字段 risk_level/review_required/...；默认可推迟 | Phase 2 可选 |
-| `docs/architecture/execution-core.md` | 新增技术文档 | Phase 8 |
-| `README.md` | 用户侧只加一句「V2 内部加入可靠执行、自动验证和失败恢复，无需额外启动服务」 | Phase 8 |
+| `docs/architecture/v2-audit.md` | This audit report (new) | Phase 1 ✅ |
+| `scripts/core/__init__.py` | New | Phase 2 |
+| `scripts/core/state.py` | New state models | Phase 2 |
+| `scripts/core/capability.py` | New Facade | Phase 2 |
+| `scripts/core/trace.py` | New JSONL Trace | Phase 2 |
+| `scripts/core/recovery.py` | New error classification & recovery decisions | Phase 4 |
+| `scripts/core/execution.py` | New Execution Core facade | Phase 3–4 |
+| `scripts/core/verification.py` (standalone) or merged into `execution.py` | Verification Adapter (reusing `sw_review` + `reviewer_gate`) | Phase 3 |
+| `tests/test_core_state.py`, etc. | Unit tests for transitions, retry bounds, fallback, `POLICY_BLOCKED`, `CAPABILITY_GAP`, Trace JSONL | Phase 2–4 |
+| `tests/evals/runner.py` (tentatively `golden_workflow_eval.py`) | Golden Workflow Eval + `eval_report` outputs; landed as `runner.py` + `metrics.py` + `baseline.json` | Phase 6 |
+| `golden-workflows.yaml` | Append **optional** fields only (`must_review`/`max_retries`/...); existing workflows untouched | Phase 6 |
+| `apps/desktop/cad_workbench/queue_worker.py` | Minimal intrusion: wire Execution Context + Verification + Recovery Decision between handler and ledger/reviewer, **no rewrite** | Phase 5 |
+| `scripts/cad_studio.py` | (Optional) attach `inspect-trace` / `eval` under debug subcommands; skippable if unneeded | Phase 8 |
+| `capabilities.yaml` | (Optional) append optional fields (`risk_level`/`review_required`/...) only; deferred by default | Phase 2 optional |
+| `docs/architecture/execution-core.md` | New technical doc | Phase 8 |
+| `README.md` | One user-facing sentence: "V2 adds internal reliable execution, automated verification, and failure recovery with no extra services required" | Phase 8 |
 
 ---
 
-## 8. 明确不会修改的模块
+## 8. Modules Explicitly Untouched
 
-| 模块 | 理由 |
+| Module | Rationale |
 |---|---|
-| `mcp-server/server.py` | 60+ 工具、Pydantic schema、`_sw_lock` 串行、锁超时、`_coinitialize`、`_run_locked`、`solidworks_recover` 全部稳定；SolidWorks COM 必须继续串行，禁止第二套锁 |
-| `scripts/sw_*.py`（COM 封装：sw_connect/sw_part/sw_assembly/sw_export/sw_motion/sw_drawing/sw_hole_features/sw_measure/sw_edge_select/sw_document_data/sw_delivery/sw_appearance/sw_session/sw_macro_guard...） | 已真机回归的稳定能力，只复用不改写 |
-| `scripts/capabilities.py` + `scripts/backend_router.py` | 路由逻辑已完整，作为真源复用 |
-| `apps/desktop/cad_workbench/reviewer_gate.py` | Reviewer Gate 已完整 |
-| `apps/desktop/cad_workbench/artifact_ledger.py` | Artifact Ledger 已完整 |
-| `apps/desktop/cad_workbench/worker_health.py` | Worker Health 已完整 |
-| `apps/desktop/cad_workbench/agent_contracts.py` | Policy Gate 已权威 |
-| `apps/desktop/cad_workbench/agent_providers.py` | Provider Adapter 稳定 |
-| `apps/desktop/cad_workbench/knowledge_retrieval.py` | RAG 稳定 |
-| `apps/desktop/cad_workbench/engineering_orchestrator.py` | 阶段 DAG 稳定（其内嵌能力表是历史事实，V2 不重构） |
-| `apps/workbench-ui/`（前端） | 用户界面不变 |
-| `SKILL.md` / `SUBSKILLS.md` / 全部 `subskills/*` | 用户 SOP 不变；开放能力机制文本保留 |
-| `install.js` / `manifest.json` / `package.json` / `setup.py` / `pyproject.toml` / 注册器脚本 | 安装与打包不变 |
-| `scripts/sync_bundled_skill.py` | 已按目录同步 `scripts/`，自动包含 `scripts/core/`，无需改 |
+| `mcp-server/server.py` | 60+ tools, Pydantic schemas, `_sw_lock` serialization, lock timeouts, `_coinitialize`, `_run_locked`, and `solidworks_recover` are all stable; SolidWorks COM must stay serialized without a second lock |
+| `scripts/sw_*.py` (COM wrappers: `sw_connect`/`sw_part`/`sw_assembly`/`sw_export`/`sw_motion`/`sw_drawing`/`sw_hole_features`/`sw_measure`/`sw_edge_select`/`sw_document_data`/`sw_delivery`/`sw_appearance`/`sw_session`/`sw_macro_guard`...) | Live-verified stable wrappers; reuse without rewriting |
+| `scripts/capabilities.py` + `scripts/backend_router.py` | Routing logic is complete; reuse as source of truth |
+| `apps/desktop/cad_workbench/reviewer_gate.py` | Reviewer Gate is complete |
+| `apps/desktop/cad_workbench/artifact_ledger.py` | Artifact Ledger is complete |
+| `apps/desktop/cad_workbench/worker_health.py` | Worker Health is complete |
+| `apps/desktop/cad_workbench/agent_contracts.py` | Policy Gate is authoritative |
+| `apps/desktop/cad_workbench/agent_providers.py` | Provider Adapter is stable |
+| `apps/desktop/cad_workbench/knowledge_retrieval.py` | RAG is stable |
+| `apps/desktop/cad_workbench/engineering_orchestrator.py` | Stage DAG is stable (embedded capability map is historical; V2 does not refactor it) |
+| `apps/workbench-ui/` (frontend) | User interface unchanged |
+| `SKILL.md` / `SUBSKILLS.md` / all `subskills/*` | User SOP unchanged; open capability-gap text retained |
+| `install.js` / `manifest.json` / `package.json` / `setup.py` / `pyproject.toml` / registry scripts | Installation and packaging unchanged |
+| `scripts/sync_bundled_skill.py` | Already syncs `scripts/` recursively, automatically picking up `scripts/core/` |
 
-> `queue_worker.py` 是**唯一**计划最小修改的运行时代码，且只做「在既有 handler→ledger→reviewer 边界接入 Execution Core」的最小侵入，不重写其 Queue/Lease/Heartbeat/Policy Gate 逻辑。
-
----
-
-## 9. 关键兼容性约束（V2 全程红线）
-
-1. 不新增用户入口、不新增启动服务（runtime/executor/orchestrator/trace server/eval server 均禁止）。
-2. `capabilities.yaml` 继续是唯一能力真源；只允许追加可选字段。
-3. MCP Tool Name / Input Schema 零破坏；SolidWorks COM 串行锁零破坏。
-4. Policy Gate / Approval 权威不可被 Runtime 绕过。
-5. Worker Health / Heartbeat / Stale Recovery / Artifact Ledger 继续工作。
-6. 运行时数据（Trace/Log/Artifact）只写 `queue/ logs/ artifacts/` 等现有运行目录，不写源码仓库根目录。
-7. CI 不要求真实 SolidWorks；真机回归保持单独自托管执行。
-8. 最终用户仍只需「安装 → 对 AI 说话 → 得到可信结果」。
+> `queue_worker.py` is the **only** runtime file planned for minimal modification, strictly wrapping the existing `handler → ledger → reviewer` boundary without rewriting Queue, Lease, Heartbeat, or Policy Gate logic.
 
 ---
 
-## 10. 核心结论
+## 9. Critical Compatibility Red Lines (Throughout V2)
 
-- **当前项目已经是半个 "Execution Runtime"**：queue、policy gate、capability gate、backend router、reviewer gate、artifact ledger、JSONL 事件流、stale recovery、heartbeat 全部齐备。
-- **V2 真正要新增的最小模块只有 5 个文件**：`state.py` / `capability.py`(facade) / `trace.py` / `recovery.py` / `execution.py`，外加 `verification` 的薄 adapter 和 Golden Workflow Eval。
-- **真正的工程价值**在于：把「Tool Success ≠ Task Success」「结构化错误分类→恢复决策」「统一 run/step Trace」「能力缺口结构化返回」这四条**目前散落、隐式、依赖 Prompt 文本**的可靠执行思想，收敛成**可复用、可单测、可量化**的轻量执行可靠性层。
-- **最大的风险不是写不出来，而是写多了**：任何一个「再造能力表 / 再造 Reviewer / 再造 Ledger / 再造多 Agent / 再造锁 / 再启动一个服务」的动作都会把一次「内部可靠性升级」变成「过度设计」。因此每个 Phase 都要做三查：是否重复造轮子、是否破坏兼容、是否新增了用户复杂度。
+1. No new user entry points and no new background services (runtime/executor/orchestrator/trace server/eval server are all forbidden).
+2. `capabilities.yaml` remains the sole capability source of truth; only optional fields may be appended.
+3. Zero breaking changes to MCP Tool Names / Input Schemas or the SolidWorks COM serial lock.
+4. Runtime may never bypass Policy Gate or Approval authority.
+5. Worker Health, Heartbeat, Stale Recovery, and Artifact Ledger continue operating intact.
+6. Runtime artifacts (Trace/Log/Artifact) write only to existing runtime directories (`queue/`, `logs/`, `artifacts/`), never the repository root.
+7. CI requires no live SolidWorks; live regressions stay on dedicated self-hosted runners.
+8. End users still follow "Install → Talk to AI → Receive trustworthy results".
 
 ---
 
-## 11. Phase 2 入口前待确认事项（请求用户拍板）
+## 10. Core Conclusions
 
-1. **Trace 落盘位置**：复用现有 `queue/events/{job_id}.jsonl`（扩展 schema 加 step_id），还是新增 `queue/trace/{run_id}.jsonl`？审计建议：**复用 `queue/events/` 目录**，在事件中补 `schema_version`、`run_id/trace_id/step_id/parent_step_id`，避免新增顶层概念。
-2. **Verification Adapter 是否独立成 `scripts/core/verification.py`**：审计建议独立，职责单一（复用 sw_review + reviewer_gate），也可并入 execution.py。默认建议独立。
-3. **Phase 5 Worker 接入深度**：是否本轮就把 `queue_worker.process_job` 接入 Execution Core，还是先把 `scripts/core/` 立住、Worker 接入留到回归稳定后再做？审计建议：**按顺序 Phase 5 做最小接入**，且只包裹 handler→verification→recovery 边界。
-4. **capabilities.yaml 可选字段**：是否本轮就追加 `risk_level/review_required/...` 可选字段，还是完全不动 YAML、只靠 facade 读取现有字段？审计建议：**Phase 2 默认不动 YAML**，facade 先复用现有字段，确有必要再加可选字段。
+- **The project is already halfway to an Execution Runtime**: queue, policy gate, capability gate, backend router, reviewer gate, artifact ledger, JSONL event stream, stale recovery, and heartbeats are all in place.
+- **V2 truly needs only 5 minimal core files**: `state.py`, `capability.py` (facade), `trace.py`, `recovery.py`, and `execution.py`, plus a thin `verification` adapter and Golden Workflow Eval.
+- **Real engineering value**: consolidating four currently scattered, implicit, prompt-dependent principles—"Tool Success ≠ Task Success", "structured error classification → recovery decision", "unified run/step Trace", and "structured capability-gap returns"—into a **reusable, unit-testable, quantifiable** lightweight execution reliability layer.
+- **The biggest risk is building too much, not too little**: recreating capability maps, Reviewers, Ledgers, multi-agent frameworks, locks, or background services would turn an internal reliability upgrade into over-engineering. Every phase must ask three checks: Does it reinvent a wheel? Does it break compatibility? Does it add user-facing complexity?
 
-以上四点确认后即可进入 Phase 2（State + Capability Adapter + Trace）。
+---
+
+## 11. Pre-Phase-2 Decisions (Awaiting User Sign-Off)
+
+1. **Trace storage location**: Reuse existing `queue/events/{job_id}.jsonl` (extending schema with `step_id`) vs. adding `queue/trace/{run_id}.jsonl`? Recommendation: **Reuse `queue/events/`**, adding `schema_version`, `run_id`/`trace_id`/`step_id`/`parent_step_id` to avoid a new top-level concept.
+2. **Standalone `scripts/core/verification.py`**: Recommended as a standalone single-responsibility adapter (reusing `sw_review` + `reviewer_gate`) rather than merging into `execution.py`.
+3. **Phase 5 Worker integration depth**: Wire `queue_worker.process_job` into Execution Core in Phase 5 vs. deferring until after `scripts/core/` stabilizes? Recommendation: **Minimal integration in Phase 5**, wrapping only the `handler → verification → recovery` boundary.
+4. **Optional fields in `capabilities.yaml`**: Append `risk_level`/`review_required`/... now vs. leaving YAML untouched and reading existing fields via the facade? Recommendation: **Leave YAML untouched in Phase 2**; add optional fields later only if strictly needed.
+
+Once these four items are confirmed, proceed to Phase 2 (State + Capability Adapter + Trace).

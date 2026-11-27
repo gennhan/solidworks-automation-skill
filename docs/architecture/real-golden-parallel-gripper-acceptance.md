@@ -1,83 +1,59 @@
-# P0-2：双指平行夹爪原生装配 Golden
+# P0-2: Two-Finger Parallel Gripper Native Assembly Golden
 
-本用例只验证结构、原生装配与交付一致性。没有电机、丝杠、同步带、联动驱动、载荷能力或制造放行结论。
-P0-1.2 的安装板验收范围、生产 Review 和 Execution Core 安全门禁均不扩大。
+This case verifies structural geometry, native assembly mating, and delivery consistency only. It makes no claims regarding motors, leadscrews, timing belts, synchronized actuation, load capacity, or manufacturing release. Neither P0-1.2's mounting-bracket acceptance scope nor production Review / Execution Core security gates are expanded.
 
-## 分支与执行边界
+## Branch and Execution Boundaries
 
-- 工作分支：`test/p0-real-assembly-gripper-2026`。
-- 堆叠 Base：`818087a366efdd830d85b37d0705dd2d873464eb`，来自最新 P0-1.2 开发分支。
-- Draft PR 目标为 `test/p0-real-golden-mounting-bracket-2026`；不合并 #39，不修改 main 或 GitHub 设置。
-- COM 写操作串行；原始工程 DAG 保存在每轮 engineering_plan.json，排除 Motion、制造工程图和驱动传递。
-- Core 仅执行 CAD 和安全清理后的终态适配，`core_scope=terminal_adaptation_only`。
+- Working branch: `test/p0-real-assembly-gripper-2026`.
+- Stacked Base: `818087a366efdd830d85b37d0705dd2d873464eb` from the latest P0-1.2 development branch.
+- Draft PR targets `test/p0-real-golden-mounting-bracket-2026`; does not merge #39 and modifies neither `main` nor GitHub settings.
+- COM write operations run serially; the original engineering DAG is stored in per-run `engineering_plan.json`, excluding Motion, manufacturing drawings, and drive transmission.
+- Core performs terminal adaptation only after CAD execution and safe cleanup: `core_scope=terminal_adaptation_only`.
 
-## 统一规格（mm）
+## Unified Specification (mm)
 
-规格唯一来源为 golden-workflows.yaml 的 parallel_gripper_assembly，不接受运行时改变尺寸、容差、版本或审批要求。
+The single source of truth is `parallel_gripper_assembly` in `golden-workflows.yaml`; dimensions, tolerances, version, and approval rules cannot be overridden at runtime.
 
-| 零件文件 | 数量 | 原生几何与定位 |
+| Part File | Qty | Native Geometry and Placement |
 | --- | --- | --- |
-| base.SLDPRT | 1 | 60×12×140；局部截面中心 (0,-32)，底面 z=0；实例原点 z=-70 |
-| rod.SLDPRT | 2 | Ø8×140 圆柱，轴线沿 Z；实例 X=-18/+18、Y=0、Z=-70 |
-| support.SLDPRT | 2 | 60×34×12，截面中心 (0,-9)；两个 Ø8.02 贯穿孔，X=-18/+18、Y=0；实例 Z=-70/+58 |
-| slider.SLDPRT | 2 | 52×20×18，截面中心 (0,0)；两个 Ø8.1 贯穿孔，X=-18/+18、Y=0；实例 Z=-43/+25 |
-| finger.SLDPRT | 2 | 12×30×18，截面中心 (0,25)；分别随对应滑块，原点 Z=-43/+25 |
+| `base.SLDPRT` | 1 | 60×12×140; local profile center (0,-32), bottom face z=0; instance origin z=-70 |
+| `rod.SLDPRT` | 2 | Ø8×140 cylinder along Z; instances at X=-18/+18, Y=0, Z=-70 |
+| `support.SLDPRT` | 2 | 60×34×12, profile center (0,-9); two Ø8.02 through-holes at X=-18/+18, Y=0; instances at Z=-70/+58 |
+| `slider.SLDPRT` | 2 | 52×20×18, profile center (0,0); two Ø8.1 through-holes at X=-18/+18, Y=0; instances at Z=-43/+25 |
+| `finger.SLDPRT` | 2 | 12×30×18, profile center (0,25); follows corresponding slider, origin Z=-43/+25 |
 
-五种零件均为参数化凸台；支撑与滑块另有孔草图和贯穿切除。草图完全定义、可编辑深度参数、材料库条目
-6061-T6 (SS)、密度及 B-Rep 回读均参与验收。这里的材料和间隙只是结构 Golden 名义参数，
-不替代材料认证、导杆硬度/耐磨要求、轴承选型、公差链或紧固件设计。
+All five parts are parametric bosses; supports and sliders add hole sketches and through-cuts. Fully defined sketches, editable depth parameters, library material `6061-T6 (SS)`, density, and B-Rep readback are all verified. Materials and clearances here are nominal structural Golden parameters and do not replace material certification, guide-rod hardness/wear requirements, bearing selection, tolerance chains, or fastener design.
 
-两导杆中心距 36；初始夹持间距沿 Z 为 50。支撑底面与底座 y=-26 贴合，手指与滑块在 y=10 接合。
-可制造性仍需补充安装/夹紧紧固件、行程限位、轴向保持、润滑、驱动和载荷设计。
+Guide-rod center distance is 36 mm; initial jaw opening along Z is 50 mm. Support bottom faces mate against the base at y=-26, and fingers join sliders at y=10. Manufacturability still requires mounting/clamping fasteners, travel stops, axial retention, lubrication, actuation, and load engineering.
 
-## 原生配合与自由度
+## Native Mates and Degrees of Freedom
 
-底座固定，其它组件不使用 Fixed 属性代替 Mate：
+Only the base is fixed; no other component uses the `Fixed` attribute in place of Mates:
 
-- 两个支撑各 3 个基准面 Mate；右端轴向距离为 128，其余对应基准重合。
-- 两根导杆各 1 个同心 Mate（对应左支撑孔）、1 个轴向基准重合 Mate 和 1 个角向平行 Mate。
-- 两个滑块各与两根导杆建立同心 Mate；两条不同轴的同心约束共同限制转动，只保留沿 Z 的轴向移动。
-- 每个手指与对应滑块建立 3 个基准面重合 Mate。
+- Each support has 3 reference-plane Mates; right end uses axial distance 128, all others coincident.
+- Each guide rod has 1 concentric Mate (to left support bore), 1 axial coincident plane Mate, and 1 angular parallel Mate.
+- Each slider has concentric Mates to both guide rods; two non-coaxial concentric constraints jointly lock rotation, leaving only axial translation along Z.
+- Each finger has 3 coincident reference-plane Mates to its slider.
 
-共 22 个真实 Mate。初始变换只用于插入定位；验收回读 MateGroup、Mate2 类型、抑制/健康、MateEntity2
-关联组件 ID 和实体参数，并回读组件变换、固定状态、约束状态和实例唯一 ID。
+22 genuine Mates in total. Initial transforms are used solely for insertion placement; acceptance reads back `MateGroup`, `Mate2` types, suppression/health, `MateEntity2` component IDs and entity parameters, plus component transforms, fixed flags, constraint status, and unique instance IDs.
 
-GetConstrainedStatus 只能证明整体约束状态，不能单独证明自由度数。目标自由度通过实际双导杆同心 Mate 的
-两条关联轴线、手指的刚性平面 Mate、静态件完全约束状态，以及原生 SetTransformAndSolve2
-六轴探针联合证明。两个滑块各执行 Z 正负移动 2 mm、X/Y 平移和 X/Y/Z 旋转请求，共 14 项；
-只允许 Z 平移且手指跟随，另一组及静态件不得变化，其它五个方向必须被约束，逐次恢复。
-被约束方向的请求可被原生求解器投影为已验证范围内的 Z 滑动，但横向偏移和旋转仍必须为零。
-每次请求都用 SAFEARRAY(double) 创建 MathTransform 并回读全部 16 项，不把无效 ArrayData 写入当作请求成功。
-测试运动不会退回直接 Transform2 赋值；无法读取或证明时验收失败，不以视觉代替证明。
+`GetConstrainedStatus` proves overall constraint state only and cannot by itself prove DOF counts. Target DOFs are proven jointly by the two associated axes of the dual-rod concentric Mates, rigid planar finger Mates, fully constrained static parts, and a native 6-axis `SetTransformAndSolve2` probe. Each slider runs ±2 mm Z translation plus X/Y translation and X/Y/Z rotation requests (14 probes total): only Z translation with finger follow-through is permitted, the opposing group and static parts must remain stationary, all five other axes must remain constrained, and each probe restores position afterward. Constrained-axis requests may be projected by the native solver into valid Z sliding, but lateral shift and rotation must remain zero. Every probe builds a `MathTransform` via `SAFEARRAY(double)` and reads back all 16 elements so invalid `ArrayData` writes are never mistaken for valid requests. Motion probing never falls back to raw `Transform2` assignment; unreadable or unproven states fail acceptance rather than substituting visual inspection.
 
-GetRemainingDOFs 网页说明不完整，12 个 out 参数已在本机原厂 sldworks.tlb / Interop 中核对，
-原始签名另存离线证据。首轮实测证明其返回值不是自由度数，状态也不能直接套用 swDofStatus_e；
-因此只保留原始 SDK 诊断和一致性检查，不把它写成直接自由度计数。精确运动约束结论以上述原生 Mate
-和六轴探针为依据，仍需人工工程复核，也不宣称其它版本支持该私有接口语义。
+Because online docs for `GetRemainingDOFs` are incomplete, its 12 `out` parameters were verified against local `sldworks.tlb` / Interop assemblies with raw signatures saved offline. First-run empirical testing showed its return value is not a DOF count and its status does not map directly to `swDofStatus_e`; therefore only raw SDK diagnostics and consistency checks are recorded without reporting it as a direct DOF count. Kinematic constraint verdicts rely on the native Mates and 6-axis probes above, still require human engineering review, and claim no cross-version support for undocumented private semantics.
 
-## 装配、干涉与交付验收
+## Assembly, Interference, and Delivery Acceptance
 
-每轮创建新目录和新实例，先拒绝已有或状态未知的 SolidWorks 进程。逐件保存、关闭重开，之后创建装配，
-保存并关闭装配及本轮加载的引用，再从磁盘重开 SLDASM。检查所有引用位于本轮 parts 目录且哈希一致。
+Each run creates a fresh directory and fresh SolidWorks instance after rejecting any pre-existing or unknown SolidWorks process. Parts are saved, closed, and reopened individually before building the assembly; the assembly and loaded references are saved, closed, and reopened from disk, asserting that every reference resides in the current run's `parts` folder with matching hashes.
 
-干涉复用 sw_measure.inspect_interference：通过 InterferenceDetectionManager.GetInterferences 实际计算，
-读取数量、体积与组件；Done 仅在读取后释放。关闭重合面干涉，但不忽略隐藏体；不以包围盒代替原生干涉。
-每轮还在自有装配中制造真实滑块/手指穿透和抑制滑块 Mate，必须检出，恢复后再保存正常交付。
+Interference reuses `sw_measure.inspect_interference`: calls `InterferenceDetectionManager.GetInterferences`, reads counts, volumes, and component pairs, and calls `Done` only after reading. Coincidence-as-interference is disabled without ignoring hidden bodies; bounding boxes never replace native interference checks. Each run also injects genuine slider/finger penetration and suppresses a slider Mate inside its own assembly, verifying detection before restoring and saving the clean deliverable.
 
-STEP 在真实 SolidWorks 中重新导入，逐体匹配九个实体的体积、世界质心、圆柱面孔径/轴线和面积，
-处理导入后拆分的圆柱接缝。BOM CSV 复用 sw_delivery，并与实际组件引用、数量和磁盘内容交叉检查。
-零件原生自定义属性同时保存编号、材料及从规格派生的尺寸/孔位/功能说明，BOM 必须回读一致；不向 CSV
-填充无关文字，也不关闭通用 Review 的文件大小规则。
-原始 Review 使用 sw_review，不修改其人工复核标记。装配体不支持的零件孔测量字段不能宣称已由通用
-Review 完成，而由本用例的独立零件与装配 B-Rep 规则承担。
+STEP is re-imported into live SolidWorks to verify all 9 solid bodies by volume, world center of mass, cylindrical bore diameter/axis, and area while handling split cylindrical seams after import. BOM CSV reuses `sw_delivery` and cross-checks against live component references, quantities, and on-disk bytes. Native part custom properties record part number, material, and spec-derived dimension/hole/function notes that must match BOM readback; no filler text is padded into CSV and generic Review file-size checks remain active. Raw Review uses `sw_review` without altering its manual-review flag. Part-hole measurement fields unsupported on assemblies are never claimed covered by generic Review, and are instead enforced by this case's standalone part and assembly B-Rep rules.
 
-完整产物哈希、Artifact Ledger、原始 Review、快照和唯一 Core trace 在套件结束时再次回读。
-只有全部通过且唯一阻塞为人工复核时才允许 acceptance_status=passed / task_status=blocked /
-manual_review_required=true。默认 completed 模式仍严格返回非零。
+All artifact hashes, Artifact Ledgers, raw Reviews, snapshots, and unique Core traces are re-read at suite end. Only when every check passes and human review is the sole blocker are `acceptance_status=passed` / `task_status=blocked` / `manual_review_required=true` permitted. Default `completed` mode strictly exits non-zero.
 
-## 运行命令
+## Commands
 
-在仓库根目录执行，输出目录必须不存在：
+Run from the repository root with a non-existent output directory:
 
 ```powershell
 $env:PYTHONUTF8 = '1'
@@ -86,51 +62,37 @@ python tests/evals/runner.py --output-dir output/p0-2-eval-unique
 python tests/solidworks_golden_workflow.py --case parallel_gripper_assembly --output output/p0-2-real-unique --runs 5 --expected-terminal blocked
 ```
 
---runtime-config 沿用模板/材料库/有界超时，另允许本用例专用 assembly_template（.asmdot）；相对路径相对
-配置文件解析。缺省模板复用原有发现。安装板不接受 assembly_template，不能以配置扩大其能力范围。
+`--runtime-config` inherits template/material-library/bounded-timeout keys and adds a case-specific `assembly_template` (`.asmdot`); relative paths resolve against the config file and defaults reuse existing discovery. `mounting_bracket` rejects `assembly_template` so configuration cannot broaden its capability scope.
 
-离线故障注入是合成数据；不得计入真机结果。开发失败、未知证据及异常清理均保留。远程 CAD CI 的
-P0-1.2 安全配置阻塞保持原状，本阶段没有变更 Runner、Environment、权限或工作流触发机制。
+Offline fault injections are synthetic and excluded from live stats. Development failures, unknown evidence, and abnormal cleanups are preserved. P0-1.2 security blocks on remote CAD CI remain unchanged; no Runner, Environment, permission, or workflow trigger was altered in this stage.
 
-## API 核查依据
+## API Verification References
 
-- [AddMate5 参数](https://help.solidworks.com/2025/English/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IAssemblyDoc~AddMate5.html)
-- [组件约束状态](https://help.solidworks.com/2022/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IComponent2~GetConstrainedStatus.html)
-- [自由度状态枚举](https://help.solidworks.com/2026/English/api/swconst/SolidWorks.Interop.swconst~SolidWorks.Interop.swconst.swDofStatus_e.html)
-- [原生干涉计算](https://help.solidworks.com/2026/English/api/sldworksapi/SOLIDWORKS.Interop.sldworks~SOLIDWORKS.Interop.sldworks.IInterferenceDetectionMgr~GetInterferences.html)
-- [Body2 质量属性及世界坐标转换](https://help.solidworks.com/2024/english/api/sldworksapi/solidworks.interop.sldworks~solidworks.interop.sldworks.ibody2~getmassproperties.html)
+- [`AddMate5` parameters](https://help.solidworks.com/2025/English/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IAssemblyDoc~AddMate5.html)
+- [Component constraint status](https://help.solidworks.com/2022/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IComponent2~GetConstrainedStatus.html)
+- [DOF status enum](https://help.solidworks.com/2026/English/api/swconst/SolidWorks.Interop.swconst~SolidWorks.Interop.swconst.swDofStatus_e.html)
+- [Native interference calculation](https://help.solidworks.com/2026/English/api/sldworksapi/SOLIDWORKS.Interop.sldworks~SOLIDWORKS.Interop.sldworks.IInterferenceDetectionMgr~GetInterferences.html)
+- [`Body2` mass properties and world transform](https://help.solidworks.com/2024/english/api/sldworksapi/solidworks.interop.sldworks~solidworks.interop.sldworks.ibody2~getmassproperties.html)
 
-以下记录实际执行结果；验收契约与历史诊断、正式五轮分别统计。
+Actual execution outcomes follow below; acceptance contracts, historical diagnostics, and the official five-run suite are tracked separately.
 
-### 开发阶段发现并保留的问题
+### Preserved Development Findings
 
-1. 首次离线定向测试 26 failed / 33 passed：合成夹具预填 trace 文本，与 Core JSONL 混合。
-   修正夹具为仅由真实 Core 适配生成 trace，定向和完整回归随后通过；未启动 CAD。
-2. 首轮真实诊断（pilot-01，PID 46796）五种原生零件均通过，但装配 Z 初始变换未实际生效，
-   滑块重叠，原生干涉检测返回 4 项（最大 16864.920954 mm³）。任务及验收均 failed，退出码 1，
-   SLDASM、STEP、BOM、预览及完整证据均保留，清理通过。
-3. 同轮暴露 GetRemainingDOFs 返回值/状态不可按原假设解释，以及空 BOM 属性导致 CSV 只有 765 字节、
-   通用 Review 出现 WARN。修复方向分别为原生六轴探针与明确 SDK 诊断范围，以及保存真实编号、材料和
-   尺寸/孔位/功能属性；没有修改生产 Review，没有把 WARN 改写为 PASS。
-4. 装配诊断 probe-02 的 MathUtility 带参方法被 pywin32 绑定为属性，触发成员不存在；改为显式
-   _FlagAsMethod 后，无文档的真实 API 最小探针回读了正确 16 项变换，清理通过。初版辅助诊断脚本未把
-   失败映射到非零退出码，随后修复；该脚本不属于 Golden 入口，诊断失败从未计入验收通过。
-5. probe-03（PID 40144）原生 Review PASS/100、零干涉，但右支撑位于错误的负向距离，且单一同心
-   Mate 即使回读 LockRotation=true，原生旋转探针仍能使滑块转动，验收按预期失败。增加第二导杆同心
-   Mate、固定导杆的显式角向 Mate，并修正距离方向；不把相应检查删除。原始失败 SLDASM/STEP 和预览保留。
+1. First targeted offline test run hit 26 failed / 33 passed: synthetic fixtures pre-populated trace text mixed with Core JSONL. Fixed fixtures to generate traces solely via real Core adaptation; targeted and full regressions passed without launching CAD.
+2. First live diagnostic (`pilot-01`, PID 46796) passed all five native parts, but initial Z assembly transforms did not take effect, causing sliders to overlap with 4 native interferences (max 16,864.920954 mm³). Both task and acceptance failed (exit 1); SLDASM, STEP, BOM, previews, and full evidence were preserved and cleanup passed.
+3. The same run revealed that `GetRemainingDOFs` return/status values cannot be interpreted as originally assumed, and empty BOM properties produced a 765-byte CSV triggering a generic Review `WARN`. Resolved by introducing native 6-axis probes with explicit SDK diagnostic scope and populating genuine part numbers, materials, and dimension/hole/function properties—without modifying production Review or rewriting `WARN` to `PASS`.
+4. In assembly probe `probe-02`, parameterized `MathUtility` methods were bound as properties by `pywin32`, raising member-not-found; adding explicit `_FlagAsMethod` allowed a minimal document-free API probe to read back all 16 transform entries cleanly. An early auxiliary probe script failed to map errors to non-zero exit codes and was fixed afterward; that script is not a Golden entry point and diagnostic failures were never counted as acceptance passes.
+5. `probe-03` (PID 40144) achieved native Review PASS/100 and zero interference, yet placed the right support at the wrong negative distance, and a single concentric Mate—even reading back `LockRotation=true`—allowed slider rotation under the native rotation probe, causing acceptance to fail as intended. Added the second guide-rod concentric Mate, explicit angular Mate on fixed rods, and corrected distance direction without removing any checks. Original failed SLDASM/STEP and previews are preserved.
 
-后续装配 API 诊断可复用上述真实零件文件，但必须标记 native_assembly_diagnostic_only，
-不属于从零建模的独立 Golden 轮次，也不计入连续五轮成功率。
+Subsequent assembly API diagnostics may reuse the verified part files above only when marked `native_assembly_diagnostic_only`; they are not from-scratch Golden runs and do not count toward the consecutive five-run success rate.
 
-## 2026-10-26 本机实测结果
+## 2026-10-26 Local Live-Machine Results
 
-正式五轮均使用冻结源码 `b2d0bc4bdc4067f9656b8b41321bbd2efd783d31`，真实 SolidWorks 2026 SP01.1
-（revision 34.1.1）、Windows 11、Python 3.12.10。之后的收尾提交只增加实际证据索引、文档和修正
-GetRemainingDOFs 注释，不改变执行或验收逻辑。交付 Commit 见堆叠 Draft PR 的 HEAD。
+All five official runs used frozen commit `b2d0bc4bdc4067f9656b8b41321bbd2efd783d31`, SolidWorks 2026 SP01.1 (revision 34.1.1), Windows 11, and Python 3.12.10. Final wrap-up commits added only the evidence index, docs, and `GetRemainingDOFs` comment clarifications without changing execution or acceptance logic. See the stacked Draft PR `HEAD` for the final delivery commit.
 
-先完成离线全量回归，再运行正式真机套件；每轮从零创建五种零件、独立进程、输出目录和 trace：
+Full offline regression ran first, followed by the official live suite; each run built all five parts from scratch in a dedicated process, output directory, and trace:
 
-| 轮次 | PID | 零件文件 / 组件实例 / Mate | SLDASM 重开 / STEP 回读 / BOM | 原生干涉 | 验收 / 任务 / 清理 |
+| Run | PID | Part Files / Instances / Mates | SLDASM Reopen / STEP Readback / BOM | Native Interference | Acceptance / Task / Cleanup |
 | --- | --- | --- | --- | --- | --- |
 | run-01 | 51052 | 5 / 9 / 22 | PASS / PASS / 9 | 0 | passed / blocked / pass |
 | run-02 | 6576 | 5 / 9 / 22 | PASS / PASS / 9 | 0 | passed / blocked / pass |
@@ -138,32 +100,23 @@ GetRemainingDOFs 注释，不改变执行或验收逻辑。交付 Commit 见堆�
 | run-04 | 35240 | 5 / 9 / 22 | PASS / PASS / 9 | 0 | passed / blocked / pass |
 | run-05 | 5276 | 5 / 9 / 22 | PASS / PASS / 9 | 0 | passed / blocked / pass |
 
-- 几何及装配成功率 5/5，预期人工门禁正确率 5/5，Test Acceptance=5、Task Completion=0、False Completion=0。
-- 五轮原始 Review 均 PASS/100、无 issues，manual_review_required=true；Core 实际终态均 blocked，
-  verification=PASS、recovery=user_action_required。唯一阻塞是 EXPECTED_MANUAL_REVIEW_REQUIRED，命令退出码 0。
-- 以同一批原始证据重算默认 completed 模式会拒绝验收，未额外执行或伪造 CAD；结果单独记录在离线控制文件。
-- 每轮 22 个健康且未抑制的原生 Mate：13 个重合、6 个同心、2 个平行、1 个距离；完整名称、类型、关联实体参数
-  及组件唯一 ID 见 built.json / reopened.json。固定件和运动件约束状态、两个独立 Z 移动方向均通过上述 14 项探针。
-- 正常装配原生干涉数量和总干涉体积均为 0。每轮实际穿透控制均检出 2 项，体积分别为
-  16864.920954 和 6480.0 mm³；抑制滑块 Mate 也被真实回读检出，恢复后正常快照重新通过。
-- 每轮原生及 STEP 回读均为 9 个实体，总体积约 208099.355043 mm³；逐体质心、圆柱面孔径、轴线与面积通过。
-  五件原生零件的特征、全约束草图、尺寸、孔位和材料均通过保存重开验证。
-- BOM 五行，数量为 1/2/2/2/2，共 9；CSV 1606 字节，编号、材料、尺寸/孔位/功能属性与组件一致。
-- 每轮四视角真实预览均已目视复核，结构一致。正投影可有正常遮挡，需结合等轴测及其它视角；没有制造工程图放行结论。
-- 清理成功率 5/5，每轮文档数归零、自有进程退出；套件后再次检查 SolidWorks 进程为空，本次 Python 入口也无残留。
+- Geometry & assembly pass rate 5/5, expected human-gate accuracy 5/5, Test Acceptance=5, Task Completion=0, False Completion=0.
+- All five raw Reviews scored PASS/100 with zero issues and `manual_review_required=true`; Core terminal state was `blocked`, `verification=PASS`, `recovery=user_action_required`, sole blocker `EXPECTED_MANUAL_REVIEW_REQUIRED`, command exit code 0.
+- Re-evaluating the same raw evidence under default `completed` mode rejected acceptance without running extra CAD or fabricating evidence; recorded separately in offline control files.
+- Each run verified 22 healthy, unsuppressed native Mates (13 coincident, 6 concentric, 2 parallel, 1 distance); full names, types, entity params, and unique component IDs are in `built.json` / `reopened.json`. Fixed/moving constraint states and both independent Z travel axes passed all 14 probes.
+- Clean assemblies had 0 native interferences and 0 volume. Each run's live penetration control detected 2 interferences (16,864.920954 and 6,480.0 mm³); slider Mate suppression was also caught via real readback, and clean snapshots re-passed after restoration.
+- Every native and re-imported STEP read back 9 bodies totaling ~208,099.355043 mm³; per-body centroids, cylindrical bore diameters, axes, and areas passed. All five native parts passed save-and-reopen verification for features, fully defined sketches, dimensions, holes, and materials.
+- BOM had 5 rows with quantities 1/2/2/2/2 (total 9); CSV was 1,606 bytes with part numbers, materials, and dimension/hole/function properties matching components.
+- All four-view live previews across all five runs were visually reviewed and structurally consistent. Orthographic views may show normal occlusion and should be read alongside isometric and companion views; no manufacturing drawing release is claimed.
+- Cleanup pass rate 5/5, zero residual documents per run, owned processes exited cleanly; post-suite checks confirmed zero running SolidWorks processes and zero leftover Python entry processes.
 
-离线全量结果为 **999 passed / 1 skipped，118.09 s**。跳过项为既有桌面内嵌 Skill 未生成的发布包检查，
-未作为通过统计。11 个工作流共 **40 个 deterministic mock 场景**，预期结果准确率 100%、逃逸假完成率 0；
-**26 项 CI 策略合成快照测试**通过。这些离线结果均不属于真实 CAD 五轮。
+Full offline suite: **999 passed / 1 skipped, 118.09 s** (skipped item is the unbuilt desktop bundled-skill release check, not counted as passed). 11 workflows generated **40 deterministic mock scenarios** with 100% expected accuracy and 0 escaped false completions; **26 synthetic CI policy tests** passed. None of these offline results count toward the five live CAD runs.
 
-## Evidence 与复核入口
+## Evidence and Review Entry Points
 
-机器可读索引：[p0-2-real-gripper-2026-10-26.json](evidence/p0-2-real-gripper-2026-10-26.json)。
-索引含各轮 PID/创建时间、trace ID、材料/模板路径及哈希、Mate 合同、体积、Review、清理及失败修复记录。
-每轮独立目录有原生零件、SLDASM、STEP、BOM、四视角、原始 Review、日志、快照、Core trace、Artifact Ledger
-和 SHA-256 清单。逐轮哈希条目共 145 项；原始失败也保留，未用后续通过结果替换。
+Machine-readable index: [p0-2-real-gripper-2026-10-26.json](evidence/p0-2-real-gripper-2026-10-26.json). It includes per-run PIDs/creation timestamps, trace IDs, material/template paths and hashes, Mate contracts, volumes, Reviews, cleanup, and failure/remediation logs. Each run directory contains native parts, SLDASM, STEP, BOM, four views, raw Review, logs, snapshots, Core trace, Artifact Ledger, and SHA-256 manifest (145 per-run hash entries total; original failures preserved without being replaced by later passes).
 
-本机证据路径：
+Local evidence paths:
 
 ```text
 <worktree-p0-real-assembly-2026>/output/p0-2-real-five-01/summary.json
@@ -175,21 +128,17 @@ GetRemainingDOFs 注释，不改变执行或验收逻辑。交付 Commit 见堆�
 <worktree-p0-real-assembly-2026>/output/p0-2-independent-seal-verification.json
 ```
 
-> 该批证据产生于 P0-2 阶段的独立 worktree（`p0-real-assembly-2026`），路径随 worktree 所在磁盘位置变化，
-> 故以占位符表示。证据包未入库，只在维护者本机保留。
+> These artifacts were produced in a dedicated P0-2 worktree (`p0-real-assembly-2026`); paths vary by local disk layout and use a placeholder. The archive is uncommitted and retained locally by the maintainer.
 
-ZIP 为 **11743432 字节 / 258 项**，包含正式五轮、开发 pilot、三个装配诊断、离线日志、SDK 签名、运行配置、
-诊断/归档复核脚本和证据索引。SHA-256：
+ZIP archive is **11,743,432 bytes / 258 items**, containing the five official runs, dev pilot, three assembly probes, offline logs, SDK signatures, runtime config, diagnostic/seal scripts, and evidence index. SHA-256:
 
 ```text
 0cdd1d7287ca6fd0438ba555a547d155ff5f22bd62bb0ee1161bd66d8e2ca1ac
 ```
 
-归档后独立验证 ZIP CRC、压缩包 SHA-256、257 项清单中的磁盘字节与 ZIP 字节一致性，并再次调用逐轮
-Evidence/Core/Ledger/交付语义检查；全部通过。首次离线失败的完整控制台未预先落盘，索引明确该日志限制，
-其后所有完整回归及真实失败日志均保留。输出目录受 .gitignore 保护，完整大文件归档留在本机，未上传远程附件。
+Post-archive independent verification checked ZIP CRCs, archive SHA-256, disk-vs-ZIP byte parity across all 257 manifest entries, and re-ran per-run Evidence/Core/Ledger/delivery semantic checks; all passed. The first offline failure's full console output was not captured to disk beforehand (explicitly noted in the index); all subsequent full regressions and live failure logs are preserved. `output/` is protected by `.gitignore`; large archives remain local without remote attachment uploads.
 
-## 本阶段完整变更清单
+## Complete Change Manifest for This Stage
 
 ```text
 golden-workflows.yaml                                     新增统一夹爪规格
@@ -204,18 +153,12 @@ docs/architecture/real-golden-parallel-gripper-acceptance.md 验收规格、运�
 docs/architecture/evidence/p0-2-real-gripper-2026-10-26.json  实际证据索引
 ```
 
-## 未验证范围及 P0-2.1
+## Unverified Scope and P0-2.1 Plan
 
-业务任务仍为 BLOCKED，未启用自动审批。Core 仅终态适配，不声称逐步调度了真实建模。
-GetRemainingDOFs 的私有直接计数语义仍未验证；两独立移动方向的结论仅限本规格的原生 Mate 和有限六轴探针，
-不等于全行程、限位、接触或其它版本认证。COM 单次调用永久挂起恢复也未验证。
+Business task status remains `BLOCKED` with no auto-approval enabled. Core covers terminal adaptation only and does not claim step-by-step scheduling of live modeling. Private direct-count semantics of `GetRemainingDOFs` remain unverified; conclusions on the two independent travel axes apply only to this spec's native Mates and bounded 6-axis probes and do not certify full travel, stops, contacts, or other SolidWorks versions. Recovery from permanent hangs inside a single COM call is also unverified.
 
-初始诊断发现旧 apply_component_transform_x 在本机有 ArrayData 空写入风险；本阶段新增严格 helper 并让
-夹爪用例逐项回读，未全局重写旧函数，其它旧调用链未做本阶段真机复测，不扩大原有验证范围。
+Early diagnostics revealed an `ArrayData` null-write risk in legacy `apply_component_transform_x` on this host; this stage introduced a strict helper with per-element readback for the gripper case without globally rewriting legacy functions, so other legacy callers were not re-tested live and do not inherit expanded verification scope.
 
-建议 P0-2.1 优先补齐导杆夹紧/轴向保持、支撑/底座和手指紧固接口、轴承及公差工程图，再定义限位和全行程
-原生碰撞回归。电机、丝杠、同步带、同步驱动、载荷/刚度/磨损及 Motion Study 需另立规格与验证，当前全部未完成。
+P0-2.1 is recommended to prioritize guide-rod clamping/axial retention, support/base and finger fastening interfaces, bearings, and tolerance drawings before defining limit stops and full-travel native collision regressions. Motors, leadscrews, timing belts, synchronized drives, load/stiffness/wear analysis, and Motion Study require separate specifications and remain unimplemented.
 
-远程 CAD CI **BLOCKED / 未执行**，继承 P0-1.2 的 Runner 隔离、GitHub 审计凭据与审批安全配置前置条件。
-本阶段没有修改生产 Review、Core、capabilities、Windows CAD 工作流、Runner、Environment 或仓库权限。
-保留堆叠 Draft PR；不建议在人工工程复核及前置安全条件关闭前直接合并 main。
+Remote CAD CI remains **BLOCKED / unexecuted**, inheriting P0-1.2 prerequisites for Runner isolation, GitHub audit credentials, and approval security settings. Production Review, Core, `capabilities.yaml`, Windows CAD workflow, Runners, Environments, and repository permissions were untouched in this stage. Keep the stacked Draft PR open; merging into `main` is not recommended until human engineering review and prerequisite security gates are closed.

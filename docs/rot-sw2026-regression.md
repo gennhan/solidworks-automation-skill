@@ -1,31 +1,31 @@
-# 可选 ROT 附着回退：SolidWorks 2026 验收
+# Optional ROT Attachment Fallback: SolidWorks 2026 Acceptance
 
-基于主线 `524a4a3` 独立吸收 PR #84，并修正附着后写入既有窗口 `Visible` 的问题。
-`visible` 只用于本轮新启动的实例；普通 ROT、延迟 ROT 和可选 Dispatch 附着均保留用户窗口状态。
-回退后完整比较 PID→版本清单，版本变为未知或改变也拒绝继续。
+PR #84 was independently integrated onto main (`524a4a3`), with an additional fix preventing attachment from overwriting `Visible` on an existing window.
+`visible` applies only to instances newly launched by the current run; standard ROT, delayed ROT, and optional `Dispatch` attachment all preserve the user's window state.
+After fallback, the full PID→version map is compared, and execution is rejected if any version changes or becomes unknown.
 
-## 真机证据
+## Live-Machine Evidence
 
-- SolidWorks 2026 SP1.1，Revision `34.1.1`。
-- 被测 `scripts/sw_connect.py` SHA-256：`32aef993532ca1db6eabd5118bdda87474bdeea2812612a20e27a4c077baa460`。
-- 本轮自启独占实例，再把它作为既有实例验证附着；附着入口始终回报 `started_by_cad_studio=False`。
-- 分别验证可见窗口及专用未保存零件、隐藏窗口及空白会话，每组各 8 个案例，共 16 个案例。
-- 直接 Python API、独立 MCP stdio 均覆盖自然 ROT 和受控 ROT 查询失败，开关分别关闭、开启。
-- 自然 ROT 可用：均连接同一 PID。受控查询失败：默认阻止 Dispatch，返回 `SW_INSTANCE_NOT_READY`；显式启用后，真实版本化 Dispatch 返回同一 PID。
-- 每次都故意请求与原窗口相反的 `visible`；进程清单、文档清单、活动文档、未保存标记及窗口可见性均保留。
-- MCP 客户端退出后实例和文档仍存在；结束时关闭本轮专用空文档，不保存，再由最外层所有者退出本轮自启实例。
+- SolidWorks 2026 SP1.1, Revision `34.1.1`.
+- Tested `scripts/sw_connect.py` SHA-256: `32aef993532ca1db6eabd5118bdda87474bdeea2812612a20e27a4c077baa460`.
+- The run launched its own exclusive instance and then treated it as an existing instance to verify attachment; attachment entry points consistently reported `started_by_cad_studio=False`.
+- Verified both a visible window with a dedicated unsaved part and a hidden window with a blank session: 8 cases per group, 16 cases total.
+- Both the direct Python API and standalone MCP stdio covered natural ROT and controlled ROT lookup failures, with the toggle both off and on.
+- When natural ROT was available, all paths connected to the same PID. Under controlled lookup failure, `Dispatch` was blocked by default with `SW_INSTANCE_NOT_READY`; when explicitly enabled, real versioned `Dispatch` returned the same PID.
+- Every case intentionally requested the opposite `visible` state from the existing window; the process list, document list, active document, unsaved flag, and window visibility were all preserved.
+- Both the instance and documents remained intact after the MCP client exited; at teardown, the dedicated blank document was closed without saving, and the outermost owner exited the self-launched instance.
 
-本机自然 ROT 可用，故障条件通过仅替换 `GetActiveObject` 注入；Dispatch、进程枚举和 SolidWorks COM 操作真实执行。没有宣称复现了本机自然 ROT 故障。
-原始报告留在本机，公开记录不包含 PID 或私人机器路径。SW2024 为贡献者原始记录，见 [rot-sw2024-regression.md](rot-sw2024-regression.md)，本轮未独立复验。
+Natural ROT worked on this machine, so the failure condition was injected solely by replacing `GetActiveObject`; `Dispatch`, process enumeration, and SolidWorks COM operations executed natively. No claim is made of reproducing a natural ROT failure on this machine.
+Raw reports remain local; the public record contains no PIDs or private machine paths. The SW2024 record is the contributor's original report (see [rot-sw2024-regression.md](rot-sw2024-regression.md)) and was not independently re-verified in this run.
 
-## 重跑与边界
+## Rerun and Boundaries
 
-使用唯一、版本明确的既有实例，输出目录须不存在。专用未保存测试文档仅可在空白会话创建。
+Use a single, version-explicit existing instance; the output directory must not exist. The dedicated unsaved test document can only be created in a blank session.
 
 ```powershell
 python tests/manual_rot_attachment.py --version 2026 --create-test-document --output output/rot-native-new-run
 ```
 
-脚本在自然 ROT 可用时对直接 API 和独立 MCP 服务额外注入查询故障；所有附着测试均请求相反显示参数。脚本本身不会退出 SolidWorks。异常中断后应检查专用未保存文档，不自动清理未知文档。
+When natural ROT is available, the script additionally injects lookup failures for both the direct API and the standalone MCP server; all attachment tests request the opposite visibility parameter. The script itself does not exit SolidWorks. After an abnormal abort, inspect the dedicated unsaved document rather than automatically cleaning up unknown documents.
 
-`SW_ATTACH_EXISTING_DISPATCH=1` 仍默认关闭。Dispatch 在其他安装环境可能启动新进程，事后身份检查不能防止构造动作本身；身份不符会停止，不退出未知进程，不自动重试。此功能不修复 Windows ROT，不代表建模、运动或制造验收。
+`SW_ATTACH_EXISTING_DISPATCH=1` remains disabled by default. On other installations, `Dispatch` may launch a new process, and post-hoc identity verification cannot prevent the constructor call itself; on identity mismatch, execution halts without exiting the unknown process or auto-retrying. This feature does not fix Windows ROT and does not constitute modeling, motion, or manufacturing acceptance.
