@@ -1,95 +1,95 @@
 ---
 name: autocad-automation
-description: "AutoCAD 自动化技能。用于让 Codex/Claude 在 Windows 上通过 Python COM/ActiveX 直连本机 AutoCAD 进行二维绘图、图层/文字/标注/块处理、DWG/DXF/PDF 导出、批量修改、工程图自检，以及在 COM 不足时切换到 AutoLISP/SCR 或 AutoCAD .NET 插件路线；当用户提到 AutoCAD、CAD、DWG、DXF、画图、出图、图层、标注、块、批量改图、AutoLISP、ObjectARX、.NET 插件、Codex 接入 CAD 软件时都应优先使用。"
+description: "AutoCAD automation skill. Enables Codex/Claude on Windows to connect directly to local AutoCAD via Python COM/ActiveX for 2D drafting, layer/text/dimension/block handling, DWG/DXF/PDF export, batch modification, drawing self-inspection, and switching to AutoLISP/SCR or AutoCAD .NET plugin workflows when COM is insufficient. Prioritize this skill whenever the user mentions AutoCAD, CAD, DWG, DXF, 2D drafting, plotting, layers, dimensions, blocks, batch drawing edits, AutoLISP, ObjectARX, .NET plugins, or integrating Codex with CAD software."
 metadata: { "os": ["win32"], "requires": { "anyBins": ["python", "py"], "pythonPackages": ["pywin32"] } }
 ---
 
-# AutoCAD 自动化技能
+# AutoCAD Automation Skill
 
-> 本目录作为 `solidworks-automation-skill` 的 AutoCAD/DWG 子技能使用。父技能负责 SolidWorks 建模、装配、工程图和三维导出；本子技能负责 AutoCAD 二维 DWG/DXF 绘制、批量改图、线稿矢量化、出图预览和图纸自检。涉及 SolidWorks 原生零件/装配体建模时回到父技能，涉及 AutoCAD 图纸或 DWG/DXF 时读取本子技能。
+> This directory serves as the AutoCAD/DWG subskill of `solidworks-automation-skill`. The parent skill handles SolidWorks modeling, Assembly, Drawing, and 3D export; this subskill handles AutoCAD 2D DWG/DXF drafting, batch drawing modification, line-art vectorization, plot preview, and drawing self-inspection. Return to the parent skill for native SolidWorks Part/Assembly modeling, and read this subskill for AutoCAD drawings or DWG/DXF tasks.
 
-## 目标
+## Objective
 
-让代理在本机 Windows 桌面环境中可靠控制 AutoCAD，而不是每次凭记忆临时拼命令。默认路线是 Python + COM/ActiveX，但原生写入必须先通过 `capabilities.yaml` 门禁和本机真机回归；当前 AutoCAD 2024 的 Documents/Layers/SelectionSets 动态代理不稳定，因此 COM 原生 DWG 绘图按 `not_implemented` 处理。DXF 无头读取、预览和结构审查可直接使用。AutoCAD 2024 .NET 白名单后端已连续通过真实 DWG 保存重开、PDF/PNG 和实体/图层/尺寸回归，运行时证据完整时为 `verified`；只允许固定命令，不得推广成任意代码执行。
+Enable agents to reliably control AutoCAD in a local Windows desktop environment instead of assembling ad-hoc commands from memory. The default route is Python + COM/ActiveX, but native writing must first pass the `capabilities.yaml` gate and live-machine regression tests; currently, AutoCAD 2024's `Documents`/`Layers`/`SelectionSets` dynamic proxies are unstable, so native COM DWG drafting is treated as `not_implemented`. Headless DXF reading, preview, and structural inspection can be used directly. The AutoCAD 2024 .NET allowlisted backend has passed consecutive regressions for real DWG save/reopen, PDF/PNG export, and entity/layer/dimension checks, reaching `verified` status when runtime evidence is complete; only fixed commands are permitted, and it must never be generalized into arbitrary code execution.
 
-## 适用场景
+## Applicable Scenarios
 
-使用本技能处理：
+Use this skill for:
 
-- 新建或修改 DWG/DXF 图纸，绘制线、圆、圆弧、多段线、矩形、文字、块、图层和简单标注。
-- 批量打开 DWG，检查图层、实体数量、文字、块参照、外部参照或输出文件。
-- 让 Codex 直接连接本机 AutoCAD、保存 DWG、导出 DXF/PDF，并生成复核报告。
-- 编写 AutoLISP、`.scr` 命令脚本或 C# AutoCAD .NET 插件。
-- 需要查 Autodesk 官方 API、ADN/GitHub 示例、ObjectARX SDK 或 APS Design Automation 模式。
+- Creating or modifying DWG/DXF drawings, drafting lines, circles, arcs, polylines, rectangles, text, blocks, layers, and basic dimensions.
+- Batch-opening DWGs to inspect layers, entity counts, text, block references, external references (Xrefs), or output files.
+- Having Codex connect directly to local AutoCAD, save DWGs, export DXF/PDF, and generate review reports.
+- Writing AutoLISP, `.scr` command scripts, or C# AutoCAD .NET plugins.
+- Looking up official Autodesk APIs, ADN/GitHub samples, ObjectARX SDK, or APS Design Automation patterns.
 
-不要把本技能用于纯渲染效果图、BIM/Revit 模型、机械 STEP-first 建模、CAM 刀路或工程认证结论；这些需求优先转给相应 CAD、BIM、仿真或制造流程。
+Do not use this skill for pure photorealistic rendering, BIM/Revit models, mechanical STEP-first 3D modeling, CAM toolpaths, or engineering certification sign-off; route those requests to the appropriate CAD, BIM, simulation, or manufacturing workflows.
 
-## 默认假设
+## Default Assumptions
 
-- 操作系统：Windows。
-- AutoCAD：用户本机已安装，最好已手动启动一次完成 COM 注册。
-- 自动化入口：`AutoCAD.Application` COM ProgID。
-- 可视化默认：新建绘图任务默认先显示并激活 AutoCAD，再逐步落图元；只有批处理或用户明确要求提速时才关闭。
-- 绘图单位：默认按毫米理解；AutoCAD 数据库本身是无单位数值，必须在图纸说明中记录单位。
-- 空间：几何默认进入 ModelSpace；版面、标题栏和打印配置单独处理。
-- 坐标：默认 WCS，二维对象使用 `Z=0`。
-- 输出：优先保存 DWG，同时按用户需求导出 DXF/PDF；所有输出路径使用绝对路径。
-- 文件安全：修改既有 DWG 前先另存副本，除非用户明确允许覆盖。
+- Operating system: Windows.
+- AutoCAD: Installed locally on the user's machine, ideally launched manually at least once to complete COM registration.
+- Automation entry point: `AutoCAD.Application` COM ProgID.
+- Visual default: For new drafting tasks, show and activate AutoCAD first, then draw entities step-by-step; disable live preview only for batch jobs or when the user explicitly requests faster execution.
+- Drawing units: Assumed to be millimeters by default; the AutoCAD database itself stores unitless numeric values, so units must be recorded in drawing notes.
+- Space: Geometry defaults to ModelSpace; layouts, title blocks, and plot configurations are handled separately.
+- Coordinates: WCS by default; 2D objects use `Z=0`.
+- Output: Save DWG first, and export DXF/PDF per user requirements; use absolute paths for all output paths.
+- File safety: Save a copy before modifying an existing DWG unless the user explicitly authorizes overwriting.
 
-缺少版本、单位、图纸标准、输出路径或是否允许覆盖时，先做一次简短确认。简单草图可以直接假设毫米、ModelSpace、新建 DWG，并在结果中说明。
+If version, units, drawing standard, output path, or overwrite permission is missing, ask briefly to confirm. For simple sketches, assume millimeters, ModelSpace, and a new DWG, and state those assumptions in the result.
 
-## 入口自检
+## Entry Preflight Check
 
-执行 AutoCAD 自动化前先运行：
+Before running AutoCAD automation, run:
 
 ```powershell
 python subskills\autocad-automation\scripts\acad_preflight.py
 ```
 
-如果用户允许自动启动 AutoCAD：
+If the user allows launching AutoCAD automatically:
 
 ```powershell
 python subskills\autocad-automation\scripts\acad_preflight.py --launch
 ```
 
-自检失败时：
+If the preflight check fails:
 
-- 缺 `pywin32`：提示用户安装 `python -m pip install pywin32`，得到明确同意后再安装。
-- 找不到 AutoCAD COM：提示用户安装 AutoCAD、启动一次 AutoCAD，或确认安装的是 LT/受限环境。
-- AutoCAD 已运行但无活动文档：可以新建文档，不要误判为连接失败。
+- Missing `pywin32`: prompt the user to install `python -m pip install pywin32`, and install only after explicit approval.
+- AutoCAD COM not found: prompt the user to install AutoCAD, launch AutoCAD once manually, or confirm whether AutoCAD LT / a restricted environment is installed.
+- AutoCAD is running with no active document: create a new document rather than misreporting a connection failure.
 
-## 核心工作流
+## Core Workflow
 
-项目提供图幅和标题栏规则时，可运行 `scripts/acad_headless.py drawing.dxf --template project-drawing.json --json drawing-checklist.json`。模板字段和 A4 样例见 [DXF 项目模板复核](README.md#dxf-项目模板复核)，报告保留尺寸避让与出图可读性的人工复核。
+When a project provides sheet-size and title-block rules, run `scripts/acad_headless.py drawing.dxf --template project-drawing.json --json drawing-checklist.json`. See [DXF Project Template Review](README.md#dxf-项目模板复核) for template fields and the A4 sample; the report preserves manual review items for dimension clearance and plot readability.
 
-1. **分类任务**：判断是新建图纸、修改既有 DWG、批处理、出图导出、API 开发、插件开发还是故障排查。
-2. **确认关键约束**：单位、版本、目标文件、输出格式、是否允许覆盖、图层/线型/标注标准、是否需要按企业模板绘图。
-3. **运行自检**：先用 `acad_preflight.py` 确认 Python COM 和 AutoCAD 状态。
-4. **查证 API**：未封装 API 必须先读 `references/api-lookup.md`，再查 Autodesk 官方文档或可信 GitHub 示例；不要猜长参数、枚举值和命令行为。
-5. **制定绘图计划**：写明图层、坐标基准、对象清单、尺寸、文本、输出路径和复核点。
-6. **先把软件拉起来**：连接或启动 AutoCAD，确保窗口可见并尽量切到前台，再开始落图。
-7. **优先复用脚本**：简单几何用 `scripts/acad_draw.py` 的 JSON 输入；复杂逻辑用 `scripts/acad_session.py` 组合 COM 调用。
-8. **串行执行 COM**：AutoCAD 桌面 COM 操作不要并行；一个脚本连接、逐步绘制、保存、复核后退出。
-9. **保存和导出**：保存 DWG/DXF/PDF 前确保目录存在；修改原图时保留备份或另存。
-10. **复核结果**：运行 `scripts/acad_review.py` 统计实体、图层、包围盒和目标文件；再运行 `scripts/acad_preview.py` 导出 AutoCAD 原生 BMP/PNG 预览，并用图片查看工具做视觉审查。窗口截图可作为补充，但若被其它窗口遮挡，不可作为通过依据。
-    若输入是 DXF 且只需无头只读检查，可先运行 `scripts/acad_headless.py`；它不支持 DWG 写入，最终 DWG/PDF 仍须走 AutoCAD COM。
-11. **沉淀经验**：遇到新坑、命令差异、版本限制或稳定封装，补进 `references/troubleshooting.md` 或脚本。
+1. **Classify the task**: Determine whether it is new drafting, modifying an existing DWG, batch processing, plotting/export, API development, plugin development, or troubleshooting.
+2. **Confirm key constraints**: Units, version, target file, output formats, overwrite permission, layer/linetype/dimension standards, and whether a company template is required.
+3. **Run preflight**: Use `acad_preflight.py` first to verify Python COM and AutoCAD status.
+4. **Verify APIs**: For unwrapped APIs, read `references/api-lookup.md` first, then consult official Autodesk documentation or trusted GitHub examples; never guess long parameter lists, enum values, or command behaviors.
+5. **Create a drafting plan**: Specify layers, coordinate datums, entity list, dimensions, text, output paths, and review checkpoints.
+6. **Launch the application first**: Connect to or launch AutoCAD, ensure the window is visible and brought to the foreground where possible, then start creating entities.
+7. **Reuse existing scripts first**: Use `scripts/acad_draw.py` with JSON input for simple geometry; compose COM calls via `scripts/acad_session.py` for complex logic.
+8. **Run COM serially**: Never run desktop AutoCAD COM operations in parallel; use a single script to connect, draw incrementally, save, verify, and exit.
+9. **Save and export**: Ensure target directories exist before saving DWG/DXF/PDF; keep a backup or save a copy when modifying existing drawings.
+10. **Verify results**: Run `scripts/acad_review.py` to tally entities, layers, bounding boxes, and output files; then run `scripts/acad_preview.py` to export an AutoCAD native BMP/PNG preview and visually inspect it with an image viewer. OS window screenshots may supplement this, but cannot serve as pass evidence if occluded by other windows.
+    If the input is a DXF and only headless read-only inspection is needed, run `scripts/acad_headless.py` first; it does not support DWG writing, so final DWG/PDF outputs still require AutoCAD COM.
+11. **Capture lessons learned**: Record newly discovered pitfalls, command differences, version limitations, or stable wrappers in `references/troubleshooting.md` or the scripts.
 
-### 机械零件图和 3D 打印开孔图硬性要求
+### Hard Requirements for Mechanical Part Drawings and 3D-Printed Enclosure Cutout Drawings
 
-当用户要求“严格遵守规范”“中国人正常喜欢的格式”“国标图纸”“加工图”“3D打印开孔”或类似机械制图交付时，必须按机械图纸而不是示意图处理：
+When the user requests "strict adherence to standards", "standard Chinese engineering drawing format", "GB/T drawings", "machining drawings", "3D-printed enclosure cutouts", or similar mechanical drafting deliverables, treat the output as an engineering drawing rather than a schematic diagram:
 
-1. 优先使用用户或企业模板；没有模板时，按国内常用 GB/T 风格出图，至少包含 A3/A4 图幅、装订边、右下标题栏、仿宋中文、粗实线/细实线/中心线/虚线/尺寸/文字/开孔分层，并在交付说明中写清“参照国标风格，未替代企业审图”。
-2. 所有实际切除、开孔、开槽、接口、水口、螺丝孔和螺丝柱必须同时给出规格和定位尺寸。仅写 `4×φ3.4`、`7×4×30`、`2×φ13.5` 而没有相对基准边、中心距、节距或高度定位，视为未完成。
-3. 孔槽密集或会造成长引线跨视图时，优先使用“孔槽明细表/孔表/槽表”，表内至少包含部位、规格、数量和定位；图面尺寸线负责关键基准、中心距和总尺寸。
-4. 不允许用随意长引线替代尺寸链；引线不得穿越其它视图、中心线、孔轮廓或尺寸文字。无法清爽标注时，移动视图、拆分视图或改用表格。
-5. 3D 打印外壳图必须标清壁厚、底厚、外形总尺寸、接口开孔尺寸、接口中心定位、装配孔中心距和水口/散热槽定位；否则用户无法按图开孔。
-6. 标注必须优先使用 AutoCAD 真实尺寸实体，例如 `AcDbRotatedDimension`，不要手画尺寸线冒充尺寸。
-7. 视觉验收不能只看实体统计。必须导出预览并目视检查：尺寸是否漏标、文字是否重叠、尺寸线是否压视图、引线是否跨视图、孔表是否可读、标题栏是否被尺寸侵入。发现问题先返工再汇报。
+1. Prioritize the user's or company's template; without a template, follow common Chinese GB/T conventions including at least an A3/A4 sheet size, binding margin, lower-right title block, FangSong (仿宋) Chinese font, and separate layers for thick solid lines, thin solid lines, centerlines, hidden lines, dimensions, text, and cutouts, and state clearly in the delivery notes: "Styled after GB/T conventions; does not replace formal company drawing review."
+2. Every actual cutout, hole, slot, port, gate/spigot, screw hole, and screw boss must specify both size and locating dimensions. Writing only `4×φ3.4`, `7×4×30`, or `2×φ13.5` without distances from datum edges, center-to-center spacing, pitch, or height locations counts as incomplete.
+3. When holes/slots are dense or would require long leaders crossing views, prefer a hole/slot schedule (hole table / slot table) listing at least feature location/ID, size, quantity, and coordinates; use on-view dimension lines for key datums, center distances, and overall dimensions.
+4. Do not use arbitrary long leaders to replace dimension chains; leaders must not cross other views, centerlines, hole outlines, or dimension text. If clean annotation is impossible, reposition views, split views, or switch to a table.
+5. 3D-printed enclosure drawings must clearly dimension wall thickness, base thickness, overall external dimensions, port cutout sizes, port center locations, mounting-hole center distances, and spigot/ventilation-slot locations; otherwise the user cannot cut or verify openings from the drawing.
+6. Dimensions must use real AutoCAD dimension entities such as `AcDbRotatedDimension`; do not manually draw lines and text to mimic dimensions.
+7. Visual acceptance cannot rely on entity counts alone. Export a preview and visually inspect for missing dimensions, overlapping text, dimension lines colliding with views, leaders crossing views, readable hole tables, and title-block intrusion. Fix all issues before reporting completion.
 
-## Codex 直连绘图
+## Direct Drafting with Codex
 
-简单任务可让 Codex 生成一个绘图 JSON，然后调用：
+For simple tasks, have Codex generate a drafting JSON and invoke:
 
 ```powershell
 python subskills\autocad-automation\scripts\acad_draw.py `
@@ -98,7 +98,7 @@ python subskills\autocad-automation\scripts\acad_draw.py `
   --new
 ```
 
-这个入口默认是“可见逐步绘图”模式：会先打开或切到 AutoCAD，再一点点把图元画出来。只有批量任务、回放太慢或用户明确要求快时，才加 `--fast`：
+This entry point defaults to "visible step-by-step drafting" mode: it opens or activates AutoCAD first and draws entities incrementally. Add `--fast` only for batch tasks, slow playback, or when the user explicitly requests faster execution:
 
 ```powershell
 python subskills\autocad-automation\scripts\acad_draw.py `
@@ -108,7 +108,7 @@ python subskills\autocad-automation\scripts\acad_draw.py `
   --fast
 ```
 
-JSON 结构示例：
+JSON structure example:
 
 ```json
 {
@@ -128,7 +128,7 @@ JSON 结构示例：
 }
 ```
 
-复杂任务使用 Python：
+Use Python for complex tasks:
 
 ```python
 import sys
@@ -144,58 +144,58 @@ session.live_update(step_delay_s=0.15, zoom=True)
 session.save_as(r"C:\temp\plate.dwg")
 ```
 
-## 技术路线选择
+## Technical Route Selection
 
-| 需求 | 首选路线 | 说明 |
+| Requirement | Preferred Route | Notes |
 |---|---|---|
-| 快速绘制、改图、批量检查 | Python COM/ActiveX | 本技能默认路线，可由 Codex 直接通过 shell 执行 |
-| 执行 AutoCAD 命令、调用已有命令习惯 | `SendCommand` / `.scr` / AutoLISP | 命令可能异步，必须保存和复核结果 |
-| 大量数据库事务、复杂选择过滤、插件菜单 | AutoCAD .NET | 适合 C# 插件，按官方 .NET Developer Guide 做事务和文档锁 |
-| 高性能原生扩展、深层数据库/图形系统 | ObjectARX C++ | 成本高，版本绑定强，先确认必要性 |
-| 云端批处理 DWG | APS Design Automation | 适合无桌面、批量生产或 CI，但需要 Autodesk APS 凭据 |
+| Rapid drafting, drawing edits, batch inspection | Python COM/ActiveX | Default route for this skill; executable directly by Codex via shell |
+| Running AutoCAD commands, reusing command workflows | `SendCommand` / `.scr` / AutoLISP | Commands may run asynchronously; always save and verify results |
+| Heavy database transactions, complex selection filters, plugin menus | AutoCAD .NET | Suitable for C# plugins; follow the official .NET Developer's Guide for transactions and document locking |
+| High-performance native extensions, deep database/graphics access | ObjectARX C++ | High development cost and tight version coupling; confirm necessity first |
+| Cloud batch processing of DWGs | APS Design Automation | Suitable for headless, bulk production, or CI, but requires Autodesk APS credentials |
 
-## 工程规则
+## Engineering Rules
 
-- 图层先建后画，颜色用 ACI 编号；不要把所有对象堆到 `0` 层。
-- 明确单位和比例，模型空间画 1:1；打印比例放到 Layout/Plot。
-- 坐标、尺寸、文字高度、孔径等关键参数写成变量，不把魔法数字散在代码里。
-- 机械图纸不要把“看得懂”当成“能制造”。开孔开槽必须有可复核基准和完整定位尺寸；图面空间不足时用孔表/槽表，不要用飞线式引出文字糊弄。
-- 根据图片生成线稿时，普通“照图画 CAD”的最终交付必须以原图矢量化线条为准。不要用大弧线、长折线、椭圆、三角形、彩色水波线、替代文字等手工猜测元素去补人物轮廓、五官、Logo、衣纹或水花；这些线容易像错误的 CAD 辅助线，用户会把它们理解成“这都是啥”。
-- 如果为了定位、调试或临时增强识别绘制了 `BODY_OUTLINE`、`JERSEY_OUTLINE`、`PORTRAIT_OUTLINE`、`OUTER_GUIDE`、`CONSTRUCTION`、`FACE_FEATURES`、`LOGO_GEOMETRY`、`WATER_SPLASH`、`JERSEY_STRIPE`、`TEXT_LOGO`、`TEXT_BRAND` 等构造/增强层，最终保存、预览和评分前必须删除、冻结、关闭或设为不打印，并在预览和图层统计中确认不可见、实体数为 0。
-- 只有当用户明确要求“重构标识”“增强五官”“补画水花”“加文字/标注”等创作型改图时，才可保留手工增强层；保留前要说明这些不是原图自然矢量线，并优先用独立图层，便于一键关闭。
-- 审查说明、评分、生成参数放到 JSON/Markdown 报告，不要作为可见文字写入最终 CAD 模型空间，除非用户明确要求图内标注。
-- COM 返回对象要检查，保存/导出后检查文件是否存在和大小是否合理。
-- `SendCommand` 是最后手段；优先调用对象模型方法，命令脚本要用 `_.COMMAND` 形式降低界面语言影响。
-- 用户明确说“我要看着它画”时，不要后台闷头生成；先把 AutoCAD 打开并前置，再逐步落图元。
-- SelectionSet 名称可能残留；创建前先删除同名选择集。
-- 批处理 DWG 时每张图单独 try/finally，失败要记录文件名、错误和阶段。
-- 对用户原图默认只读打开或另存副本；覆盖必须得到明确授权。
-- 不把任意 Python/VBA/AutoLISP 执行口暴露成通用 MCP 工具；如做 MCP，只提供白名单绘图/导出/复核工具。
+- Create layers before drawing entities, using ACI color indices; never dump all objects onto layer `0`.
+- Specify units and scale explicitly; draw 1:1 in ModelSpace and configure plot scale in Layout/Plot.
+- Store key parameters such as coordinates, dimensions, text heights, and hole diameters as variables rather than scattering magic numbers through code.
+- For mechanical drawings, do not confuse "visually understandable" with "manufacturable". Cutouts and slots must have verifiable datums and complete locating dimensions; when drawing space is tight, use a hole/slot table instead of stray callout leaders.
+- When generating line art from a reference image, a standard "trace image to CAD" deliverable must rely strictly on vectorized lines from the original image. Do not manually add guessed large arcs, long polylines, ellipses, triangles, colored splash waves, or placeholder text to fill in portraits, facial features, logos, folds, or splashes; users perceive these as erroneous CAD construction lines.
+- If construction or enhancement layers such as `BODY_OUTLINE`, `JERSEY_OUTLINE`, `PORTRAIT_OUTLINE`, `OUTER_GUIDE`, `CONSTRUCTION`, `FACE_FEATURES`, `LOGO_GEOMETRY`, `WATER_SPLASH`, `JERSEY_STRIPE`, `TEXT_LOGO`, or `TEXT_BRAND` were created for positioning, debugging, or temporary recognition aid, they must be deleted, frozen, turned off, or set to non-plotting before final save, preview, and scoring, and verified as invisible with 0 entities in both preview and layer statistics.
+- Retain manually enhanced layers only when the user explicitly requests creative edits such as "reconstruct logo", "enhance facial features", "add water splashes", or "add text/callouts"; clarify beforehand that they are not raw traced vectors and place them on dedicated layers for easy toggling.
+- Put review notes, scores, and generation parameters into JSON/Markdown reports—never write them as visible text into final CAD ModelSpace unless the user explicitly asks for in-drawing notes.
+- Validate COM return objects, and verify file existence and reasonable file size after every save/export.
+- Treat `SendCommand` as a last resort; prefer object model methods, and prefix script commands with `_.COMMAND` to avoid UI-language localization issues.
+- When the user explicitly says "I want to watch it draw", do not generate silently in the background; open and foreground AutoCAD first, then place entities step-by-step.
+- `SelectionSet` names can persist in a drawing; delete any existing selection set with the same name before creating a new one.
+- During batch DWG processing, wrap each drawing in its own `try/finally` block and log the filename, error, and stage on failure.
+- Open existing user drawings read-only or save to a copy by default; explicit authorization is required before overwriting.
+- Never expose arbitrary Python/VBA/AutoLISP execution as a generic MCP tool; if building an MCP server, expose only allowlisted drafting/export/review tools.
 
-## GitHub 与官方文档策略
+## GitHub & Official Documentation Policy
 
-优先来源：
+Preferred sources:
 
-- Autodesk AutoCAD API 概览、ActiveX/VBA、Managed .NET、ObjectARX 和 APS 官方文档。
-- ADN-DevTech / Autodesk Platform Services GitHub 示例。
-- `pyautocad` 等成熟开源项目可借鉴坐标、迭代和 COM 封装模式，但不要复制不明许可证代码。
-- 论坛、博客和 Stack Overflow 只作排错补充；关键 API 仍回到官方文档确认。
+- Autodesk AutoCAD API Overview, ActiveX/VBA, Managed .NET, ObjectARX, and APS official documentation.
+- ADN-DevTech / Autodesk Platform Services GitHub examples.
+- Mature open-source projects such as `pyautocad` may be referenced for coordinate handling, iteration, and COM wrapper patterns, but do not copy code with unclear licensing.
+- Forums, blogs, and Stack Overflow are supplemental for troubleshooting only; confirm key APIs against official documentation.
 
-当资料冲突时，以目标 AutoCAD 版本的官方文档和本机实测结果为准。
+When sources conflict, defer to the official documentation for the target AutoCAD version and local machine test results.
 
-## 渐进参考
+## Progressive References
 
-按需读取，不要一次塞满上下文：
+Read on demand rather than loading everything into context at once:
 
-- `references/api-lookup.md`：官方文档、GitHub 示例和 API 查证路线。
-- `references/engineering-patterns.md`：资深工程师绘图、图层、单位、块、标注和批处理经验。
-- `references/troubleshooting.md`：COM、AutoCAD 会话、SendCommand、保存导出和版本问题排查。
+- `references/api-lookup.md`: Official documentation, GitHub samples, and API verification workflow.
+- `references/engineering-patterns.md`: Senior engineering practices for drafting, layers, units, blocks, dimensions, and batch processing.
+- `references/troubleshooting.md`: Troubleshooting COM, AutoCAD sessions, `SendCommand`, saving/exporting, and version issues.
 
-## 验收与汇报
+## Acceptance & Reporting
 
-完成 AutoCAD 操作后，最终回复要包含：
+After completing AutoCAD operations, the final report must include:
 
-- 输入假设：单位、版本、模板、是否新建/修改原图。
-- 输出文件：DWG/DXF/PDF/JSON 报告和 BMP/PNG 预览的绝对路径。
-- 实际执行的验证：自检、实体统计、图层统计、包围盒、保存/导出检查、AutoCAD 原生预览图审查；根据图片生成线稿时，还要确认最终预览中没有额外外围辅助轮廓线、内部辅助几何、彩色装饰线或图内审查说明显示；若使用窗口截图，还要说明是否无遮挡。
-- 仍需人工确认的事项：图框、打印机、企业标准、线宽、字体、比例、专业审图。
+- Input assumptions: units, version, template, and whether a new drawing was created or an existing one modified.
+- Output files: absolute paths to DWG/DXF/PDF/JSON reports and BMP/PNG previews.
+- Verification actually performed: preflight, entity counts, layer counts, bounding box, save/export checks, and visual review of AutoCAD native preview images; for raster-to-CAD line art, also confirm that the final preview shows no extra outer guide contours, internal construction geometry, colored decorative lines, or in-drawing review notes; if OS window screenshots were used, state whether the window was unobstructed.
+- Items still requiring manual confirmation: title block/border, plotter, company standards, lineweights, fonts, scale, and formal engineering drawing review.

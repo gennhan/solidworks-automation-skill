@@ -1,14 +1,11 @@
-# SW2026 扩展 GD&T 结构化输入
+# SW2026 Extended GD&T Structured Inputs
 
-入口、源文件保护和保存重开规则见 [native-gdt.md](native-gdt.md)。这里的字段同时适用于
-图纸副本计划与 DrawingSpec 的 `professionalAnnotations.geometricTolerances`，
-通过既有 `solidworks_generate_drawing` MCP 工具执行，不新增工具。
-旧单框字段和旧字母基准列表保持兼容。数值示例用于 API 回归，不能直接作为生产公差。
+See [native-gdt.md](native-gdt.md) for entry points, source-file protection, and save-and-reopen rules. The fields documented here apply to both drawing-copy plans and `professionalAnnotations.geometricTolerances` in `DrawingSpec`, executed through the existing `solidworks_generate_drawing` MCP tool without adding new tools.
+Legacy single-frame fields and plain-letter datum lists remain backward-compatible. Numeric examples are for API regression only and must not be used directly as production tolerances.
 
-## 公共基准与子基准组
+## Common Datums and Datum Sub-Groups
 
-`datums` 最多包含三个按优先级排列的基准格；每格可为单个字母、带修饰的单个基准，
-或一组公共基准。公共组写在同一格，不能用自由字符串 `"A-B"` 代替。
+`datums` contains up to three precedence-ordered datum compartments; each compartment may be a single letter, a single datum with modifiers, or a common datum group. Write a common group inside one compartment rather than substituting a free-form string like `"A-B"`.
 
 ```json
 {
@@ -20,11 +17,10 @@
 }
 ```
 
-第一格表达 `A-B-(C-D)`，第二格为 E。每个成员必须对应实际存在或本计划声明的基准，
-同一框中不得重复字母；公共组为 2..8 个成员，最多三个子基准组，每组 2..8 个成员。
-各成员可独立指定 M/L/S。复合后续层只能保留前层完整基准格的前缀，不能拆散公共组。
+The first compartment represents `A-B-(C-D)`, and the second is `E`. Every member must correspond to an existing datum or one declared in the current plan, with no duplicate letters within the same frame; a common group has 2..8 members, with up to three datum sub-groups of 2..8 members each.
+Each member may independently specify `M`/`L`/`S`. Subsequent composite frames may retain only a prefix of complete datum compartments from the preceding frame and cannot split a common group.
 
-单个基准还可以声明 `modifiers`；公共组成员也可使用这些字段：
+Individual datums—and members of common groups—may also declare `modifiers`:
 
 ```json
 {"label": "A", "modifiers": {
@@ -32,39 +28,36 @@
 }}
 ```
 
-`situation` 为 `plane` / `straightLine` / `point`，`section` 为 `cross` / `longitudinal`，
-`projection` 为明确的正十进制长度字符串（毫米），`freeState` 为布尔值。
-整个基准格可指定 `constraints`：`translationX/Y/Z`、`rotationX/Y/Z`、`contactFeature`、
-`orientationOnly`、`variableDistance` 是约束开关；`translation` 为三个有符号十进制字符串组成的 I/J/K 分量。
-这些是公差框要求，不会移动模型。约束适用性仍由设计者确认。
+`situation` accepts `plane` / `straightLine` / `point`; `section` accepts `cross` / `longitudinal`; `projection` is an explicit positive decimal length string (mm); `freeState` is a boolean.
+An entire datum compartment may specify `constraints`: `translationX/Y/Z`, `rotationX/Y/Z`, `contactFeature`, `orientationOnly`, and `variableDistance` are boolean constraint flags; `translation` is an array of three signed decimal strings for the I/J/K components.
+These specify feature control frame requirements and do not move model geometry. Suitability of constraints must still be confirmed by the designer.
 
-## 公差层选项
+## Frame-Level Options
 
-旧单框的 `options` 直接放在该公差项；多框时放在每个 `frames[]` 内。
-不能同时提供 `frames` 和顶层单框 `options`。
+For legacy single-frame items, place `options` directly on the tolerance item; for multi-frame items, place `options` inside each `frames[]` entry.
+Do not supply both `frames` and top-level single-frame `options`.
 
-| options 字段 | 结构与含义 |
+| `options` Field | Structure & Meaning |
 |---|---|
-| `projectedZone` | `{"projection":"12","range":"4"}`；主投影长度必填，范围可选，均为正毫米字符串。目前用于圆柱位置度或轴线方向公差。 |
-| `profileZone` | 轮廓不等分布、偏置、CZ/SZ、动态轮廓和公差带约束，见下方。 |
-| `zoneShape` | `none` / `diameter` / `sphericalDiameter` / `square`；圆柱/球形直径须与 `diameter:true` 一致。复合层不能改变形状。 |
-| `unitZone` | `separator`（`/` 或 `-`）、正 `value`、可选 `symbol`；可追加 `limit:{separator,value,symbol}`，第二分隔为 `X` 或 `-`。 |
-| `maxTolerance` | `{"value":"0.5","diameter":true}`；最大公差不得小于主公差。 |
-| `reciprocity` | 互易要求开关；启用时必须同时声明公差本体 `materialCondition:"M"` 或 `"L"`。 |
-| `freeState` / `statistical` | 公差本体的自由状态、统计公差开关，与基准成员的自由状态分别表达。 |
-| `symbolLibrary` | `iso` / `asme` / `gb`，分别映射 IGTOL / GTOL / GGTOL。默认保持旧 ISO 库；复合层不得改变符号库。 |
-| `associatedFeature` | Minimax / LeastSquares / MinimumCircumscribed / Tangent / MaximumInscribed。 |
-| `derivedFeature` | 尺寸要素导出特征开关。 |
-| `associatedCharacteristic` | C / CE / CI / G / GE / GI / X / N。 |
-| `parametricCharacteristic` | P / V / T / Q。 |
-| `filters` | 1..8 项显式滤波配置，见下方。 |
+| `projectedZone` | `{"projection":"12","range":"4"}`; primary projection length is required, range is optional, both positive millimeter strings. Currently used for cylindrical position or axis orientation tolerances. |
+| `profileZone` | Unequal profile distribution, offsets, CZ/SZ, dynamic profile, and zone constraints; see below. |
+| `zoneShape` | `none` / `diameter` / `sphericalDiameter` / `square`; cylindrical/spherical diameter must agree with `diameter:true`. Composite frames cannot change zone shape. |
+| `unitZone` | `separator` (`/` or `-`), positive `value`, optional `symbol`; may append `limit:{separator,value,symbol}` with second separator `X` or `-`. |
+| `maxTolerance` | `{"value":"0.5","diameter":true}`; maximum tolerance must not be smaller than the primary tolerance. |
+| `reciprocity` | Reciprocity requirement toggle; when enabled, the tolerance itself must also declare `materialCondition:"M"` or `"L"`. |
+| `freeState` / `statistical` | Free-state and statistical tolerance flags for the tolerance value itself, expressed separately from datum-member `freeState`. |
+| `symbolLibrary` | `iso` / `asme` / `gb`, mapping to `IGTOL` / `GTOL` / `GGTOL` respectively. Defaults to the legacy ISO library; composite frames cannot change symbol library. |
+| `associatedFeature` | `Minimax` / `LeastSquares` / `MinimumCircumscribed` / `Tangent` / `MaximumInscribed`. |
+| `derivedFeature` | Toggle for derived feature of size. |
+| `associatedCharacteristic` | `C` / `CE` / `CI` / `G` / `GE` / `GI` / `X` / `N`. |
+| `parametricCharacteristic` | `P` / `V` / `T` / `Q`. |
+| `filters` | 1..8 explicit filter entries; see below. |
 
-`unitZone.symbol` 与 `limit.symbol` 允许 `none`、`diameter`、`sphericalDiameter`、`square`、`angle`。
-公差、长度、偏置、滤波截止值使用非指数十进制字符串，最多 32 个字符；拒绝 NaN、Infinity、
-指数形式和未支持字段。负数仅用于明确允许的平移分量，偏置正负由 `direction` 指定。
-公差本体材料条件仍沿用原生入口已验证的范围；Schema 接受不等于标准或几何适用性已经证明。
+`unitZone.symbol` and `limit.symbol` allow `none`, `diameter`, `sphericalDiameter`, `square`, and `angle`.
+Tolerances, lengths, offsets, and filter cutoff values use non-exponential decimal strings up to 32 characters; `NaN`, `Infinity`, scientific notation, and unsupported fields are rejected. Negative numbers are permitted only for explicit translation components; offset sign is specified via `direction`.
+Material conditions on the tolerance value follow the verified native scope; schema acceptance does not prove standard compliance or geometric suitability.
 
-### 轮廓与公差带
+### Profile and Tolerance Zone
 
 ```json
 {"options": {"profileZone": {
@@ -75,11 +68,11 @@
 }}}
 ```
 
-不等分布使用 `unequalOutside:"0.05"`，不得超过总公差；它与 `offsets` 互斥。
-`offsets` 为一或两项，方向为 `outside` 或 `inside`。不等分布、偏置、动态轮廓要求使用线轮廓度或面轮廓度。
-`combination` 为 `CZ` 或 `SZ`；三个公差带约束不得重复。组合和约束可单独声明。
+Unequal distribution uses `unequalOutside:"0.05"`, which must not exceed the total tolerance and is mutually exclusive with `offsets`.
+`offsets` accepts one or two items with `direction` set to `outside` or `inside`. Unequal distribution, offsets, and dynamic profile require `line_profile` or `surface_profile`.
+`combination` is `CZ` or `SZ`; the three zone constraints must not contain duplicates. Combination and constraints may be declared independently.
 
-### 滤波
+### Filters
 
 ```json
 {"options": {"filters": [{
@@ -88,26 +81,23 @@
 }]}}
 ```
 
-每项必须提供滤波符号和正 `cutOff`，可选 `shortWave` / `longWave`。
-符号白名单为 G/S/SW/CW/RG/RS/OB/OH/OD/CB/CH/CD/AB/AH/AD/F/H。
-第二段具有自己的截止值和开关，双段必须显式指定 `separator:"Space"` 或 `"X"`。
+Each entry must supply a filter symbol and a positive `cutOff`, with optional `shortWave` / `longWave`.
+The symbol allowlist is `G`/`S`/`SW`/`CW`/`RG`/`RS`/`OB`/`OH`/`OD`/`CB`/`CH`/`CD`/`AB`/`AH`/`AD`/`F`/`H`.
+The second band has its own cutoff and flags; dual-band filters must explicitly specify `separator:"Space"` or `"X"`.
 
-## SW2026 实测格式差异与验收
+## Observed SW2026 Format Differences and Verification
 
-公开帮助和安装 XSD 是查证起点，实际接口并非逐字遵循它们。本机 SW2026 SP1.1 已确认：
+Public help and the installed XSD are starting points for investigation, but the actual API does not follow them verbatim. Local testing on SW2026 SP1.1 confirmed:
 
-- CZ/SZ 原生界面回读使用 `CombinationSymbol`，公开 XSD 的 `Combination` 会被接口静默丢弃。
-- 基准截面标志在实际回读中排在其他成员修饰之后。
-- 局部范围会补齐空的范围符号节点；`false` 缺省节点则被省略。
+- Native UI readback for CZ/SZ uses `CombinationSymbol`; the public XSD's `Combination` node is silently dropped by the API.
+- The datum section flag appears after other member modifiers in actual readback.
+- Unit zones fill in an empty range-symbol node, whereas `false` default nodes are omitted.
 
-生成器按已验证的原生形式构建 XML，并继续严格核对全部节点、值和顺序，
-不会通过忽略差异来隐藏选项丢失。失败报告指出首个差异路径，缺失/改变公共组成员、
-投影长度、材料条件或 CZ/SZ 都不能通过审查。未知选项在连接 CAD 前阻断，不回退为普通 Note。
+The generator constructs XML using the verified native form and strictly validates every node, value, and ordering without masking dropped options by ignoring diffs. Failure reports pinpoint the first diverging path; any missing or altered common-group member, projection length, material condition, or CZ/SZ fails review. Unknown options are blocked before connecting to CAD and never fall back to plain `Note` text.
 
-真机矩阵只使用自建测试件，逐例核对原生写入、保存重开、持久关联、PDF/BMP 与源哈希，
-并检查实际显示的 A-B、子基准组、P 长度、轮廓偏置和 CZ/SZ。
-稀有组合矩阵用于 API 验证，可能故意将很多符号放在同一测试位置，不作为可制造图纸交付。
-完整自动落图样例还必须通过 PDF/布局检查和目视复核。
+The live-machine matrix uses only self-created test parts, checking native writes, save-and-reopen, persistent attachments, PDF/BMP outputs, and source hashes case-by-case, and inspecting the rendered `A-B`, datum sub-groups, `P` projection lengths, profile offsets, and CZ/SZ.
+The rare-combination matrix is for API verification and may intentionally stack many symbols at the same test location; it is not a manufacturable drawing deliverable.
+Full automated drawing generation samples must additionally pass PDF/layout inspection and visual review.
 
 ```powershell
 python -m pytest -q tests/test_sw_gdt_options.py tests/test_sw_gdt_annotation.py tests/test_sw_gdt_copy.py tests/test_sw_drawing_native.py
@@ -115,5 +105,4 @@ python tests/solidworks_gdt_extended_live.py --source C:\test\self-created.slddr
 python tests/solidworks_gdt_generation_live.py --source C:\test\self-created-plate.sldprt --extended-gdt --mcp
 ```
 
-真机和 `test_sw_read_guard` 不并行执行。输出继续保持 `review_required`，
-本功能表达用户给定要求，不自动证明任意参数组合符合制造标准。
+Do not run live-machine tests in parallel with `test_sw_read_guard`. Outputs remain `review_required`; this feature expresses user-supplied requirements and does not automatically prove that arbitrary parameter combinations comply with manufacturing standards.

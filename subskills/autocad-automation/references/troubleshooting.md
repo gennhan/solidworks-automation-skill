@@ -1,100 +1,100 @@
-# AutoCAD 自动化排查
+# AutoCAD Automation Troubleshooting
 
-## Python 依赖
+## Python Dependencies
 
-症状：`ModuleNotFoundError: No module named 'win32com'`
+Symptom: `ModuleNotFoundError: No module named 'win32com'`
 
-处理：
+Resolution:
 
 ```powershell
 python -m pip install pywin32
 python -m pywin32_postinstall -install
 ```
 
-如果本机有多个 Python，使用执行脚本的同一个解释器安装。
+If multiple Python installations exist on the machine, install into the exact same interpreter used to execute the scripts.
 
-## 找不到 AutoCAD COM
+## AutoCAD COM Not Found
 
-症状：`Invalid class string`、`Operation unavailable`、`AutoCAD.Application` 创建失败。
+Symptom: `Invalid class string`, `Operation unavailable`, or `AutoCAD.Application` creation fails.
 
-处理：
+Resolution:
 
-1. 确认安装的是 Windows 桌面版 AutoCAD。
-2. 手动启动 AutoCAD 一次，让 COM 注册和首次配置完成。
-3. 确认不是无桌面服务会话、远程无 GUI 会话或权限受限环境。
-4. 如果安装多个版本，先用默认 `AutoCAD.Application`，必要时查注册表确认版本化 ProgID。
+1. Confirm that the Windows desktop edition of AutoCAD is installed.
+2. Launch AutoCAD manually once to complete COM registration and initial setup.
+3. Confirm the script is not running in a headless service session, remote non-GUI session, or restricted permission environment.
+4. If multiple versions are installed, try the default `AutoCAD.Application` first; if needed, inspect the registry for versioned ProgIDs.
 
-## AutoCAD 已打开但无活动文档
+## AutoCAD Is Open but Has No Active Document
 
-症状：连接成功，访问 `ActiveDocument` 报错。
+Symptom: Connection succeeds, but accessing `ActiveDocument` raises an error.
 
-处理：调用 `Documents.Add()` 新建图纸，或显式打开目标 DWG。
+Resolution: Call `Documents.Add()` to create a new drawing, or explicitly open the target DWG.
 
-## 新建文档后访问 `Layers` / `ModelSpace` 失败
+## Accessing `Layers` / `ModelSpace` Fails After Creating a New Document
 
-症状：`Documents.Add()` 后返回对象访问 `Layers` 报 `AttributeError: Add.Layers`。
+Symptom: Accessing `Layers` on the object returned by `Documents.Add()` raises `AttributeError: Add.Layers`.
 
-处理：在 AutoCAD 2024 + pywin32 动态代理环境中，`Documents.Add()` 的返回值可能不是稳定的 `AcadDocument` 代理。调用 `Documents.Add()` 后重新绑定：
+Resolution: In AutoCAD 2024 + pywin32 dynamic proxy environments, the return value of `Documents.Add()` may not be a stable `AcadDocument` proxy. Rebind after calling `Documents.Add()`:
 
 ```python
 app.Documents.Add()
 doc = app.ActiveDocument
 ```
 
-`scripts/acad_session.py` 的 `new_document()` 已按此方式实现。
+`new_document()` in `scripts/acad_session.py` already implements this pattern.
 
-## `SendCommand` 没有效果
+## `SendCommand` Has No Effect
 
-常见原因：
+Common causes:
 
-- 命令字符串缺少最后的换行。
-- 命令异步执行，脚本立刻保存导致命令尚未完成。
-- 本地化界面导致命令名变化。
-- 命令正在等待用户输入。
+- Missing trailing newline in the command string.
+- Asynchronous command execution causes the script to save immediately before the command completes.
+- Localized UI alters command names.
+- The command is still waiting for user input.
 
-建议：
+Recommendations:
 
-- 优先用 COM 对象模型。
-- 命令前加 `_.`，例如 `_.ZOOM _E`。
-- 每条命令显式提供所有参数和换行。
-- 发送后等待并用 `acad_review.py` 验证结果。
+- Prefer the COM object model.
+- Prefix commands with `_.`, such as `_.ZOOM _E`.
+- Explicitly supply all parameters and trailing newlines for every command.
+- Wait after sending commands and verify results with `acad_review.py`.
 
-## 保存失败或覆盖风险
+## Save Failures or Overwrite Risk
 
-处理：
+Resolution:
 
-- 输出路径使用绝对路径。
-- 保存前创建目录。
-- 修改既有 DWG 前另存副本。
-- 关闭占用该文件的其他程序。
-- 失败时记录异常，不要继续导出衍生文件。
+- Always use absolute paths for output files.
+- Create target directories before saving.
+- Save a copy before modifying an existing DWG.
+- Close any other applications locking the file.
+- Log exceptions on failure and do not proceed to export derivative files.
 
-## DXF 导出失败
+## DXF Export Fails
 
-症状：`Document.SaveAs("xxx.dxf")` 失败，或 AutoCAD 返回乱码 COM 错误。
+Symptom: `Document.SaveAs("xxx.dxf")` fails, or AutoCAD returns a garbled COM error.
 
-处理：DXF 不要依赖 `SaveAs` 扩展名推断，使用 `Document.Export(fileBase, "DXF", selectionSet)`。ActiveX `Export` 即使导出整张图也要求传入 `SelectionSet` 参数，可创建临时空选择集。`scripts/acad_session.py` 的 `export_dxf()` 已封装此流程。
+Resolution: Do not rely on `SaveAs` extension inference for DXF; use `Document.Export(fileBase, "DXF", selectionSet)`. ActiveX `Export` requires a `SelectionSet` parameter even when exporting the entire drawing—create a temporary empty selection set. `export_dxf()` in `scripts/acad_session.py` already wraps this workflow.
 
-## 图片线稿里出现奇怪的外围轮廓、椭圆、三角形或彩色线
+## Stray Outer Outlines, Ellipses, Triangles, or Colored Lines in Traced Line Art
 
-症状：
+Symptoms:
 
-- 用户截图指出“外围这是啥”“这都是啥”。
-- 人像外侧出现大弧线、长折线，脸上出现椭圆/折线，Logo 附近出现三角形/斜线，水花处出现彩色波浪线。
-- 复核图层里存在 `PORTRAIT_OUTLINE`、`BODY_OUTLINE`、`JERSEY_OUTLINE`、`FACE_FEATURES`、`LOGO_GEOMETRY`、`WATER_SPLASH`、`JERSEY_STRIPE`、`TEXT_LOGO`、`TEXT_BRAND`、`REVIEW_NOTES` 等非原图描线层。
+- User screenshots point out extraneous outer geometry ("what is this around the outside?").
+- Large arcs or long polylines appear outside a portrait, ellipses/polylines appear on the face, triangles/diagonals appear near logos, or colored wavy lines appear around splashes.
+- Review layer counts show non-source-trace layers such as `PORTRAIT_OUTLINE`, `BODY_OUTLINE`, `JERSEY_OUTLINE`, `FACE_FEATURES`, `LOGO_GEOMETRY`, `WATER_SPLASH`, `JERSEY_STRIPE`, `TEXT_LOGO`, `TEXT_BRAND`, or `REVIEW_NOTES`.
 
-原因：
+Causes:
 
-- 为了让图像“更像”参考图，脚本手工补了外围轮廓、五官、Logo、水花或替代文字。
-- 这些增强线在 CAD 里会被用户理解成真实图纸对象或错误辅助线，而不是艺术化补笔。
-- 图内审查说明、评分文字也会污染最终模型空间。
+- To make the image look "closer" to the reference photo, the script manually added outer contours, facial features, logos, water splashes, or placeholder text.
+- In CAD, users interpret these enhancement lines as real drawing objects or erroneous construction geometry rather than artistic embellishments.
+- In-drawing review notes and scoring text also pollute final ModelSpace.
 
-处理：
+Resolution:
 
-1. 普通“照图画 CAD”最终版只保留原图矢量化线条，例如 `TRACE_DARK`、`TRACE_LIGHT`。
-2. 删除或关闭所有手工增强/构造层；不要仅依赖口头说明。
-3. 审查说明、评分、生成参数写入 JSON/Markdown 报告，不写进最终 ModelSpace。
-4. 复核时把禁止层列入检查清单，并要求实体数为 0：
+1. Standard "trace image to CAD" final deliverables must retain only vectorized lines from the original image, such as `TRACE_DARK` and `TRACE_LIGHT`.
+2. Delete or turn off all manually enhanced/construction layers; never rely solely on verbal disclaimers.
+3. Write review notes, scores, and generation parameters to JSON/Markdown reports rather than final ModelSpace.
+4. Include prohibited layers in the verification checklist and enforce 0 entities:
 
 ```python
 aux_layers = [
@@ -106,34 +106,34 @@ aux_layers = [
 assert all(layer_counts.get(name, 0) == 0 for name in aux_layers)
 ```
 
-5. 如果用户明确要求增强或重构，增强对象必须放独立图层，并在最终回复说明“这些是手工增强层，可关闭”。
+5. If the user explicitly requests enhancements or reconstruction, place enhancement objects on dedicated layers and state in the final response that they are manual enhancement layers that can be turned off.
 
-复盘教训：
+Postmortem lessons:
 
-- 不要把“可辨识”误解成“可以手工猜线”。参考图线稿任务的第一目标是干净、忠实、无多余实体。
-- 彩色辅助层、水波线、替代文字和构造几何即使在技术上提高评分，也可能降低用户信任。
-- 最终审查标准要包含负向检查：没有额外辅助层、没有图内说明文字、没有非原图装饰线。
+- Do not equate "recognizable" with "manually guessed lines". The primary goal of reference line-art tracing is cleanliness, fidelity, and zero extraneous entities.
+- Colored auxiliary layers, wave lines, placeholder text, and construction geometry may technically raise automated similarity scores while undermining user trust.
+- Final acceptance criteria must include negative checks: no extra auxiliary layers, no in-drawing note text, and no decorative lines absent from the source image.
 
-## AutoCAD COM 短暂拒绝调用或返回乱码错误
+## AutoCAD COM Transient Call Rejection or Garbled Errors
 
-症状：
+Symptoms:
 
-- 批量落线或创建图层时出现 `pywintypes.com_error: (-2147418111, ...)`，错误文本可能是乱码。
-- `Layers.Item()`、`Layers.Add()`、`ModelSpace.AddLine()` 偶发失败，重跑又可能成功。
+- Batch line drawing or layer creation raises `pywintypes.com_error: (-2147418111, ...)`, often with garbled error text.
+- `Layers.Item()`, `Layers.Add()`, or `ModelSpace.AddLine()` intermittently fails, then succeeds on rerun.
 
-原因：
+Causes:
 
-- AutoCAD 桌面 COM 是单线程/交互式自动化目标，绘图、重生成、打开文档或导出时会短暂忙碌。
-- 并行访问同一个 AutoCAD 实例会放大这种不稳定。
+- Desktop AutoCAD COM is a single-threaded, interactive automation target that is momentarily busy during drafting, regeneration, document opening, or export.
+- Concurrent access to the same AutoCAD instance amplifies this instability.
 
-处理：
+Resolution:
 
-1. AutoCAD COM 操作串行执行，不要并行跑复核、预览和绘图。
-2. 对高频 COM 调用加有限重试和退避，尤其是建层、`AddLine`、`SelectionSets`、`Export`、`SaveAs`。
-3. 新建或打开文档后等待 1-2 秒，再重新绑定 `app.ActiveDocument`。
-4. 批量生成大量实体时，每隔几百个实体 `Regen()` / `live_update()` 一次，但不要过于频繁。
+1. Execute AutoCAD COM operations serially; never run review, preview, and drafting in parallel.
+2. Add bounded retries with backoff around high-frequency COM calls, especially layer creation, `AddLine`, `SelectionSets`, `Export`, and `SaveAs`.
+3. Wait 1–2 seconds after creating or opening a document before rebinding `app.ActiveDocument`.
+4. When generating many entities in bulk, call `Regen()` / `live_update()` every few hundred entities rather than too frequently.
 
-示例：
+Example:
 
 ```python
 for attempt in range(12):
@@ -146,13 +146,13 @@ for attempt in range(12):
         time.sleep(0.08 + attempt * 0.04)
 ```
 
-## ModelSpace 不能直接枚举
+## ModelSpace Cannot Be Enumerated Directly
 
-症状：`for entity in session.model` 报 `TypeError: This object does not support enumeration`。
+Symptom: `for entity in session.model` raises `TypeError: This object does not support enumeration`.
 
-原因：某些 AutoCAD/pywin32 动态代理下，`ModelSpace` 不提供 Python 可迭代接口，但仍支持 `Count` 和 `Item(index)`。
+Cause: Under certain AutoCAD/pywin32 dynamic proxies, `ModelSpace` does not expose a Python iterable interface, though it still supports `Count` and `Item(index)`.
 
-处理：复核脚本使用 `Count` / `Item(i)` 兼容方式遍历：
+Resolution: Iterate using the `Count` / `Item(i)` pattern in review scripts:
 
 ```python
 ms = doc.ModelSpace
@@ -160,85 +160,85 @@ for i in range(int(ms.Count)):
     entity = ms.Item(i)
 ```
 
-## `SaveAs` 覆盖当前已打开 DWG 失败
+## `SaveAs` Fails When Overwriting a Currently Open DWG
 
-症状：生成完成但 `SaveAs(target)` 报“保存文档时出错”，目标文件已存在或正在 AutoCAD 中打开。
+Symptom: Generation completes, but `SaveAs(target)` reports an error saving the document because the target file already exists or is currently open in AutoCAD.
 
-处理：
+Resolution:
 
-1. 不要强制覆盖用户已打开的旧文件。
-2. 输出到带版本/语义的新文件名，例如 `_approved`、`_trace_only`。
-3. 保存后检查文件存在和大小，再继续导出 DXF/预览。
+1. Do not force-overwrite an existing file currently open by the user.
+2. Output to a new versioned or semantic filename such as `_approved` or `_trace_only`.
+3. Verify file existence and size after saving before proceeding to export DXF/previews.
 
-## `SelectionSets` 或 `Export` 代理异常
+## `SelectionSets` or `Export` Proxy Exceptions
 
-症状：
+Symptoms:
 
-- `doc.SelectionSets.Add(name)` 报 `AttributeError: <unknown>.Add`。
-- `doc.Export(...)` 报 `AttributeError: Open.Export` 或其它代理错位错误。
-- DXF 或 BMP 预览导出单独失败，但 DWG 已保存。
+- `doc.SelectionSets.Add(name)` raises `AttributeError: <unknown>.Add`.
+- `doc.Export(...)` raises `AttributeError: Open.Export` or other proxy misalignment errors.
+- DXF or BMP preview export fails independently even though the DWG saved successfully.
 
-原因：
+Causes:
 
-- AutoCAD 正在忙碌、活动文档代理错位，或刚打开只读图纸后 COM 动态代理未稳定。
+- AutoCAD is busy, the active document proxy is misaligned, or the COM dynamic proxy has not stabilized immediately after opening a read-only drawing.
 
-处理：
+Resolution:
 
-1. 串行执行，避免同时跑 `acad_review.py` 和 `acad_preview.py`。
-2. 打开源文件后等待，再重新获取 `app.ActiveDocument`。
-3. 创建 SelectionSet 前删除同名残留；失败时重试。
-4. 若 BMP 预览失败但 DWG/DXF 和实体复核已通过，最终回复要明确“原生预览导出失败”，并给出已完成的复核证据，不要伪造截图。
+1. Execute serially; avoid running `acad_review.py` and `acad_preview.py` simultaneously.
+2. Wait after opening a source file, then re-acquire `app.ActiveDocument`.
+3. Delete any leftover `SelectionSet` with the same name before creating a new one; retry on failure.
+4. If BMP preview fails while DWG/DXF and entity checks pass, explicitly state "native preview export failed" in the final report and present the completed verification evidence—never fabricate screenshots.
 
-## 窗口截图被遮挡或黑屏
+## Window Screenshots Occluded or Black
 
-症状：OS 截图成功但画面被其它前景窗口遮住，或只得到黑色小图。
+Symptom: OS screenshot succeeds, but the view is covered by another foreground window or yields only a small black image.
 
-处理：
+Resolution:
 
-1. 窗口截图只能证明桌面当前可见内容，不能证明 DWG 本身正确。
-2. 优先用 `scripts/acad_preview.py` 通过 AutoCAD `Document.Export(..., "BMP", selectionSet)` 导出原生预览。
-3. 导出前调用 `Regen()` 和 `ZoomExtents()`；导出后用图片查看工具检查图框、视图、文字、尺寸和重叠。
-4. 如仍需 OS 截图，先确认 AutoCAD 窗口无遮挡，再调用 screenshot helper；被遮挡截图不可作为通过依据。
+1. Window screenshots only prove what is currently visible on the desktop, not that the DWG itself is correct.
+2. Prefer exporting a native preview via `scripts/acad_preview.py` using AutoCAD's `Document.Export(..., "BMP", selectionSet)`.
+3. Call `Regen()` and `ZoomExtents()` before exporting; inspect borders, views, text, dimensions, and overlaps with an image viewer after export.
+4. If an OS screenshot is still needed, confirm the AutoCAD window is unobstructed before calling the screenshot helper; occluded screenshots cannot serve as pass evidence.
 
-## 画图过程不可见
+## Drafting Process Not Visible
 
-症状：脚本虽然成功生成 DWG，但用户看不到 AutoCAD 被打开或看不到逐步落图过程。
+Symptom: The script successfully generates the DWG, but the user cannot see AutoCAD opening or drawing entities step-by-step.
 
-处理：
+Resolution:
 
-1. 使用 `scripts/acad_draw.py` 的默认模式，不要加 `--fast`。
-2. 确认 `live_preview` 没被设为 `false`；默认应为 `true`。
-3. 调用 `AutoCADSession.activate_window()` 把 AutoCAD 尽量切到前台，再在每步之后执行 `live_update()`。
-4. 如果桌面上有其它窗口频繁抢焦点，逐步绘图仍可能被遮挡；此时 AutoCAD 原生预览仍要作为最终审查依据。
+1. Use the default mode of `scripts/acad_draw.py` without `--fast`.
+2. Confirm `live_preview` is not set to `false`; the default should be `true`.
+3. Call `AutoCADSession.activate_window()` to bring AutoCAD to the foreground where possible, then call `live_update()` after each step.
+4. If other desktop windows repeatedly steal focus, step-by-step drawing may still be occluded; in that case, AutoCAD native previews remain the final review evidence.
 
-## SelectionSet 名称冲突
+## SelectionSet Name Conflict
 
-症状：创建选择集时报名称已存在。
+Symptom: Creating a selection set fails because the name already exists.
 
-处理：先遍历 `doc.SelectionSets`，删除同名 SelectionSet，再创建。
+Resolution: Iterate through `doc.SelectionSets`, delete any `SelectionSet` with the matching name, and then create the new one.
 
-## 包围盒读取失败
+## Bounding Box Read Failure
 
-部分对象、空对象或代理对象不支持 `GetBoundingBox`。复核脚本应跳过并记录错误，不应整体失败。
+Some objects, empty objects, or proxy objects do not support `GetBoundingBox`. Review scripts should skip them and log the error rather than failing the entire run.
 
-## PDF/Plot 不稳定
+## Unstable PDF/Plot Output
 
-PDF 输出依赖打印机、PC3、页面设置、CTB/STB、后台打印配置。自动化时：
+PDF output depends on plotters, PC3 files, page setups, CTB/STB plot style tables, and background plotting settings. During automation:
 
-- 首选已有模板的 PageSetup。
-- 关闭后台打印或等待 Plot 完成。
-- 输出后检查 PDF 文件大小。
-- 关键交付前人工打开 PDF 看图框、方向、比例和线宽。
+- Prefer an existing template's `PageSetup`.
+- Disable background plotting or wait for `Plot` to finish.
+- Check the output PDF file size afterward.
+- Manually open the PDF before critical deliveries to verify borders, orientation, scale, and lineweights.
 
-## 任务实例退出后仍被误报为运行中
+## Task Instance Falsely Reported as Still Running After Exit
 
-症状：图纸、DWG/DXF 和预览均已生成，系统随后也看不到 `acad.exe`，但回归报告仍写着“任务启动的 AutoCAD 实例未在超时内退出”。
+Symptom: The drawing, DWG/DXF, and previews were generated, and `acad.exe` is no longer visible on the system, yet the regression report still states that the task-launched AutoCAD instance did not exit within the timeout.
 
-原因：`Quit()` 和 `TerminateProcess()` 都可能先返回，再由 Windows 异步完成进程对象退出。只检查一次或等待时间过短，会把退出状态传播延迟误判为遗留进程。
+Cause: Both `Quit()` and `TerminateProcess()` may return before Windows asynchronously finishes tearing down the process object. Checking only once or waiting too briefly misclassifies exit-status propagation delay as a leftover process.
 
-处理：
+Resolution:
 
-1. 只记录由 `DispatchEx` 启动且经 AutoCAD 主窗口句柄解析出的 PID；附着到用户已有实例时禁止调用 `Quit()` 或强制终止。
-2. 先礼貌调用 `Quit()` 并等待精确 PID；超时后只终止已记录的任务 PID，再等待并最终复查退出状态。
-3. 报告保留 `owned_process_id`、`quit_requested`、`forced_termination_used`、`process_exit_confirmed` 和清理错误，禁止由命令行异常处理覆盖原始清理证据。
-4. 若仍失败，先用 `Get-Process acad -ErrorAction SilentlyContinue` 核对实际进程，再依据报告 PID 排查；不得按进程名批量关闭用户 AutoCAD。
+1. Record only the PID launched via `DispatchEx` and resolved from the AutoCAD main window handle; never call `Quit()` or force-terminate when attached to an existing user instance.
+2. Politely call `Quit()` first and wait on the exact PID; if that times out, terminate only the recorded task PID, wait again, and perform a final exit-status check.
+3. Preserve `owned_process_id`, `quit_requested`, `forced_termination_used`, `process_exit_confirmed`, and cleanup errors in the report; never let CLI exception handlers overwrite the original cleanup evidence.
+4. If failures persist, check running processes with `Get-Process acad -ErrorAction SilentlyContinue` first, then investigate using the reported PID; never bulk-kill user AutoCAD instances by process name.

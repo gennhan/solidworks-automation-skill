@@ -1,70 +1,65 @@
 # SolidWorks Engineering Drawing
 
-工程图生成与制造交付审视子技能。它可以被根 `solidworks-automation`、VibeCAD、孔槽/CNC
-子技能或工程编排器按需连接，不要求其他建模子技能反向依赖它。
+Engineering Drawing generation and manufacturing-delivery review subskill. It can be invoked on demand by the root `solidworks-automation` skill, VibeCAD, hole/slot/CNC subskills, or an engineering orchestrator, without requiring other modeling subskills to reverse-depend on it.
 
-## 真机案例
+## Live-Machine Case Study
 
 <p align="center">
-  <img src="../../assets/showcase/solidworks-engineering-drawing-demo.gif" alt="solidworks-engineering-drawing 复杂测试件真机案例" width="900">
+  <img src="../../assets/showcase/solidworks-engineering-drawing-demo.gif" alt="solidworks-engineering-drawing complex test artifact live case" width="900">
 </p>
 
-案例在 SolidWorks 2026 SP01.1 中读取 NIST 公共领域 Additive Manufacturing Test Artifact Ver3B，先核对模型包围盒，再生成 GB/T 第一角 A1 工程图。实际交付包含：
+In this case study, SolidWorks 2026 SP01.1 reads the public-domain NIST Additive Manufacturing Test Artifact Ver3B, verifies the model bounding box first, and then generates a GB/T first-angle A1 Drawing. The actual deliverable includes:
 
-- 原生 `SLDPRT` 与 `SLDDRW`
-- 三视图、等轴测图和 A-A 剖视
-- 10 个必需尺寸与孔位/基准要求
-- PDF、BMP 预览、`drawing_evidence.json` 和 `drawing_review_report.json`
-- 当前工程图定向测试 70 项通过，实验产物的 PDF 可提取文字边界 0 重叠
+- Native `SLDPRT` and `SLDDRW` files
+- Three orthographic views, an isometric view, and Section View A-A
+- 10 required dimensions along with hole-location and datum requirements
+- PDF, BMP preview, `drawing_evidence.json`, and `drawing_review_report.json`
+- 70 targeted drawing tests currently passing, with 0 overlapping extractable PDF text bounding boxes in the experimental artifacts
 
-该案例用于证明“代码驱动 SolidWorks → 原生工程图 → 结构化证据”的完整链路，不代表无人值守制造放行；最终图框、尺寸链、孔表和制造语义仍需工程师目视复核。
+This case study demonstrates the end-to-end "code-driven SolidWorks → native Drawing → structured evidence" pipeline and does not represent unattended manufacturing release; final drawing borders, dimension chains, hole tables, and manufacturing semantics still require visual review by an engineer.
 
-## 输入
+## Inputs
 
-使用 `schemas/drawing_spec.schema.json` 描述：
+Described using `schemas/drawing_spec.schema.json`:
 
-- 源 `.sldprt` / `.sldasm` / 钣金模型
-- GB/T 或 ISO 标准、图幅和投影法
-- 视图、比例、剖视和局部放大
-- 必需尺寸、孔槽规格/数量/定位
-- 标题栏、技术要求、BOM 和交付输出
+- Source `.sldprt` / `.sldasm` / sheet-metal model
+- GB/T or ISO standard, sheet size, and projection method
+- Views, scale, section views, and detail views
+- Required dimensions and hole/slot specifications, quantities, and locations
+- Title block, technical notes, BOM, and delivery outputs
 
-## 输出
+## Outputs
 
 - `.slddrw`
 - PDF
-- BMP/PNG 预览
+- BMP/PNG preview
 - `drawing_evidence.json`
 - `drawing_review_report.json`
-- Markdown 审查摘要
+- Markdown review summary
 
-## 兼容入口
+## Compatibility Entry Points
 
-已有图纸的 SW2026 原生基准和 GD&T 写入使用独立的[图纸副本流程](references/native-gdt.md)，
-支持精确目标、14 种符号、独立多框/复合框和基准 M/L/S 修饰，并重开核对持久关联。
-公共基准、子基准组、投影公差带、轮廓偏置、CZ/SZ、局部范围及最大公差等，见[扩展 GD&T 输入](references/gdt-extended-options.md)。
-现有 MCP `solidworks_generate_drawing` 和 `scripts/sw_drawing_package.py` 也支持从单零件结构化规格
-自动创建尺寸、基本尺寸、基准和 GD&T，保存重开并检查 PDF/布局。原生路径限 SW2026，
-提供设计公差与精确几何目标；自由文字不猜测落图，保持 `pilot/review_required`，须目视复核。
+Writing native SW2026 datums and GD&T onto existing drawings uses the dedicated [drawing copy workflow](references/native-gdt.md), supporting exact geometric targets, 14 characteristic symbols, stacked/composite frames, and M/L/S datum modifiers, with save-and-reopen verification of persistent attachments.
+For common datums, datum sub-groups, projected tolerance zones, profile offsets, CZ/SZ, unit zones, and maximum tolerances, see [extended GD&T inputs](references/gdt-extended-options.md).
+The existing MCP tool `solidworks_generate_drawing` and `scripts/sw_drawing_package.py` also support automatically creating dimensions, basic dimensions, datums, and GD&T from structured single-part specs, followed by save-reopen and PDF/layout verification. The native path is limited to SW2026 and requires design tolerances plus exact geometric targets; free-text requirements are never guessed onto the drawing, results remain `pilot/review_required`, and visual review is mandatory.
 
-历史调用仍可使用根路径：
+Legacy callers can still import from the root path:
 
 ```python
 from scripts.sw_drawing import plan_standard_view_layout
 ```
 
-## 跨版本真机矩阵
+## Cross-Version Live-Machine Matrix
 
 ```powershell
 $env:CAD_STUDIO_VISIBLE='false'
 python tests/solidworks_drawing_version_matrix.py --years 2024 2025 2026
 ```
 
-矩阵按精确版本 ProgID 串行执行，输出每个版本独立工程图报告和总矩阵 JSON。未注册版本记录为 `unavailable`；只有回读年份与请求年份一致时才记为 `pass`。
+The matrix executes serially by exact version ProgID, outputting an independent drawing report per version and an aggregated matrix JSON. Unregistered versions are recorded as `unavailable`; a version is marked `pass` only when the read-back year matches the requested year.
 
-新代码应优先使用本子技能脚本，并通过根技能提供的 COM/session API 执行。
+New code should prefer this subskill's scripts and execute through the COM/session APIs provided by the root skill.
 
-## 状态
+## Status
 
-当前为 `pilot`。交付时强制将 COM 尺寸位置与 SolidWorks 导出 PDF 的实际矢量文字框一一关联；
-关联完整且没有碰撞时可返回 `pass`。缺 PDF、缺 PyMuPDF、匹配不完整或发现重叠时不会放行。
+Currently `pilot`. On delivery, COM dimension locations are strictly correlated one-to-one against actual vector text bounding boxes in the SolidWorks-exported PDF; `pass` may be returned only when correlation is complete with zero collisions. Missing PDFs, missing PyMuPDF, incomplete matching, or detected overlaps block release.

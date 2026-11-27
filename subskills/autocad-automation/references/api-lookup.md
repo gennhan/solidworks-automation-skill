@@ -1,73 +1,73 @@
-# AutoCAD API 查证路线
+# AutoCAD API Lookup Path
 
-## 官方资料优先级
+## Official Documentation Priority
 
-1. Autodesk AutoCAD API 概览：说明 AutoCAD 可用 ObjectARX、Managed .NET、Visual LISP 和 ActiveX 等编程环境。
+1. Autodesk AutoCAD API Overview: covers available AutoCAD programming environments including ObjectARX, Managed .NET, Visual LISP, and ActiveX.
    - https://aps.autodesk.com/developer/overview/autocad-api
-2. AutoCAD Developer and ObjectARX Help：查 Managed .NET、ActiveX/VBA、DXF Reference、AutoLISP、Core Console。
+2. AutoCAD Developer and ObjectARX Help: reference for Managed .NET, ActiveX/VBA, DXF Reference, AutoLISP, and Core Console.
    - https://help.autodesk.com/view/OARX/2027/ENU/
-3. Managed .NET Developer's Guide：用于 C# 插件、事务、文档锁、实体创建、标注、布局和打印。
+3. Managed .NET Developer's Guide: for C# plugins, transactions, document locking, entity creation, dimensions, layouts, and plotting.
    - https://help.autodesk.com/view/OARX/2027/ENU/?guid=GUID-C3F3C736-40CF-44A0-9210-55F6A939B6F2
-4. ObjectARX SDK：用于 C++/C# 深度扩展、数据库结构、图形系统和原生命令。
+4. ObjectARX SDK: for deep C++/C# extensions, database structures, graphics systems, and native commands.
    - https://aps.autodesk.com/developer/overview/objectarx-autocad-sdk
-5. APS Design Automation：用于无桌面云端批处理 DWG。
+5. APS Design Automation: for headless cloud batch processing of DWGs.
    - https://aps.autodesk.com/en/docs/design-automation/v3
 
-## GitHub 参考
+## GitHub References
 
-- ADN-DevTech `acad-api-skill`：AI agent 生成 AutoCAD/Civil 3D/Plant 3D .NET 插件的规则。
+- ADN-DevTech `acad-api-skill`: rules for AI agents generating AutoCAD/Civil 3D/Plant 3D .NET plugins.
   - https://github.com/ADN-DevTech/acad-api-skill
-- ADN-DevTech `autocad-automation-apps`：APS Design Automation 的 AutoLISP、C++ CRX、.NET bundle 示例。
+- ADN-DevTech `autocad-automation-apps`: AutoLISP, C++ CRX, and .NET bundle samples for APS Design Automation.
   - https://github.com/ADN-DevTech/autocad-automation-apps
-- `reclosedev/pyautocad`：Python ActiveX 自动化封装，可借鉴坐标点、对象迭代和轻量 API 设计。
+- `reclosedev/pyautocad`: Python ActiveX automation wrapper; useful reference for coordinate points, object iteration, and lightweight API design.
   - https://github.com/reclosedev/pyautocad
-- AutoCAD .NET Wizards：Visual Studio AutoCAD .NET 项目模板。
+- AutoCAD .NET Wizards: Visual Studio project templates for AutoCAD .NET.
   - https://github.com/ADN-DevTech/AutoCAD-Net-Wizards
 
-## 查证流程
+## Verification Workflow
 
-1. 先确定路线：COM/ActiveX、AutoLISP/SCR、.NET、ObjectARX、APS。
-2. 搜索精确对象和方法名，例如 `ModelSpace AddLine ActiveX AutoCAD`、`DocumentLock AutoCAD .NET`。
-3. 阅读目标版本文档，记录方法签名、参数类型、单位、返回值、异常和版本限制。
-4. 找 GitHub 示例时优先看 Autodesk/ADN 官方仓库；第三方仓库只吸收模式，不直接照搬。
-5. 写最小可运行脚本验证，保存输出文件，并用 `acad_review.py` 复核。
-6. 如果文档和实测不一致，把本机版本、语言、错误码和解决办法写入 `troubleshooting.md`。
+1. Choose the route first: COM/ActiveX, AutoLISP/SCR, .NET, ObjectARX, or APS.
+2. Search exact object and method names, such as `ModelSpace AddLine ActiveX AutoCAD` or `DocumentLock AutoCAD .NET`.
+3. Read the documentation for the target version and record method signatures, parameter types, units, return values, exceptions, and version limitations.
+4. When looking for GitHub examples, prioritize official Autodesk/ADN repositories; borrow patterns from third-party repos without copying verbatim.
+5. Write a minimal runnable verification script, save the output file, and inspect it with `acad_review.py`.
+6. If documentation and live tests disagree, record the local version, language pack, error code, and workaround in `troubleshooting.md`.
 
-## COM/ActiveX 常用对象
+## Common COM/ActiveX Objects
 
-- `AutoCAD.Application`：应用入口；可设置 `Visible`，访问 `Documents` 和 `ActiveDocument`。
-- `Document`：当前图纸；包含 `ModelSpace`、`PaperSpace`、`Layers`、`Blocks`、`SelectionSets`、`SaveAs`、`SendCommand`。
-- `ModelSpace`：创建几何实体，例如线、圆、多段线、文字和标注。
-- `Layer`：图层颜色、线型和开关状态。
-- `AcadEntity`：通用实体，可设置 `Layer`、`Color`，多数对象支持 `GetBoundingBox`。
+- `AutoCAD.Application`: application entry point; controls `Visible` and provides access to `Documents` and `ActiveDocument`.
+- `Document`: current drawing; exposes `ModelSpace`, `PaperSpace`, `Layers`, `Blocks`, `SelectionSets`, `SaveAs`, and `SendCommand`.
+- `ModelSpace`: creates geometric entities such as lines, circles, polylines, text, and dimensions.
+- `Layer`: layer color, linetype, and on/off state.
+- `AcadEntity`: base entity supporting `Layer` and `Color`; most objects support `GetBoundingBox`.
 
-## 常用方法核查清单
+## Common Method Checklist
 
-- 线：`ModelSpace.AddLine(startPoint, endPoint)`
-- 圆：`ModelSpace.AddCircle(centerPoint, radius)`
-- 轻量多段线：`ModelSpace.AddLightWeightPolyline(points2d)`
-- 文字：`ModelSpace.AddText(text, insertionPoint, height)`
-- 多行文字：`ModelSpace.AddMText(insertionPoint, width, text)`
-- 保存：`Document.SaveAs(path)`
-- 命令：`Document.SendCommand(command)`
-- 视图：`Application.ZoomExtents()`
+- Line: `ModelSpace.AddLine(startPoint, endPoint)`
+- Circle: `ModelSpace.AddCircle(centerPoint, radius)`
+- Lightweight polyline: `ModelSpace.AddLightWeightPolyline(points2d)`
+- Single-line text: `ModelSpace.AddText(text, insertionPoint, height)`
+- Multiline text: `ModelSpace.AddMText(insertionPoint, width, text)`
+- Save: `Document.SaveAs(path)`
+- Command: `Document.SendCommand(command)`
+- View: `Application.ZoomExtents()`
 
-这些方法在不同 AutoCAD 版本、语言包、LT/完整版中可能有差异；未实测前不要承诺高级对象或导出格式一定可用。
+These methods may behave differently across AutoCAD versions, language packs, and LT vs. full editions; do not promise that advanced objects or export formats work until verified locally.
 
-## .NET 插件路线
+## .NET Plugin Route
 
-当 COM 脚本变得难以维护，或需要事务、文档锁、选择过滤、命令注册、面板 UI、事件监听时，切换到 .NET：
+Switch to .NET when COM scripts become difficult to maintain or when transactions, document locking, selection filters, command registration, palette UI, or event listeners are required:
 
-1. 使用与 AutoCAD 版本匹配的 .NET 目标框架和 SDK 引用。
-2. 命令入口使用 `CommandMethod`。
-3. 数据库修改放入事务，涉及活动文档时正确锁定文档。
-4. 使用 `NETLOAD` 或调试配置加载 DLL。
-5. 插件成功后再考虑封装成 bundle 或 APS Design Automation activity。
+1. Use the .NET target framework and SDK references matching the target AutoCAD version.
+2. Register command entry points with `CommandMethod`.
+3. Wrap database modifications in transactions, and properly lock the document when operating on the active document.
+4. Load the DLL via `NETLOAD` or debug launch configuration.
+5. Once the plugin succeeds locally, consider packaging it as a bundle or an APS Design Automation activity.
 
-## 资料使用底线
+## Documentation Usage Boundaries
 
-- 不凭记忆猜枚举值、保存类型、Plot 配置和命令参数。
-- 不把论坛答案当最终依据；论坛只用于定位关键词和错误症状。
-- 不复制许可证不明的 GitHub 代码进用户项目。
-- 不把云端 APS 流程说成本地 AutoCAD COM 能力，也不把本地 COM 脚本说成可在 CI 直接运行。
+- Never guess enum values, save types, Plot configurations, or command parameters from memory.
+- Never treat forum answers as final authority; use forums only to identify keywords and error symptoms.
+- Never copy GitHub code with unclear licensing into user projects.
+- Never describe cloud APS workflows as local AutoCAD COM capabilities, and never claim local COM scripts can run directly in CI.
 

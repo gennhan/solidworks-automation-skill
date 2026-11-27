@@ -1,77 +1,77 @@
-# AutoCAD 工程实践
+# AutoCAD Engineering Patterns
 
-## 绘图前设计
+## Pre-Drafting Design
 
-- 先写一页绘图 brief：单位、比例、坐标原点、图层、线型、文字高度、标注样式、输出路径、验收点。
-- 对机械/建筑/电气图，先确认行业标准和企业模板；没有模板时只做中性图层，不伪造标准。
-- ModelSpace 画真实尺寸 1:1；Layout 负责图框、视口和打印比例。
-- 原点选择要服务后续定位：机械件常用左下角或中心；平面布置常用项目基准点。
+- Write a one-page drafting brief first: units, scale, coordinate origin, layers, linetypes, text height, dimension style, output paths, and acceptance criteria.
+- For mechanical/architectural/electrical drawings, confirm industry standards and company templates first; without a template, use neutral layers and never fabricate a formal standard.
+- Draft at true 1:1 scale in ModelSpace; handle borders, viewports, and plot scales in Layout.
+- Choose the origin to support downstream referencing: mechanical parts typically use the lower-left corner or center; floor plans use the project datum point.
 
-## 图层与对象
+## Layers and Objects
 
-- 先建图层再画对象，推荐最少区分：`OUTLINE`、`CENTER`、`HIDDEN`、`DIM`、`TEXT`、`CONSTRUCTION`。
-- 临时辅助线放 `CONSTRUCTION`，任务结束前按需求删除或冻结。
-- 块适合重复构件；块名要稳定，属性名用英文大写，避免不同语言环境出问题。
-- 外部参照、字体、线型、打印样式是交付风险点，批处理时要显式检查。
+- Create layers before drawing objects; at minimum separate `OUTLINE`, `CENTER`, `HIDDEN`, `DIM`, `TEXT`, and `CONSTRUCTION`.
+- Place temporary guide lines on `CONSTRUCTION`, and delete or freeze them as required before task completion.
+- Use blocks for repeated components; keep block names stable and use uppercase English attribute tags to avoid localization issues.
+- External references (Xrefs), fonts, linetypes, and plot styles are delivery risk points; inspect them explicitly during batch processing.
 
-## 尺寸和标注
+## Dimensions and Annotations
 
-- 尺寸、文字、线宽应来自图纸标准；没有标准时只添加必要文字说明，不装作最终施工图。
-- 标注样式可能依赖模板；COM 中直接创建尺寸前先确认 `DIMSTYLE`。
-- 文字高度按图纸比例确定，模型空间直接写固定高度容易导致打印不可读。
-- 机械零件图必须先确定尺寸基准，再标总尺寸、定位尺寸和孔槽规格。不要把规格说明当作定位尺寸。
-- 开孔/开槽图元应具备“规格 + 定位 + 数量”：例如显示孔要有直径和中心到基准边距离，螺丝孔要有孔径和中心距，接口孔要有宽高和中心高度，水口要有孔径、横向位置和两个中心高度。
-- 密集孔槽优先用孔表、槽表或孔槽明细表；表格中的项目必须能回到视图里的基准尺寸，不得只写“见图”或只写数量。
-- 引线只用于简短说明，不用于代替关键尺寸。引线不得横跨其它视图，不得穿过孔、中心线、尺寸文字或标题栏。
+- Dimensions, text, and lineweights should come from drawing standards; without a standard, add only essential text notes rather than pretending the output is a released production drawing.
+- Dimension styles may depend on a template; verify `DIMSTYLE` before creating dimensions directly via COM.
+- Base text height on drawing scale; writing fixed text heights in ModelSpace easily makes plots unreadable.
+- Mechanical part drawings must establish dimension datums first, then dimension overall sizes, locating dimensions, and hole/slot specifications. Never treat a feature callout as a locating dimension.
+- Cutout/slot features must provide "size + location + quantity": e.g., display openings need diameter/size and center distance to datum edges; screw holes need diameter and center-to-center spacing; port cutouts need width, height, and center elevation; spigots/gates need hole diameter, lateral position, and both center heights.
+- For dense holes or slots, prefer a hole table, slot table, or hole/slot schedule; every table entry must tie back to datum dimensions in the views rather than merely stating "see drawing" or quantity only.
+- Leaders are for brief callouts only, never substitutes for critical dimensions. Leaders must not cross other views, holes, centerlines, dimension text, or the title block.
 
-## 国内机械制图习惯检查
+## Chinese Mechanical Drafting Convention Checklist
 
-用户要求国标风格、严格规范或中国机械图纸习惯时，至少检查以下内容：
+When the user requests GB/T style, strict standards, or Chinese mechanical drafting conventions, check at least the following:
 
-- 图幅和图框：A3 横向常用 `420×297`，左装订边常用 `25`，其余边常用 `5`；标题栏位于右下角，常用宽度 `180`。
-- 字体和文字：中文优先仿宋；技术要求、标题栏、视图名、孔槽表不要混用随意字体。
-- 图层和线型：粗实线、细实线、中心线、虚线、尺寸、文字、图框、开孔/剖切应分层，中心线和虚线不能画成普通实线。
-- 尺寸实体：线性尺寸应使用真实 AutoCAD 标注实体，如 `AcDbRotatedDimension`；不要用普通线和文字拼尺寸。
-- 开孔交付：3D 打印外壳必须标清外形、壁厚/底厚、屏幕孔、接口孔、水口、散热槽、螺丝孔/柱的规格和定位。
-- 排版复核：尺寸线、文字、孔槽表不得侵入标题栏，不得压住视图主体；视图空间不足时应移动视图或拆表。
+- Sheet size and border: A3 landscape typically uses `420×297`, left binding margin `25`, other margins `5`; title block in the lower-right corner, typically `180` wide.
+- Fonts and text: Prefer FangSong (仿宋) for Chinese text; do not mix arbitrary fonts across technical notes, title block, view labels, and hole/slot tables.
+- Layers and linetypes: Separate thick solid lines, thin solid lines, centerlines, hidden lines, dimensions, text, borders, and cutouts/sections onto distinct layers; centerlines and hidden lines must not be drawn as plain continuous lines.
+- Dimension entities: Linear dimensions must use real AutoCAD dimension entities such as `AcDbRotatedDimension`; do not fake dimensions with plain lines and text.
+- Cutout deliverables: 3D-printed enclosures must clearly specify overall dimensions, wall/base thickness, screen cutout, port cutouts, spigots, ventilation slots, and screw hole/boss sizes and locations.
+- Layout review: Dimension lines, text, and hole/slot tables must not intrude into the title block or collide with main view geometry; if space is tight, move views or split tables.
 
-典型反例复盘：
+Typical anti-pattern postmortems:
 
-- 只写 `4×螺丝柱φ8，导孔φ2.6`，但没有螺丝柱中心距和离边尺寸，不能加工。
-- 只写 `7×4×30格栅`，但没有槽组中心、首槽位置或节距，不能定位。
-- 只写 `2×水口通孔φ13.5`，但没有横向位置和两个高度中心，不能开孔。
-- 用一根很长的引线跨过中心线、孔轮廓或其它视图，看起来像辅助线污染，应返工为尺寸链或孔槽表。
+- Writing only `4×screw boss φ8, pilot hole φ2.6` without boss center-to-center spacing and edge distances—unmachinable.
+- Writing only `7×4×30 grille` without slot-array center, first-slot location, or pitch—cannot be positioned.
+- Writing only `2×spigot through-hole φ13.5` without lateral location and both center heights—cannot be drilled/cut.
+- Drawing a long leader across centerlines, hole outlines, or other views—looks like construction-line clutter and must be reworked into a dimension chain or hole/slot table.
 
-## 自动化编码
+## Automation Coding Practices
 
-- 把尺寸参数集中在脚本顶部或 JSON brief 中。
-- 每个 COM 调用后检查返回对象；保存/导出后检查文件存在和大小。
-- 尽量用对象模型创建实体；`SendCommand` 用于对象模型缺失、调用已有命令或兼容旧流程。
-- `SendCommand` 可能异步，执行后要等待、保存并复核，不要只看命令已发送。
-- SelectionSet 名称会在图纸里残留；创建前删除同名集合。
-- 批处理时不要让一张坏图中断全部任务；记录失败文件和阶段。
+- Centralize dimensional parameters at the top of the script or in the JSON brief.
+- Validate return objects after every COM call; check file existence and size after saving/exporting.
+- Prefer object model methods for creating entities; reserve `SendCommand` for missing object model APIs, invoking existing commands, or legacy compatibility.
+- `SendCommand` can execute asynchronously; wait, save, and verify afterward instead of assuming success once the command is sent.
+- `SelectionSet` names persist inside the drawing; delete any existing set with the same name before creating one.
+- During batch processing, never let one corrupt drawing abort the entire run; log the failed file and stage.
 
-## 复核思路
+## Review Strategy
 
-最少检查：
+Minimum checks:
 
-- 文件是否落盘，大小是否合理。
-- 实体数量和类型是否符合 brief。
-- 图层是否包含预期对象。
-- 全局包围盒是否与预期尺寸量级一致。
-- AutoCAD 视图 `ZoomExtents` 后主图形是否可见。
+- File written to disk with reasonable file size.
+- Entity count and types match the brief.
+- Layers contain the expected objects.
+- Global bounding box matches the expected order of magnitude.
+- Primary geometry is visible in AutoCAD after `ZoomExtents`.
 
-高风险检查：
+High-risk checks:
 
-- 文字、块属性、外部参照、线型和字体是否缺失。
-- DXF/PDF 是否与 DWG 一致。
-- 图框比例、打印机、CTB/STB、页面方向和边距是否正确。
-- 批量改图是否覆盖了用户原图。
+- Missing text, block attributes, Xrefs, linetypes, or fonts.
+- Consistency between DXF/PDF exports and the source DWG.
+- Correct border scale, plotter, CTB/STB plot style table, page orientation, and margins.
+- Confirm batch edits did not overwrite original user drawings.
 
-## 经验判断
+## Engineering Judgment
 
-- 图纸自动化先求可复现，再求漂亮；视觉修饰放在功能正确之后。
-- DWG 是富数据库，不是普通图片；仅靠截图无法证明属性、图层、块参照正确。
-- 复杂插件开发优先 .NET，不要把几百行业务逻辑塞进 `SendCommand` 字符串。
-- 版本升级会影响 .NET 目标框架、ObjectARX SDK 和插件加载；每个大版本都要实测。
-- AutoCAD LT、教育版、网络许可、无桌面会话可能限制自动化能力，遇到异常先确认环境。
+- Prioritize reproducibility before visual polish in drawing automation; visual refinement comes after functional correctness.
+- A DWG is a rich database, not a flat raster image; screenshots alone cannot prove attributes, layers, or block references are correct.
+- Use .NET for complex plugin development rather than cramming hundreds of lines of business logic into `SendCommand` strings.
+- Major AutoCAD version upgrades affect the .NET target framework, ObjectARX SDK, and plugin loading; always verify on each major release.
+- AutoCAD LT, educational editions, network licenses, or headless sessions may restrict automation capabilities; verify the environment first when exceptions occur.

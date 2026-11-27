@@ -1,24 +1,24 @@
-# SolidWorks 螺纹孔实测经验
+# SolidWorks Threaded Hole Live Lessons
 
-## 2026-08-29 实测结论
+## 2026-08-29 Live Verification Findings
 
-以前 `CreateFeature(ThreadFeatureData)` 返回 `None` 的主要原因不只是“COM 不稳定”，而是创建数据不完整：
+Previously, `CreateFeature(ThreadFeatureData)` returning `None` was not merely "COM instability", but incomplete creation data:
 
-- `InitializeThreadData()` 后 `Type` 默认为空，内公制螺纹必须设置 `Type="Metric Tap"`。
-- Thread Profiles 目录必须存在 `Metric Tap.SLDLFP`。官方文档允许 `Type` 使用不带路径和扩展名的轮廓名。
-- 平面圆边使用选择标记 `1`，再设置 `IThreadFeatureData.Edge`。
-- 已提供平面圆边时，不要再把同一圆边写入 `StartEntity`。
-- `IThreadFeatureData` 没有 `LoadReferences(edge)` 创建步骤，不应调用。
-- 底孔圆柱面已决定线程直径；不要用公称大径强制 `DiameterOverride=True`。
+- After `InitializeThreadData()`, `Type` defaults to empty; internal metric threads must set `Type="Metric Tap"`.
+- `Metric Tap.SLDLFP` must exist in the Thread Profiles directory. Official docs permit passing the profile name to `Type` without path or file extension.
+- Select the planar circular edge with selection mark `1`, then assign `IThreadFeatureData.Edge`.
+- When a planar circular edge is already supplied, do not also assign that same circular edge to `StartEntity`.
+- `IThreadFeatureData` has no `LoadReferences(edge)` creation step; do not call it.
+- The tap-drill cylindrical face already governs thread diameter; do not force `DiameterOverride=True` with the nominal major diameter.
 
-修正后的 M6×1 右旋内螺纹在 SolidWorks 2026 SP01.1 上实测成功：
+Corrected M6×1 right-hand internal threads succeeded in live testing on SolidWorks 2026 SP01.1:
 
-| 场景 | 底孔 | Thread 终止 | 结果 |
+| Scenario | Tap Drill | Thread End Condition | Result |
 |---|---|---|---|
-| 16 mm 基体、12 mm 螺纹深度的盲孔 | Ø5.0、13 mm 定深 | `BlindDepth=12 mm` | `real-thread-verified`，review `pass/100` |
-| 16 mm 基体的贯穿孔 | Ø5.0、`Through All` | `Revolutions=16` | `real-thread-verified`，review `pass/100` |
+| Blind hole in 16 mm block, 12 mm thread depth | Ø5.0, 13 mm blind Cut | `BlindDepth=12 mm` | `real-thread-verified`, review `pass/100` |
+| Through-hole in 16 mm block | Ø5.0, `Through All` | `Revolutions=16` | `real-thread-verified`, review `pass/100` |
 
-## 官方 API 依据
+## Official API References
 
 - [Thread Features and ThreadFeatureData Objects](https://help.solidworks.com/2026/English/api/sldworksapiprogguide/Overview/Thread_Features_and_ThreadFeatureData_Objects.htm)
 - [IThreadFeatureData.Type](https://help.solidworks.com/2026/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IThreadFeatureData~Type.html)
@@ -28,9 +28,9 @@
 - [swCosmeticEndConditions_e](https://help.solidworks.com/2026/English/api/swconst/SolidWorks.Interop.swconst~SolidWorks.Interop.swconst.swCosmeticEndConditions_e.html)
 - [BlankSketch](https://help.solidworks.com/2026/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IModelDoc2~BlankSketch.html)
 
-## 正确的终止条件
+## Correct End Conditions
 
-底孔、真实 Thread 和 CosmeticThread 是三组不同枚举，不能混用：
+Tap-drill Cuts, real `Thread` features, and `CosmeticThread` features use three distinct enumerations that must never be mixed:
 
 ```text
 底孔 FeatureCut4:
@@ -47,38 +47,38 @@ CosmeticThread:
   Through = swEndConditionThrough (2)
 ```
 
-贯穿底孔必须用 `FeatureCut4(..., T1=1, ...)`。使用“厚度 + 1 mm”的盲孔虽然视觉上穿透，但特征语义、后续修改和工程图识别都不正确。
+Through tap-drill holes must use `FeatureCut4(..., T1=1, ...)`. A blind Cut of "thickness + 1 mm" appears to break through visually, but breaks feature semantics, parametric edits, and Engineering Drawing recognition.
 
-## 参数验证底线
+## Parameter Validation Floor
 
-COM 调用前必须拒绝：
+Reject before calling COM:
 
-- NaN/无穷大、非正的基体尺寸、底孔、深度和倒角。
-- 底孔直径大于等于公称直径。
-- 螺纹深度大于盲孔底孔深度，或贯穿螺纹深度大于板厚。
-- 孔中心越出基体，或没有为螺纹大径和孔口倒角保留边界。
-- 表外公制螺距却没有显式 `--tap-drill`。攻丝底孔受切削材料、丝锥类型和螺纹百分比影响，不能只靠 `D-P` 通用估算当作确认值。
+- `NaN`/infinity or non-positive block dimensions, tap-drill diameter, depths, or Chamfer sizes.
+- Tap-drill diameter greater than or equal to nominal diameter.
+- Thread depth greater than blind tap-drill depth, or through-thread depth greater than plate thickness.
+- Hole center outside the block, or insufficient edge margin for major thread diameter and hole-mouth Chamfer.
+- Non-table metric pitch without an explicit `--tap-drill`. Tap-drill size depends on workpiece material, tap type, and percent thread engagement, so a generic `D-P` rule of thumb must never be treated as a confirmed value.
 
-## 特征持久化证据
+## Feature Persistence Evidence
 
-Thread/CosmeticThread 返回非空 COM 对象只是“尝试创建”，不是最终证据。脚本在 `ForceRebuild3(False)` 后遍历 `FirstFeature/GetNextFeature`，并递归遍历 `GetFirstSubFeature/GetNextSubFeature`，输出：
+A non-null COM object returned by `Thread`/`CosmeticThread` proves only an attempted creation, not final persistence. After `ForceRebuild3(False)`, the script traverses `FirstFeature`/`GetNextFeature` and recursively traverses `GetFirstSubFeature`/`GetNextSubFeature`, outputting:
 
-- `thread_attempts`：每种 API 的尝试结果和失败原因。
-- `thread_evidence`：底孔、倒角、真实 Thread、CosmeticThread 和 3D 证据草图是否留在特征树。
-- `thread_status`：基于重建后证据得出的 `real-thread-verified` / `cosmetic-thread-verified` / `visible-helix-verified`。若只剩自定义属性，模板会阻断交付。
+- `thread_attempts`: attempt outcome and failure reason for each API.
+- `thread_evidence`: whether the tap-drill Cut, Chamfer, real `Thread`, `CosmeticThread`, and 3D evidence Sketch remain in the FeatureManager tree.
+- `thread_status`: `real-thread-verified` / `cosmetic-thread-verified` / `visible-helix-verified` derived from post-rebuild evidence. If only custom properties remain, the template blocks delivery.
 
-SolidWorks 官方示例说明 CosmeticThread 是孔或切除的子特征。只遍历顶层特征会把已经持久化的 CosmeticThread 误判为丢失；当前证据收集已包含子特征。
+Official SolidWorks examples document that `CosmeticThread` is a sub-feature of the hole or Cut. Traversing only top-level features falsely flags persisted `CosmeticThread` features as missing; current evidence collection includes sub-features.
 
-## 3D 螺旋线只是证据表达
+## 3D Helix Is Visual Evidence Only
 
-旧实现将 `thread_depth / pitch` 四舍五入为整数圈，会改变真实螺距。例如 16 mm 深、P=1.25 mm 应为 12.8 圈，不应改为 13 圈。当前使用小数圈和每圈 32 段以保持螺距，并将螺旋线限制在孔深之内。
+The legacy implementation rounded `thread_depth / pitch` to whole turns, distorting true pitch—for example, 16 mm depth at `P=1.25 mm` is 12.8 turns, not 13 turns. The current code uses fractional turns at 32 segments per turn to preserve exact pitch and stays within hole depth.
 
-SolidWorks 会把可见 3D 草图线透过实体显示，直接用于标准等轴测预览会出现外壁虚线。因此脚本先生成 `*_thread_evidence.bmp`，再通过 `BlankSketch()` 隐藏证据草图，标准预览只显示清洁模型。
+SolidWorks renders visible 3D Sketch curves through solid bodies, causing dashed lines across outer walls in standard isometric views. Therefore, the script exports `*_thread_evidence.bmp` first and then calls `BlankSketch()` to hide the evidence Sketch so standard previews stay clean.
 
-3D 草图不是可切削牙型，不得将其宣称为 CAM 实体螺纹。
+A 3D Sketch is not a machinable thread form and must never be claimed as a CAM solid thread.
 
-## 尚未覆盖的制造细节
+## Manufacturing Details Not Yet Covered
 
-当前盲孔底孔仍是平底切除，没有建模标准钻尖、有效全牙深度、不完整牙、攻丝退刀量和排屑空间。因此“底孔 + Thread”是良好的 CAD 和工程图语义，但不能在没有工艺复核的情况下宣称已完成全部攻丝工艺设计。
+Blind tap-drill Cuts currently have flat bottoms without a standard drill-point cone, effective full-thread depth, incomplete lead/runout threads, tap-bottom clearance, or chip clearance. Thus "tap-drill Cut + `Thread`" provides sound CAD and drawing semantics, but must not be claimed as complete tapping process design without manufacturing review.
 
-详细扩展顺序和验收门槛见 [threaded-hole-roadmap.md](threaded-hole-roadmap.md)。
+For detailed expansion ordering and acceptance gates, see [threaded-hole-roadmap.md](threaded-hole-roadmap.md).

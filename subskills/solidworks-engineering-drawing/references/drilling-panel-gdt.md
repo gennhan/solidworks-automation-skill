@@ -1,27 +1,27 @@
-# 钻孔面板分析（pilot）
+# Drilling Panel Analysis (pilot)
 
-`drilling_panel_gdt.py` 识别面板孔位阵列、计算候选坐标表，并提出基准方案。结果是设计人员复核用的**候选方案**，不会自动交付工程图。它参考了社区贡献 [PR #36](https://github.com/wzyn20051216/solidworks-automation-skill/pull/36)。
+`drilling_panel_gdt.py` detects hole-pattern arrays on a panel, computes a candidate coordinate table, and proposes a datum scheme. The output is a **candidate proposal** for design-engineer review and does not automatically deliver a released Engineering Drawing. It references community contribution [PR #36](https://github.com/wzyn20051216/solidworks-automation-skill/pull/36).
 
-默认不猜测孔的用途，也不生成位置度、平面度或材料条件。需要 GD&T 候选时，须由工程师显式提供 `--gdt-profile` JSON，包含 `positionToleranceMm`、`dowelPositionToleranceMm`、`flatnessMm`、`materialCondition` 和 `datumRefs`。计算结果仍须复核，不能代替设计输入或标准符合性判定。
+By default, it does not guess hole functions or generate position tolerances, flatness, or material condition modifiers. When GD&T candidates are required, an engineer must explicitly supply a `--gdt-profile` JSON containing `positionToleranceMm`, `dowelPositionToleranceMm`, `flatnessMm`, `materialCondition`, and `datumRefs`. Computed results still require human review and cannot replace design inputs or standards-compliance sign-off.
 
-历史函数 `default_gdt_profile()` 只返回带 `_exampleOnly` 标记的示例；它不能直接用于候选生成，实际公差必须由设计输入提供。
+The legacy helper `default_gdt_profile()` returns only an example tagged with `_exampleOnly`; it cannot be used directly for candidate generation—actual tolerances must come from engineering design inputs.
 
-从中性文档分析（需真实模型路径和 `metadata.plate` 的宽、高、厚）：
+Analyze from a neutral document (requires a real model path and `metadata.plate` width, height, and thickness):
 
 ```powershell
 python subskills/solidworks-engineering-drawing/scripts/drilling_panel_gdt.py panel.cadstudio.json --source-model C:\work\panel.SLDPRT --analysis-out panel_analysis.json --spec-out panel_spec.json
 ```
 
-从已保存的 SolidWorks 零件读取：
+Read directly from a saved SolidWorks Part:
 
 ```powershell
 python subskills/solidworks-engineering-drawing/scripts/drilling_panel_gdt.py --from-model C:\work\panel.SLDPRT --analysis-out panel_analysis.json --spec-out panel_spec.json
 ```
 
-输出文件采用独占创建，不覆盖已有文件。真实模型路径来自打开的文档；使用受控会话，已有用户文档不会作为本次打开的文档关闭。没有保存的模型、缺失包围盒或 B-Rep 读取出错时阻断出图规格生成。
+Output files use exclusive creation and never overwrite existing files. The real model path comes from the opened document; using a managed session ensures pre-existing user documents are not closed as documents opened by this run. Unsaved models, missing bounding boxes, or B-Rep read errors block drawing-spec generation.
 
-面板法向按包围盒最薄方向推测；该方法仅适合坐标轴对齐的简单面板。`GetPartBox` 返回的是[近似包围盒](https://help.solidworks.com/2013/English/Api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IPartDoc~GetPartBox.html)，不能当作精确板边或加工尺寸；输出会保留提示。缺少有效边界时不再按孔位外扩或虚构板厚。中性文档未指定板原点时会明确提示按 `(0, 0)` 假定，必须由设计人员确认。
+The panel normal is inferred from the thinnest bounding-box axis; this heuristic applies only to simple axis-aligned panels. `GetPartBox` returns an [approximate bounding box](https://help.solidworks.com/2013/English/Api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IPartDoc~GetPartBox.html) and must not be treated as exact plate edges or machining dimensions; warnings are preserved in the output. When valid bounds are absent, the script no longer expands bounds from hole positions or fabricates plate thickness. When a neutral document omits the plate origin, the output explicitly notes that `(0, 0)` was assumed and must be confirmed by the designer.
 
-孔壁必须有有效轴向，同轴分段按 0.01 mm 容差合并；几何本身不能证明通孔、螺纹、沉孔用途或定位销。包围盒、基准面、孔型、孔边距和材料条件均须结合真实模型及设计意图复核。斜置面板、多实体、阶梯孔和复杂几何需要单独验证。
+Hole walls must have valid axes, and coaxial segments are merged within a 0.01 mm tolerance; geometry alone cannot prove through-holes, threads, counterbore functions, or dowel pins. Bounding boxes, datum planes, hole types, edge distances, and material conditions must all be verified against the real model and design intent. Tilted panels, multi-body parts, stepped holes, and complex geometry require separate verification.
 
-SolidWorks 2026 SP1.1 已用一个 80×60×20 mm 四孔板验证保存、重开、四孔轴线和孔径回读。它只证明该样例的分析路径可用，**未验证不同版本或实际 GD&T/孔表落图**。候选 `drawing_spec` 不等于已生成或可制造的工程图。
+SolidWorks 2026 SP1.1 has been verified on an 80×60×20 mm four-hole plate for save, reopen, and readback of the four hole axes and diameters. That proves only that the analysis path works on this sample—it **does not verify other SolidWorks versions or actual GD&T/hole-table placement onto drawings**. A candidate `drawing_spec` is not equivalent to a generated or manufacturable Engineering Drawing.
