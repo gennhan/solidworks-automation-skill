@@ -1,8 +1,8 @@
-# 企业 Agent 与机械知识库
+# Enterprise Agent and Mechanical Knowledge Base
 
-## 目标架构
+## Target Architecture
 
-CAD Studio 采用“控制平面 + 确定性 CAD 工具 + Reviewer Gate + 本地优先 RAG”的结构：
+CAD Studio uses a "Control Plane + Deterministic CAD Tools + Reviewer Gate + Local-First RAG" architecture:
 
 ```text
 用户对话/UI 配置
@@ -16,25 +16,25 @@ CAD Studio 采用“控制平面 + 确定性 CAD 工具 + Reviewer Gate + 本地
   -> 人工复核与继续对话
 ```
 
-`apps/desktop/cad_workbench/knowledge_retrieval.py` 已实现：
+`apps/desktop/cad_workbench/knowledge_retrieval.py` implements:
 
-- 检索主 `SKILL.md`、`references/`、所有子技能参考资料和知识文件。
-- 中英文词元检索、分块、Top-K 排序。
-- 每个片段返回来源路径、内容 SHA-256、评分和 provider。
-- Worker 自动把检索结果注入企业 Prompt。
-- 可选 HTTPS 云 RAG 连接器，令牌只从环境变量读取。
+- Retrieval across root `SKILL.md`, `references/`, all subskill references, and knowledge files.
+- Bilingual (Chinese/English) tokenization, chunking, and Top-K ranking.
+- Source path, content SHA-256, relevance score, and provider metadata on every chunk.
+- Automatic injection of retrieved chunks into enterprise prompts by the Worker.
+- Optional HTTPS cloud RAG connector reading tokens exclusively from environment variables.
 
-## 数据边界
+## Data Boundaries
 
-1. 默认只检索本地 Skill 知识，不上传用户工程、模型、图纸或 Prompt。
-2. 云知识库必须在任务中显式声明 `external_network`，并完成人工审批。
-3. 云端 endpoint 必须是 HTTPS；Token 不写入任务 JSON、日志或 UI 持久化文件。
-4. Token 环境变量固定为 `CAD_STUDIO_RAG_TOKEN`；任务不能指定其它环境变量名，避免读取并外发无关凭据。
-5. 自定义本地知识目录会触发跨工作区访问审批；直接写队列文件也不能绕过该门禁。
-6. 检索片段只能作为参考证据，不能替代 GB/T、ISO、材料手册、供应商目录或企业标准原文。
-7. 知识片段必须保留 `source` 与 `sha256`；无法追溯来源的内容不得作为制造门禁依据。
+1. Local skill knowledge is searched by default without uploading user projects, models, drawings, or prompts.
+2. Cloud knowledge bases must explicitly declare `external_network` on the task and pass manual approval.
+3. Cloud endpoints must use HTTPS; tokens are never written to task JSON, logs, or UI persistence files.
+4. The token environment variable is fixed to `CAD_STUDIO_RAG_TOKEN`; tasks cannot specify arbitrary environment variable names to prevent exfiltrating unrelated credentials.
+5. Custom local knowledge directories trigger cross-workspace access approval; writing directly to queue files cannot bypass this gate.
+6. Retrieved chunks serve only as reference evidence and cannot replace primary TCVN/ISO standards, material handbooks, vendor catalogs, enterprise standard originals, or secondary GB/T reference documents.
+7. Knowledge chunks must retain `source` and `sha256`; content without traceable provenance must never serve as a manufacturing gate basis.
 
-## 任务配置
+## Task Configuration
 
 ```json
 {
@@ -51,7 +51,7 @@ CAD Studio 采用“控制平面 + 确定性 CAD 工具 + Reviewer Gate + 本地
 }
 ```
 
-云服务响应契约：
+Cloud service response contract:
 
 ```json
 {
@@ -66,21 +66,21 @@ CAD Studio 采用“控制平面 + 确定性 CAD 工具 + Reviewer Gate + 本地
 }
 ```
 
-## 知识库分层
+## Knowledge Hierarchy
 
-- `L0 会话事实`：用户尺寸、用途、材料、载荷、制造方式、目标软件。
-- `L1 项目知识`：当前工程图、参数表、BOM、企业标准、历史修订。
-- `L2 技能知识`：本仓库参考文档、专项子技能、已验证 API 经验。
-- `L3 组织知识`：经批准的模板、失败案例、工艺能力、供应商约束。
-- `L4 外部知识`：官方 API、国家/行业标准、厂商手册；必须保留版本和来源。
+- `L0 Session Facts`: User dimensions, purpose, material, loads, manufacturing process, target CAD software.
+- `L1 Project Knowledge`: Active drawings, parameter tables, BOMs, company standards, revision history.
+- `L2 Skill Knowledge`: Repository reference docs, specialized subskills, verified API experience.
+- `L3 Organizational Knowledge`: Approved templates, failure postmortems, shop capabilities, supplier constraints.
+- `L4 External Knowledge`: Official APIs, national/industry standards, vendor handbooks; version and provenance must be preserved.
 
-检索优先级为 `L0 > L1 > L2 > L3 > L4`。发生冲突时停止自动执行并把冲突交给 Reviewer，不允许静默选择。
+Retrieval precedence is `L0 > L1 > L2 > L3 > L4`. On conflict, halt automatic execution and escalate the conflict to the Reviewer—never silently choose one side.
 
-## 上云前门禁
+## Pre-Cloud Readiness Gates
 
-- 多租户 namespace 隔离与最小权限 Token。
-- 文档级 ACL 在检索前执行，不能只在生成答案后过滤。
-- 上传、删除、重建索引均有不可变审计记录。
-- PII、密钥、客户图纸水印和受控技术资料在客户端脱敏。
-- 支持来源撤销、版本回滚、过期策略和引用命中统计。
-- 对标准号、材料、公差和安全系数建立“需原文复核”标签。
+- Multi-tenant namespace isolation and least-privilege tokens.
+- Document-level ACLs enforced prior to retrieval, never merely filtered after answer generation.
+- Immutable audit logs for uploads, deletions, and re-indexing.
+- Client-side redaction of PII, secrets, customer drawing watermarks, and controlled technical data.
+- Support for source revocation, version rollback, expiration policies, and citation hit metrics.
+- Attach a "verify against original text" tag to standard numbers, materials, tolerances, and safety factors.

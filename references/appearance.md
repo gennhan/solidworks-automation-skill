@@ -1,21 +1,19 @@
-# 外观与材质参考
+# Appearance and Material Reference
 
-## 核心规则
+## Core Rules
 
-SolidWorks 的九位材质数组必须以 `SAFEARRAY(double)` 传给 COM。不要直接把 Python
-`list` 赋给 `MaterialPropertyValues`；在 pywin32 动态分派下，普通列表可能被错误编组，
-表现为 RGB 落入第 2、5、8 位，最终模型几乎只显示绿色。
+SolidWorks' 9-element material property array must be passed to COM as a `SAFEARRAY(double)`. Never assign a plain Python `list` directly to `MaterialPropertyValues`; under `pywin32` late-bound dispatch, a plain list can be marshaled incorrectly so RGB values land in positions 2, 5, and 8, causing the model to render almost entirely green.
 
-稳定封装位于 `scripts/sw_appearance.py`：
+Stable wrappers live in `scripts/sw_appearance.py`:
 
-- `material_variant()`：把九位数组封装为 `VT_ARRAY | VT_R8`。
-- `set_document_appearance()`：写入并回读文档级 RGB。
-- `set_feature_appearance()`：写入并回读特征级 RGB。
-- `set_component_appearance()`：写入并回读装配组件级 RGB。
-- `apply_component_palette()`：批量上色并生成逐组件审计结果。
-- `verify_appearance()`：比较预期 RGB 与 COM 回读值。
+- `material_variant()`: Wraps the 9-element array as `VT_ARRAY | VT_R8`.
+- `set_document_appearance()`: Writes and reads back document-level RGB values.
+- `set_feature_appearance()`: Writes and reads back feature-level RGB values.
+- `set_component_appearance()`: Writes and reads back assembly component-level RGB values.
+- `apply_component_palette()`: Applies colors in batch and produces per-component audit results.
+- `verify_appearance()`: Compares expected RGB values against COM readback values.
 
-## 推荐用法
+## Recommended Usage
 
 ```python
 from sw_appearance import (
@@ -38,27 +36,27 @@ reports = apply_component_palette([
 assert all(item["ok"] for item in reports)
 ```
 
-## 预设颜色
+## Preset Colors
 
-| 名称 | 说明 |
+| Name | Description |
 |---|---|
-| `iron_red` | 深红装甲 |
-| `armor_gold` | 金色装甲 |
-| `dark_gunmetal` | 深色金属/关节 |
-| `arc_blue` | 蓝色发光件 |
-| `silver` | 银色金属 |
-| `black` | 黑色 |
-| `white` | 白色 |
-| `aqua_blue` | 青蓝车身色 |
-| `glass_tint` | 深色玻璃 |
-| `signal_red` | 尾灯/警示红 |
-| `light_cyan` | 浅蓝发光件 |
-| `tire_black` | 轮胎黑 |
-| `graphite` | 石墨灰 |
+| `iron_red` | Deep red armor |
+| `armor_gold` | Gold armor |
+| `dark_gunmetal` | Dark metal / joints |
+| `arc_blue` | Blue emissive part |
+| `silver` | Silver metal |
+| `black` | Black |
+| `white` | White |
+| `aqua_blue` | Aqua blue body paint |
+| `glass_tint` | Dark tinted glass |
+| `signal_red` | Tail light / warning red |
+| `light_cyan` | Light blue emissive part |
+| `tire_black` | Tire black |
+| `graphite` | Graphite gray |
 
-## 已验证 API 签名
+## Verified API Signatures
 
-本机 SolidWorks 2024 SP3.1 的 `SolidWorks.Interop.sldworks.dll` 反射结果：
+Reflection results from local SolidWorks 2024 SP3.1 `SolidWorks.Interop.sldworks.dll`:
 
 ```text
 IModelDoc2.MaterialPropertyValues = Object
@@ -69,24 +67,22 @@ IComponent2.SetMaterialPropertyValues2(Object, Int32, Object) -> void
 IComponent2.GetMaterialPropertyValues2(Int32, Object) -> Object
 ```
 
-配置选项：`swThisConfiguration=1`、`swAllConfiguration=2`、
-`swSpecifyConfiguration=3`。返回 `void` 的 setter 只要没有 COM 异常即表示调用完成，
-不能写成 `bool(method(...))` 判断成败；最终必须以 `verify_appearance()` 回读为准。
+Configuration options: `swThisConfiguration=1`, `swAllConfiguration=2`, `swSpecifyConfiguration=3`. A setter returning `void` succeeds if no COM exception is raised—do not wrap it in `bool(method(...))` to test success; always rely on `verify_appearance()` readback as the source of truth.
 
-## 多色装配工作流
+## Multi-Color Assembly Workflow
 
-1. 在源零件文档级设置基础颜色并保存。
-2. 添加组件后按需设置组件级覆盖色。
-3. 每次写入后回读前三位 RGB；不匹配立即停止。
-4. 保存前调用 `assembly.ClearSelection2(True)`。
-5. 预览前再次清除选择并重绘，避免绿色选择高亮覆盖真实外观。
-6. 至少检查一张彩色等轴测图和一张能看到灯组/轮毂的正投影视图。
+1. Set the base document-level color on each source part and save.
+2. After inserting components, apply component-level color overrides as needed.
+3. Read back the first three RGB values after every write; stop immediately on mismatch.
+4. Call `assembly.ClearSelection2(True)` before saving.
+5. Clear selection and redraw again before capturing previews so green selection highlights do not obscure true appearances.
+6. Inspect at least one color isometric view and one orthographic view showing lights/wheel hubs or key detail features.
 
-## 稳定性建议
+## Stability Recommendations
 
-- 单零件多特征上色可能受 SolidWorks 版本、显示状态、特征合并影响。
-- 对颜色要求高的模型，优先拆成多个零件，并对每个零件使用文档级外观。
-- 复杂项目建议输出装配体，由组件层级表达颜色、材质和可替换模块。
-- 不要把“setter 未抛异常”当作颜色正确；必须回读 RGB。
-- 不要在仍有选中组件/面/边时截图；绿色选择色会干扰视觉判断。
-- 生成后必须用 `sw_review.py` 导出预览图检查颜色和层次是否可见。
+- Multi-feature coloring within a single part can be affected by SolidWorks version, display states, and feature merging.
+- For models with strict appearance requirements, split them into multiple parts and apply document-level appearance to each part.
+- For complex projects, output an assembly so component hierarchy expresses colors, materials, and replaceable modules.
+- Do not treat "setter did not throw an exception" as proof of correct color; always read back RGB.
+- Do not capture screenshots while components, faces, or edges remain selected; green selection highlighting interferes with visual review.
+- After generation, always export preview images with `sw_review.py` to verify color contrast and visual separation.

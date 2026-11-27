@@ -1,8 +1,8 @@
-# 多 Agent Provider 架构
+# Multi-Agent Provider Architecture
 
-## 目标
+## Objective
 
-CAD Studio 面向不同用户环境，不绑定单一模型或 CLI。所有 Provider 共用一份 CAD 任务协议、审批策略、知识检索、产物账本和复核门禁，差异只保留在命令编译与结果解析层。
+CAD Studio targets diverse user environments without locking into a single model or CLI. All providers share one CAD task protocol, approval policy, knowledge retrieval layer, artifact ledger, and review gate; differences are confined strictly to command compilation and result parsing.
 
 ```text
 用户任务
@@ -16,24 +16,24 @@ CAD Studio 面向不同用户环境，不绑定单一模型或 CLI。所有 Prov
   -> 本地交付目录
 ```
 
-## Provider 状态不能混用
+## Do Not Conflate Provider States
 
-界面和日志必须分别表达以下状态：
+The UI and logs must distinguish each of the following states explicitly:
 
-| 状态 | 证据 | 能否表述为已连接 |
+| State | Evidence | Can Be Described as "Connected"? |
 |---|---|---|
-| 未安装 | 找不到 CLI 入口或 `--version` 失败 | 否 |
-| 已安装 | `--version` 成功 | 否 |
-| 认证失败 | 官方认证状态命令返回失败 | 否 |
-| 认证待验证 | CLI 没有低成本认证查询命令 | 否，首个真实任务验证 |
-| 认证已验证 | 官方认证命令成功 | 可以表述为认证已验证 |
-| 执行已验证 | 真实任务按统一协议返回结构化结果 | 可以表述为该次任务执行成功 |
+| Not Installed | CLI entry point not found or `--version` fails | No |
+| Installed | `--version` succeeds | No |
+| Auth Failed | Official auth status command returns failure | No |
+| Auth Pending | CLI lacks a low-cost auth status command | No; verified on first real task |
+| Auth Verified | Official auth status command succeeds | May be described as auth verified |
+| Execution Verified | Real task returns structured output under unified protocol | May be described as task execution succeeded |
 
-CLI 存在、环境变量存在、CC Switch 中有 Provider 配置，都不能单独证明模型请求可用。Provider 自报成功也不能证明 SolidWorks/AutoCAD 产物正确。
+The presence of a CLI binary, environment variables, or a Provider entry in CC Switch cannot independently prove that model requests work. Nor does a Provider's self-reported success prove that SolidWorks/AutoCAD deliverables are valid.
 
-## 统一任务协议
+## Unified Task Protocol
 
-任务类型使用 `agent_task`，执行器使用 `agent`：
+Tasks use kind `agent_task` and executor `agent`:
 
 ```json
 {
@@ -52,11 +52,11 @@ CLI 存在、环境变量存在、CC Switch 中有 Provider 配置，都不能�
 }
 ```
 
-旧的 `codex_task`、`executor=codex` 只作为兼容入口，进入 Worker 后仍归一到同一执行流程。
+Legacy `codex_task` and `executor=codex` remain compatibility aliases only and normalize into the exact same execution flow once inside the Worker.
 
-## 统一结果协议
+## Unified Result Protocol
 
-每个 Provider 最终必须生成以下字段：
+Every Provider must ultimately produce the following fields:
 
 ```json
 {
@@ -68,41 +68,41 @@ CLI 存在、环境变量存在、CC Switch 中有 Provider 配置，都不能�
 }
 ```
 
-统一结果只是 Agent 执行记录，不是 CAD 验收证据。机械交付仍需独立的文件哈希、B-Rep 尺寸、孔槽定位、预览图、Motion 结果和人工复核记录。
+The unified result is only an agent execution record, not CAD acceptance evidence. Mechanical deliverables still require independent file hashes, B-Rep dimensions, hole/slot locating checks, preview renders, Motion results, and manual review records.
 
-## 当前 Adapter
+## Current Adapters
 
-| Provider | 协议 ID | 非交互入口 | 结构化输出来源 |
+| Provider | Protocol ID | Non-Interactive Entry | Structured Output Source |
 |---|---|---|---|
-| Codex | `codex-exec-v1` | `codex exec` | `--output-schema` + 输出文件 |
+| Codex | `codex-exec-v1` | `codex exec` | `--output-schema` + output file |
 | Claude Code | `claude-print-v1` | `claude -p` | `--output-format json` + `--json-schema` |
-| Gemini CLI | `gemini-headless-v1` | `gemini -p` | JSON response 包装层 |
-| OpenCode | `opencode-jsonl-v1` | `opencode run` | JSONL 文本事件 |
+| Gemini CLI | `gemini-headless-v1` | `gemini -p` | JSON response wrapper |
+| OpenCode | `opencode-jsonl-v1` | `opencode run` | JSONL text events |
 
-实现位于：
+Implementations live in:
 
 - `apps/desktop/cad_workbench/agent_providers.py`
 - `apps/desktop/cad_workbench/queue_worker.py`
 - `apps/workbench-ui/src-tauri/src/lib.rs`
 
-## 新增 Provider 的步骤
+## Steps to Add a New Provider
 
-1. 在 `SUPPORTED_PROVIDER_IDS` 和前端 `AgentProviderId` 中登记稳定 ID。
-2. 只使用该 CLI 官方文档确认的非交互参数，不凭记忆猜选项。
-3. 在 `build_provider_command()` 中把统一任务编译为 Provider 命令。
-4. 在 `parse_provider_result()` 中解析原生包装层，最终强制收敛到统一结果字段。
-5. 增加安装、认证、超时、非 JSON、缺字段和取消任务测试。
-6. 在桌面健康检查中区分安装、认证和执行验证，不新增含糊的“已连接”布尔值。
-7. 真实执行最小探针，确认退出码、stdout/stderr、取消和超时行为。
+1. Register a stable ID in `SUPPORTED_PROVIDER_IDS` and frontend `AgentProviderId`.
+2. Use only non-interactive flags confirmed in that CLI's official documentation; never guess flags from memory.
+3. Compile the unified task into a Provider command inside `build_provider_command()`.
+4. Parse the native wrapper inside `parse_provider_result()` and enforce convergence onto the unified result schema.
+5. Add tests for installation, authentication, timeout, non-JSON output, missing fields, and task cancellation.
+6. Distinguish install, auth, and execution verification in desktop health checks; never introduce an ambiguous "connected" boolean.
+7. Run a real minimal probe to verify exit code, stdout/stderr, cancellation, and timeout behavior.
 
-## 可观察执行过程
+## Observable Execution Trace
 
-软件可以展示计划、公开步骤、工具调用、审批、日志、文件变化和复核结果。不要承诺或伪造模型隐藏思维链；用户真正需要的是可审计的执行轨迹和可继续追问的对话上下文。
+The application may display plans, public steps, tool calls, approvals, logs, file changes, and review results. Never promise or fabricate hidden model chain-of-thought; what users actually need is an auditable execution trail and a follow-up-ready conversation context.
 
-## 安全边界
+## Security Boundaries
 
-- Provider Adapter 不直接暴露任意 Python、PowerShell 或 VBA 工具。
-- CAD COM 调用串行化，避免多个 Agent 同时操作同一桌面会话。
-- 外部网络、云 RAG 和危险本地 CAD 操作进入 Policy Gate。
-- API Key 不写入任务 JSON、日志或前端持久化；只记录脱敏状态或环境变量名。
-- Provider 输出必须经过 schema、Artifact Ledger 和 Reviewer Gate，不能直接宣布交付成功。
+- Provider adapters do not expose arbitrary Python, PowerShell, or VBA tools directly.
+- CAD COM calls are serialized to prevent multiple agents from colliding in the same desktop session.
+- External network access, cloud RAG, and hazardous local CAD operations pass through the Policy Gate.
+- API keys are never written to task JSON, logs, or frontend persistent state; only redacted status or environment variable names are recorded.
+- Provider outputs must pass schema validation, Artifact Ledger logging, and the Reviewer Gate before delivery can be declared complete.

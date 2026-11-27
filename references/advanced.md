@@ -1,17 +1,17 @@
-# 高级功能参考
+# Advanced Features Reference
 
-## 目录
+## Table of Contents
 
-- [自定义属性](#自定义属性)
-- [设计表与配置](#设计表与配置)
-- [钣金设计](#钣金设计)
-- [焊件设计](#焊件设计)
-- [曲面建模](#曲面建模)
-- [仿真/FEA](#仿真fea)
+- [Custom Properties](#custom-properties)
+- [Design Tables and Configurations](#design-tables-and-configurations)
+- [Sheet Metal Design](#sheet-metal-design)
+- [Weldment Design](#weldment-design)
+- [Surface Modeling](#surface-modeling)
+- [Simulation/FEA](#simulationfea)
 
 ---
 
-## 自定义属性
+## Custom Properties
 
 ```python
 # 获取属性管理器
@@ -41,9 +41,9 @@ count = props.Count
 names = props.GetNames()
 ```
 
-## 设计表与配置
+## Design Tables and Configurations
 
-### 配置管理
+### Configuration Management
 
 ```python
 from sw_document_data import (
@@ -76,12 +76,9 @@ dimension = update_dimension_mm(
 evidence = inspect_configurations(model)
 ```
 
-SW2026 真机已验证配置创建、切换、配置级尺寸/属性以及保存重开回读。`AddConfiguration3`
-会自动激活新配置，因此重复调用 `ShowConfiguration2` 可能返回 `False`；执行器会记录原始
-返回值，但以 `ConfigurationManager.ActiveConfiguration.Name` 回读和重建结果作为成功证据。
-设计表、派生配置、显示状态和大规模抑制矩阵仍是 `pilot` 范围外能力。
+Verified on live SW2026: configuration creation, switching, configuration-specific dimensions/properties, and save/reopen readback. Because `AddConfiguration3` automatically activates the newly created configuration, calling `ShowConfiguration2` again may return `False`; the executor records the raw return value but uses `ConfigurationManager.ActiveConfiguration.Name` readback and rebuild status as success evidence. Design tables, derived configurations, display states, and large-scale suppression matrices remain outside the `pilot` scope.
 
-### 设计表
+### Design Tables
 
 ```python
 # 插入设计表（从 Excel）
@@ -94,9 +91,9 @@ model.CloseFamilyTable()
 model.InsertFamilyTableEdit()
 ```
 
-## 钣金设计
+## Sheet Metal Design
 
-### 基本操作
+### Basic Operations
 
 ```python
 from sw_sheet_metal import BaseFlangeSpec, create_base_flange
@@ -114,11 +111,9 @@ feature = create_base_flange(
 )
 ```
 
-该封装使用 `CreateDefinition(swFmBaseFlange)`、`IBaseFlangeFeatureData.Initialize`
-和 `CreateFeature`，不会猜测已废弃长参数接口。SW2026 SP01.1 已验证开放 U 型轮廓、
-两道真实折弯及保存重开；边线法兰、斜接法兰和放样折弯仍按 `pilot` 门禁处理。
+This wrapper uses `CreateDefinition(swFmBaseFlange)`, `IBaseFlangeFeatureData.Initialize`, and `CreateFeature` without guessing deprecated long-parameter interfaces. Verified on SW2026 SP01.1 with an open U-shaped profile, two real bends, and save/reopen; Edge Flange, Miter Flange, and Lofted Bend remain gated under `pilot`.
 
-### 展开图导出
+### Flat Pattern Export
 
 ```python
 from sw_export import export_flat_pattern_dxf
@@ -127,10 +122,9 @@ from sw_export import export_flat_pattern_dxf
 export_flat_pattern_dxf(model, dxfPath, include_bend_lines=True)
 ```
 
-`ExportToDWG2` 的第五个参数是 12 个双精度数值组成的对齐数组，第八个参数才是
-钣金选项位掩码；不要把多个布尔值误当作“轮廓/折弯线/草图/隐藏边线”。
+In `ExportToDWG2`, the 5th parameter is a 12-double alignment array and the 8th parameter is the sheet metal options bitmask; do not pass multiple booleans mistaking them for "geometry / bend lines / sketches / hidden edges."
 
-### 钣金参数
+### Sheet Metal Parameters
 
 ```python
 # 获取钣金特征数据
@@ -140,9 +134,9 @@ thickness = sheet_metal_data.Thickness    # 板厚
 bend_radius = sheet_metal_data.BendRadius # 折弯半径
 ```
 
-## 焊件设计
+## Weldment Design
 
-### 切割清单
+### Cut List
 
 ```python
 from sw_weldment import (
@@ -165,12 +159,9 @@ evidence = weldment_evidence(model)
 export_cut_list_csv(evidence, csv_path)
 ```
 
-SW2026 的 `InsertWeldmentCutList2` 在 Python IDispatch 下可能被投影成值为
-`None` 的伪属性；封装会按本机类型库确认的 DISPID 174 以
-`DISPATCH_METHOD` 调用。矩形框架回归会按实体包围盒最长边分组，生成两个
-真实 `CutListFolder`，而不是把不同长度构件错误合并。
+In SW2026, `InsertWeldmentCutList2` under Python `IDispatch` can be projected as a pseudo-property returning `None`; the wrapper invokes it via `DISPATCH_METHOD` using DISPID 174 confirmed from the local type library. The rectangular frame regression groups bodies by their longest bounding-box edge, producing two distinct `CutListFolder` entries rather than merging members of different lengths.
 
-### 结构构件
+### Structural Members
 
 ```python
 from sw_weldment import create_weldment_profile
@@ -184,11 +175,9 @@ profile = create_weldment_profile(
 )
 ```
 
-`create_structural_member()` 内部使用 `CreateStructuralMemberGroup` 与最新
-`InsertStructuralWeldment5`，路径段和组均作为 `VT_ARRAY | VT_DISPATCH`
-安全数组封送；调用者不需要猜长参数或依赖当前选择集。
+`create_structural_member()` internally uses `CreateStructuralMemberGroup` and the latest `InsertStructuralWeldment5`, marshaling path segments and groups as `VT_ARRAY | VT_DISPATCH` safe arrays so callers do not have to guess long signatures or rely on the active selection set.
 
-## 曲面建模
+## Surface Modeling
 
 ```python
 # 拉伸曲面
@@ -216,9 +205,9 @@ feature_mgr.InsertSewRefSurface(True, False, 0.001)
 feature_mgr.InsertThickenSheet(thickness, False, True)
 ```
 
-## 仿真/FEA
+## Simulation/FEA
 
-> 需要安装 SolidWorks Simulation 插件
+> Requires the SolidWorks Simulation add-in to be installed.
 
 ```python
 # 获取 Simulation 插件
@@ -247,14 +236,14 @@ results = study.Results
 # 应力、位移、安全系数等
 ```
 
-### 算例类型
+### Study Types
 
-| 值 | 类型 | 说明 |
+| Value | Type | Description |
 |---|---|---|
-| 0 | Static | 静态分析 |
-| 1 | Frequency | 频率分析 |
-| 2 | Buckling | 屈曲分析 |
-| 3 | Thermal | 热分析 |
-| 4 | Drop Test | 跌落测试 |
-| 5 | Fatigue | 疲劳分析 |
-| 6 | Nonlinear | 非线性分析 |
+| 0 | Static | Static analysis |
+| 1 | Frequency | Frequency analysis |
+| 2 | Buckling | Buckling analysis |
+| 3 | Thermal | Thermal analysis |
+| 4 | Drop Test | Drop test |
+| 5 | Fatigue | Fatigue analysis |
+| 6 | Nonlinear | Nonlinear analysis |

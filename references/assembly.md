@@ -1,21 +1,18 @@
-# 装配体与运动配合参考
+# Assembly and Kinematic Mate Reference
 
-## 官方资料入口
+## Official Documentation Links
 
 - AddMate5: `https://help.solidworks.com/2023/english/api/sldworksapi/solidworks.interop.sldworks~solidworks.interop.sldworks.iassemblydoc~addmate5.html`
 - GetModelDoc2: `https://help.solidworks.com/2019/english/api/sldworksapi/solidworks.interop.sldworks~solidworks.interop.sldworks.icomponent2~getmodeldoc2.html`
 - GetCorresponding: `https://help.solidworks.com/2019/English/api/sldworksapi/solidworks.interop.sldworks~solidworks.interop.sldworks.icomponent2~getcorresponding.html`
-- IsCylinder / CylinderParams: `https://help.solidworks.com/2021/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.ISurface~IsCylinder.html`、`https://help.solidworks.com/2024/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.ISurface~CylinderParams.html`
+- IsCylinder / CylinderParams: `https://help.solidworks.com/2021/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.ISurface~IsCylinder.html`, `https://help.solidworks.com/2024/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.ISurface~CylinderParams.html`
 - Gear Mates: `https://help.solidworks.com/2024/English/solidworks/sldworks/t_Gear_Mates_SWassy.htm`
 - Hinge Mates: `https://help.solidworks.com/2023/english/SolidWorks/sldworks/t_hinge_mates.htm`
-- Mate Controller: `https://help.solidworks.com/2024/english/Solidworks/sldworks/c_assembly_mate_controller.htm`
+- Mate Controller: `https://help.solidworks.com/2024/english/SolidWorks/sldworks/c_assembly_mate_controller.htm`
 
-## 添加组件
+## Adding Components
 
-优先复用 `scripts/sw_assembly.py` 的 `add_component()`。SW2024 中文版 + pywin32 下，
-`AddComponent4()` 可能无异常但返回 `None`；当前封装会优先走 `AddComponent5()` 的
-8 参数签名，失败后再回退 `AddComponent4()`。若两者都返回空，封装会自动把零件
-静默打开到 SolidWorks 会话、重新激活装配体，再重试 `AddComponent5()`。
+Prefer reusing `add_component()` from `scripts/sw_assembly.py`. Under SolidWorks 2024 Chinese Edition + pywin32, `AddComponent4()` can silently return `None` without raising an exception; the current wrapper tries the 8-parameter `AddComponent5()` signature first and falls back to `AddComponent4()` on failure. If both return `None`, the wrapper automatically opens the part silently in the SolidWorks session, reactivates the assembly, and retries `AddComponent5()`.
 
 ```python
 from sw_assembly import add_component
@@ -23,7 +20,7 @@ from sw_assembly import add_component
 component = add_component(asm_model, r"E:\parts\base.SLDPRT", x=0, y=0, z=0)
 ```
 
-底层稳定调用：
+Stable low-level call:
 
 ```python
 component = asm_model.AddComponent5(
@@ -31,36 +28,36 @@ component = asm_model.AddComponent5(
 )
 ```
 
-`AddComponent4` / `AddComponent5` 失败时，先检查零件文件是否真实存在、装配体是否为活动文档、零件是否已保存到磁盘；必要时先打开零件再切回装配体。真实回归验证：
+When `AddComponent4` / `AddComponent5` fails, verify that the part file actually exists, the assembly is the active document, and the part has been saved to disk; if needed, open the part first and then switch back to the assembly. Live regression test:
 
 ```powershell
 py -3.13 tests\solidworks_add_component_regression.py --output-dir C:\CADAutomationWorkbench\solidworks_add_component_regression
 ```
 
-## 运动型装配工作流
+## Kinematic Assembly Workflow
 
-1. 先生成并保存每个零件，尽量关闭不再编辑的零件文档，避免 SolidWorks 打开的文档过多。
-2. 新建装配体，添加底座、轴承座、轴、齿轮、上盖等组件。
-3. 对所有需要读特征或面的组件先调用 `resolve_component(component)`；轻化/压缩组件会让 `GetModelDoc2()` 返回 `None`。
-4. 用 `IComponent2.GetCorresponding()` 将零件内部基准面、圆柱面或草图实体映射到装配体上下文，再用 `Select2()` 选择。
-5. 固定件可以用三基准面重合或距离 Mate 锁死；旋转件不要用三基准面完全锁死。
-6. 轴/孔用同心 Mate，`lock_rotation=False`，保留绕轴旋转自由度。
-7. 齿轮联动用 Gear Mate；选择齿轮轴线、孔圆柱面、圆柱面或轴实体，按齿数传入比例。
-8. 上盖铰链可用同心 Mate 加一个平面重合/距离 Mate 表达一条旋转自由度；若需要 Motion 分析，优先在 GUI 中用官方 Hinge Mate 或用更高阶 MateFeatureData API 生成。
-9. 创建后遍历 MateGroup 子特征，确认真实 Mate 写入特征树；预览动画只说明脚本能驱动，不等同于可在软件里拖动。
-10. 最后运行 `sw_review.py` 导出多视角预览图，并在 SolidWorks 中手动拖动一个自由件验证运动。
+1. Generate and save each part first, closing part documents that are no longer being edited to avoid opening too many documents in SolidWorks.
+2. Create a new assembly and insert components such as the base, bearing housings, shafts, gears, and top cover.
+3. Call `resolve_component(component)` on every component whose features or faces need to be read; lightweight or suppressed components cause `GetModelDoc2()` to return `None`.
+4. Use `IComponent2.GetCorresponding()` to map part-level reference planes, cylindrical faces, or sketch entities into the assembly context, then select them with `Select2()`.
+5. Fixed components can be locked using three coincident reference plane mates or distance mates; do not fully lock rotating components with three reference plane mates.
+6. Use a Concentric mate for shafts/holes with `lock_rotation=False` to preserve the rotational degree of freedom around the axis.
+7. Use a Gear mate for gear transmission: select gear axes, bore cylindrical faces, outer cylindrical faces, or shaft entities, and pass the ratio according to tooth counts.
+8. A top cover hinge can be represented with a Concentric mate plus a Coincident/Distance planar mate to leave one rotational degree of freedom; if Motion Analysis is required, prefer creating a native Hinge Mate in the GUI or using the higher-level `MateFeatureData` API.
+9. After creation, traverse the `MateGroup` sub-features to verify that real mates are written into the FeatureManager design tree; preview animations only prove that a script can drive positions, not that the mechanism can be dragged interactively in SolidWorks.
+10. Finally, run `sw_review.py` to export multi-view previews and manually drag a free component in SolidWorks to verify motion.
 
-## 在线工程经验摘要
+## Engineering Reference Summary
 
-- 官方 Mechanical Mates 文档强调：Gear Mate 只强制两个组件绕所选轴按比例相对转动；Hinge Mate 的效果等价于同心配合加重合配合，并可限制角度。
-- GoEngineer 的 Mate 教程把 Mate 理解为零部件之间的几何约束；机械配合用于齿轮、齿条、螺旋、万向节等运动关系，不等同于接触仿真：`https://www.goengineer.com/blog/introduction-to-solidworks-mates`
-- CodeStack 的轻化组件示例说明 `GetModelDoc2()` 对轻化/压缩组件会返回空，可通过解析或静默打开引用模型兜底：`https://www.codestack.net/solidworks-api/document/assembly/components/lightweight-get-model-doc/`
-- CAD Booster 的 GetCorresponding 文章强调 part context 与 assembly context 不能混用；能拿对象引用时优先用 `GetCorresponding()` + `Select2()`，少依赖坐标点击：`https://cadbooster.com/entities-and-getcorresponding-in-the-solidworks-api/`
-- 轻化组件导致 `GetModelDoc2()` 返回空是高频坑；做 Mate 前先解析组件，不要把 `None` 当作“零件没有特征”。
+- Official Mechanical Mates documentation emphasizes that a Gear Mate only enforces proportional relative rotation between two components around selected axes, and a Hinge Mate is equivalent to a Concentric mate plus a Coincident mate with optional angle limits.
+- GoEngineer's Mate guide treats mates as geometric constraints between components; mechanical mates represent kinematic relationships such as gears, rack-and-pinion, screws, and universal joints, and are not equivalent to physical contact simulation: `https://www.goengineer.com/blog/introduction-to-solidworks-mates`
+- CodeStack's lightweight component example shows that `GetModelDoc2()` returns `None` for lightweight or suppressed components, with a fallback of resolving the component or silently opening the referenced model: `https://www.codestack.net/solidworks-api/document/assembly/components/lightweight-get-model-doc/`
+- CAD Booster's `GetCorresponding` guide emphasizes that part context and assembly context cannot be mixed; whenever an object reference is available, prefer `GetCorresponding()` + `Select2()` over coordinate-based clicking: `https://cadbooster.com/entities-and-getcorresponding-in-the-solidworks-api/`
+- Lightweight components causing `GetModelDoc2()` to return `None` is a common pitfall; always resolve components before creating mates rather than mistaking `None` for "the part has no features."
 
-## AddMate5 参数
+## AddMate5 Parameters
 
-SolidWorks 2015+ 的 `AddMate5` 是 15 参数签名，Python COM 下 by-ref 错误码必须用 `VARIANT` 包装：
+`AddMate5` in SolidWorks 2015+ takes a 15-parameter signature; in Python COM, the by-ref error code must be wrapped in a `VARIANT`:
 
 ```python
 errors = VARIANT(pythoncom.VT_BYREF | pythoncom.VT_I4, 0)
@@ -83,7 +80,7 @@ mate = asm_model.AddMate5(
 )
 ```
 
-优先复用 `scripts/sw_assembly.py`：
+Prefer reusing `scripts/sw_assembly.py`:
 
 ```python
 from sw_assembly import (
@@ -116,37 +113,37 @@ add_gear_mate_by_cylinders(
 print(collect_mate_feature_summary(asm))
 ```
 
-## 配合类型枚举
+## Mate Type Enumeration
 
-本机 SW 2024 `SolidWorks.Interop.swconst.dll` 验证过的常用值：
+Common values verified against local SW 2024 `SolidWorks.Interop.swconst.dll`:
 
-| 值 | 名称 | 说明 |
+| Value | Name | Description |
 |---:|---|---|
-| 0 | `swMateCOINCIDENT` | 重合 |
-| 1 | `swMateCONCENTRIC` | 同心 |
-| 2 | `swMatePERPENDICULAR` | 垂直 |
-| 3 | `swMatePARALLEL` | 平行 |
-| 4 | `swMateTANGENT` | 相切 |
-| 5 | `swMateDISTANCE` | 距离 |
-| 6 | `swMateANGLE` | 角度 |
-| 10 | `swMateGEAR` | 齿轮 |
-| 11 | `swMateWIDTH` | 宽度 |
-| 16 | `swMateLOCK` | 锁定 |
-| 22 | `swMateHINGE` | 铰链 |
+| 0 | `swMateCOINCIDENT` | Coincident |
+| 1 | `swMateCONCENTRIC` | Concentric |
+| 2 | `swMatePERPENDICULAR` | Perpendicular |
+| 3 | `swMatePARALLEL` | Parallel |
+| 4 | `swMateTANGENT` | Tangent |
+| 5 | `swMateDISTANCE` | Distance |
+| 6 | `swMateANGLE` | Angle |
+| 10 | `swMateGEAR` | Gear |
+| 11 | `swMateWIDTH` | Width |
+| 16 | `swMateLOCK` | Lock |
+| 22 | `swMateHINGE` | Hinge |
 
-组件压缩状态常用值：
+Common component suppression state values:
 
-| 值 | 名称 | 说明 |
+| Value | Name | Description |
 |---:|---|---|
-| 0 | `swComponentSuppressed` | 压缩 |
-| 1 | `swComponentLightweight` | 轻化 |
-| 2 | `swComponentFullyResolved` | 完全解析 |
-| 3 | `swComponentResolved` | 解析 |
-| 4 | `swComponentFullyLightweight` | 完全轻化 |
+| 0 | `swComponentSuppressed` | Suppressed |
+| 1 | `swComponentLightweight` | Lightweight |
+| 2 | `swComponentFullyResolved` | Fully Resolved |
+| 3 | `swComponentResolved` | Resolved |
+| 4 | `swComponentFullyLightweight` | Fully Lightweight |
 
-## 选择与装配体上下文
+## Selection and Assembly Context
 
-稳定顺序：
+Reliable sequence:
 
 ```python
 from sw_assembly import (
@@ -170,16 +167,16 @@ entity_b = get_assembly_entity(component_b, feature_b)
 select_entities_for_mate(asm, entity_a, entity_b, mark=1)
 ```
 
-注意事项：
+Notes:
 
-- 先解析组件，再选择实体；`SetSuppression2()` 可能清空选择集。
-- 第一个实体用 `Select2(False, 1)`，第二个实体用 `Select2(True, 1)` 追加。
-- 创建 Mate 前检查 `SelectionManager.GetSelectedObjectCount2(-1) == 2`。
-- Gear Mate、普通 Mate 选择标记通常用 `1`；Width Mate 用 `16`，Cam-Follower 用 `8`。
+- Resolve components before selecting entities; `SetSuppression2()` can clear the active selection set.
+- Select the first entity with `Select2(False, 1)` and append the second entity with `Select2(True, 1)`.
+- Verify `SelectionManager.GetSelectedObjectCount2(-1) == 2` before creating the mate.
+- Gear mates and standard mates typically use selection mark `1`; Width Mate uses `16`, and Cam-Follower uses `8`.
 
-## 圆柱面识别
+## Cylindrical Face Identification
 
-轴、孔、齿轮轴线常通过最大圆柱面识别：
+Shafts, holes, and gear axes are typically identified via their largest cylindrical face:
 
 ```python
 from sw_assembly import find_largest_cylinder_face
@@ -191,7 +188,7 @@ face = find_largest_cylinder_face(
 )
 ```
 
-底层逻辑：
+Underlying logic:
 
 ```python
 bodies = part.GetBodies2(0, False)
@@ -203,24 +200,24 @@ for body in bodies:
             radius = params[6]  # 单位米
 ```
 
-## 可以在软件里操作吗
+## Can the Assembly Be Manipulated Interactively in SolidWorks?
 
-可以，但前提是装配体里有真实 Mate 且没有被过约束：
+Yes, provided the assembly contains real mates and is not over-constrained:
 
-- 在 SolidWorks 打开 `.SLDASM`。
-- 使用 `移动零部件` / `Move Component` 拖动轴、齿轮或上盖。
-- 如果 Gear Mate 正确，拖动一个齿轮绕轴旋转时，另一个齿轮会按比例反向/同向联动。
-- 如果拖不动，优先检查：零件是否固定、同心 Mate 是否勾了 Lock Rotation、是否额外用平面 Mate 把旋转件锁死、Mate 是否报错或过定义。
+- Open the `.SLDASM` file in SolidWorks.
+- Use `Move Component` (`移动零部件` / `Move Component`) to drag shafts, gears, or covers.
+- If the Gear Mate is properly configured, rotating one gear about its axis drives the mating gear proportionally in the opposite or same direction.
+- If a component cannot be dragged, check whether the part is Fixed, whether Lock Rotation is checked on a Concentric mate, whether additional planar mates lock the rotating part, or whether mates have errors or are over-defined.
 
-脚本生成的 GIF/预览视频只能证明“可以被驱动到多个位置”；真正可交互要靠 SolidWorks Mate 求解器和自由度。
+Script-generated GIFs or preview videos only demonstrate that components can be driven to multiple poses; true interactive motion depends on the SolidWorks Mate solver and remaining degrees of freedom.
 
-## 干涉与运动边界
+## Interference and Motion Limits
 
-Gear Mate 不负责防止齿轮实体穿透；它只建立旋转比例关系。需要几何安全时：
+A Gear Mate does not prevent solid gear bodies from penetrating each other; it only enforces a rotational ratio. When geometric clearance must be verified:
 
-- 用 `InterferenceDetection` 或 GUI 中的干涉检查验证。
-- 用 Limit Angle / Limit Distance 限制行程。
-- 用 Mate Controller 保存几个关键位置并生成 Motion Study 动画。
+- Run `InterferenceDetection` or GUI Interference Detection to verify clearances.
+- Use Limit Angle / Limit Distance mates to restrict travel.
+- Use Mate Controller to save key positions and generate a Motion Study animation.
 
 ```python
 from scripts.sw_measure import inspect_interference
@@ -230,14 +227,11 @@ print(result["status"], result["interference_count"], result["items"])
 # status=blocked 或 count=None 是证据未知，不能解释为零干涉。
 ```
 
-原生对象为 `IAssemblyDoc.InterferenceDetectionManager`；`GetInterferences()` 执行计算，
-必须在读取数量、干涉体积和组件之后才调用 `Done()` 释放管理器。零干涉不能单独证明装配正确。
-多零件结构 Golden 的 Mate、约束状态、自由度和交付验收规范见
-[P0-2 双指夹爪验收](../docs/architecture/real-golden-parallel-gripper-acceptance.md)。
+The native object is `IAssemblyDoc.InterferenceDetectionManager`; `GetInterferences()` performs the calculation, and `Done()` must be called only after reading the count, interference volumes, and interfering components. Zero interference alone does not prove an assembly is correct. For multi-part structural Golden acceptance criteria covering mates, constraint status, degrees of freedom, and delivery verification, see [P0-2 Parallel Gripper Acceptance](../docs/architecture/real-golden-parallel-gripper-acceptance.md).
 
-## 大型装配体建议
+## Large Assembly Recommendations
 
-- 超过 20 个零件时，分批生成零件，保存后关闭文档，再统一装配。
-- 添加组件前确认所有路径存在，失败组件要记录清单。
-- 自动化脚本中关闭不必要的图形刷新；最终恢复、重建、导出预览。
-- 文档太多或 COM 报内部错误时，先 `CloseAllDocuments(False)`；仍不稳定再重启 SolidWorks 主进程。
+- When building more than 20 parts, generate parts in batches, save and close each document, and then assemble them together.
+- Verify that all file paths exist before inserting components, and log a list of any failed components.
+- Disable unnecessary graphics redraws during automation scripts; re-enable graphics, rebuild, and export previews at the end.
+- If too many documents are open or COM throws internal errors, call `CloseAllDocuments(False)` first; if instability persists, restart the main SolidWorks process.

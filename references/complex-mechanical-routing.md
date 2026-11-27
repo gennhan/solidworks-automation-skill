@@ -1,59 +1,59 @@
-# 复杂机械模型能力路由
+# Complex Mechanical Model Capability Routing
 
-## 先探测，再执行
+## Probe First, Execute Second
 
-复杂机械任务开始前运行：
+Before starting a complex mechanical task, run:
 
 ```powershell
 python scripts\sw_capability_probe.py --output capability_report.json
 ```
 
-报告同时区分：
+The report separates three dimensions:
 
-- `type_library_present`：本机安装包含接口定义。
-- `implementation_status`：本技能是否已有经过真实回归的封装。
-- `ready_for_unattended_use`：是否允许无人值守执行。
+- `type_library_present`: The local installation includes the interface definitions.
+- `implementation_status`: Whether this skill provides a wrapper validated by live regression tests.
+- `ready_for_unattended_use`: Whether unattended execution is permitted.
 
-类型库存在不等于许可证可用，也不等于自动化已验证。`reference_only`、`not_implemented` 和缺少证据的 `pilot` 禁止向用户宣称已完成。
+Having a type library installed does not guarantee a valid license or verified automation. Capabilities marked `reference_only`, `not_implemented`, or `pilot` without evidence must never be reported to the user as completed.
 
-## 当前能力等级
+## Current Capability Levels
 
-| 领域 | 当前等级 | 执行规则 |
+| Domain | Current Level | Execution Rules |
 |---|---|---|
-| 参数化零件、孔槽、圆角倒角 | Verified | 可走真实 COM，必须输出参数 JSON 和审查报告 |
-| 装配、同心/距离/齿轮 Mate | Verified | 必须检查自由度和 Mate 特征树 |
-| Motion Study 旋转马达 | Verified | 计算后调用 `collect_motion_study_summary()` 检查结果是否过期 |
-| 工程图 | Pilot | 必须人工复核图框、视图、尺寸链和 GB/T 格式 |
-| 配置、设计表 | Reference only | 先做最小样件回归，再用于客户模型 |
-| 钣金 | Pilot（SW2026 开放轮廓基体法兰） | 必须回读原生 SheetMetal/BaseFlange/FlatPattern、制造参数，并验证重开与 DXF |
-| 焊件 | Pilot（SW2026 HSS 平面框架） | 必须回读 WeldmentFeature/WeldMemberFeat、每项实体数、长度、数量、角度、来源属性及重开证据 |
-| 复杂曲面、模具 | Pilot | `create-ocp-loft/create-ocp-surface` 可生成并重开受限直纹/平滑 Loft、Sweep/Knit/Thicken；G1/G2 和曲率半径只使用离散采样证据，复杂路径和模具仍门禁 |
-| Routing | Pilot | 只能运行 `routing-preflight` 或 `check-routing`；无加载项/许可证证据时原生写入必须 blocked |
-| Simulation/FEA | Pilot | `run-fea` 可运行受限线性/非线性静力并解析最终步接触穿透/压力/滑移，`run-fea-convergence` 执行 3-8 档线性或非线性网格序列；塑性、接触和收敛均必须保留工程复核 |
+| Parametric parts, holes/slots, fillets/chamfers | Verified | May run live COM; must emit parameter JSON and review report |
+| Assemblies, Concentric/Distance/Gear Mates | Verified | Must verify degrees of freedom and Mate feature tree |
+| Motion Study rotary motors | Verified | After calculating, call `collect_motion_study_summary()` to verify results are not out of date |
+| Engineering Drawings | Pilot | Must manually review sheet borders, views, dimension chains, and TCVN/ISO format (or GB/T reference format when requested) |
+| Configurations, Design Tables | Reference only | Run a minimal sample regression before applying to customer models |
+| Sheet Metal | Pilot (SW2026 open-profile Base Flange) | Must read back native SheetMetal/BaseFlange/FlatPattern, manufacturing parameters, reopen check, and flat-pattern DXF |
+| Weldments | Pilot (SW2026 HSS planar frame) | Must read back WeldmentFeature/WeldMemberFeat, per-item body count, length, quantity, angles, source properties, and reopen evidence |
+| Complex Surfacing, Molds/Tooling | Pilot | `create-ocp-loft/create-ocp-surface` builds and reopens constrained ruled/smooth Lofts and Sweep/Knit/Thicken; G1/G2 continuity and curvature radius use discrete sampling evidence only; complex paths and molds remain gated |
+| Routing | Pilot | Only `routing-preflight` or `check-routing` allowed; native writes must remain blocked without add-in/license evidence |
+| Simulation/FEA | Pilot | `run-fea` runs constrained linear/nonlinear statics and parses final-step contact penetration/pressure/slip; `run-fea-convergence` executes 3–8 linear or nonlinear mesh sequences; plasticity, contact, and convergence all require engineering review |
 
-## 复杂零件
+## Complex Parts
 
-1. 将模型拆成基础体、主功能特征、接口特征、制造特征和外观特征。
-2. 优先稳定基准、全约束草图和命名特征；禁止依赖 `Edge1`、屏幕坐标或偶然选择顺序。
-3. 复杂曲面必须明确连续性目标（G0/G1/G2）、分型/拔模、厚度和可制造方式。
-4. 钣金必须记录板厚、材料、内折弯半径、K 因子/折弯表、折弯方向和展开 DXF。
-5. 焊件必须记录型材标准、切割长度、斜接、焊缝、切割清单和加工余量。
-6. 配置/设计表必须验证每个配置可重建、质量属性合理、输出文件命名无碰撞。
+1. Decompose the model into base solid, primary functional features, interface features, manufacturing features, and cosmetic features.
+2. Prefer stable datums, fully constrained sketches, and named features; never rely on `Edge1`, screen coordinates, or incidental selection order.
+3. Complex surfaces must specify continuity targets (G0/G1/G2), parting/draft, wall thickness, and manufacturability.
+4. Sheet metal must record thickness, material, inner bend radius, K-factor/bend table, bend direction, and flat-pattern DXF.
+5. Weldments must record profile standard, cut lengths, miters, welds, cut list, and machining allowances.
+6. Configurations/Design Tables must verify each configuration rebuilds cleanly, has reasonable mass properties, and avoids output filename collisions.
 
-## 复杂装配与运动
+## Complex Assemblies and Motion
 
-1. 建立自由度预算：每个移动件先列出预期 6 自由度，再逐个 Mate 消除。
-2. 旋转件使用同心 Mate + 轴向定位，不锁旋转；直线件使用槽/距离/限位配合。
-3. 接触、摩擦、弹簧、阻尼、重力和碰撞不属于当前“旋转马达已验证”范围。
-4. 运动交付必须包含：算例类型、时长、马达数量、外力数量、特征数量、结果存在性和 `results_out_of_date`。
-5. 可播放动画不能证明机构正确；还要检查干涉、行程极限、速度/加速度、驱动力/扭矩和 Mate 反力。
-6. Motion Analysis 结果依赖加载项和许可证，缺失时明确降级为 Animation/Basic Motion，不能伪造分析结果。
+1. Build a DOF budget: list the expected 6 degrees of freedom for every moving component, then remove them mate by mate.
+2. Use Concentric mate + axial locating mate (rotation unlocked) for rotating parts; use Slot/Distance/Limit mates for linear motion.
+3. Contact, friction, springs, dampers, gravity, and collisions are outside the current "verified rotary motor" scope.
+4. Motion deliverables must include study type, duration, motor count, external force count, feature count, result presence, and `results_out_of_date`.
+5. Playable animation does not prove mechanism validity; also inspect interference, travel limits, velocity/acceleration, driving force/torque, and mate reaction forces.
+6. Motion Analysis depends on add-ins and licenses; when absent, explicitly downgrade to Animation/Basic Motion and never fabricate analysis outputs.
 
-## 新能力开发门禁
+## New Capability Development Gate
 
-1. 从本机 `.tlb` 或 SolidWorks 官方 API 文档确认接口、签名、枚举和版本。
-2. 创建最小回归样件，不直接在用户复杂装配上试错。
-3. 封装成 `scripts/sw_*.py` 的窄接口，所有 COM 返回值显式检查。
-4. 添加静态测试和真实 SolidWorks 回归脚本。
-5. 生成机器可读验收证据和多视图预览。
-6. 把失败模式写入 `references/troubleshooting.md` 后才能把能力标为 Pilot；连续真实回归通过后才能标为 Verified。
+1. Confirm interfaces, signatures, enumerations, and versions from local `.tlb` files or official SolidWorks API docs.
+2. Build a minimal regression specimen—never experiment directly on complex user assemblies.
+3. Wrap behind a narrow interface in `scripts/sw_*.py` with explicit checks on every COM return value.
+4. Add offline unit tests and a live SolidWorks regression script.
+5. Generate machine-readable acceptance evidence and multi-view previews.
+6. Document failure modes in `references/troubleshooting.md` before marking a capability `Pilot`; promote to `Verified` only after consecutive passing live regressions.

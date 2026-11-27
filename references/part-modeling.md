@@ -1,8 +1,8 @@
-# 零件建模 API 参考
+# Part Modeling API Reference
 
-## 草图操作
+## Sketch Operations
 
-### 基准面选择
+### Reference Plane Selection
 
 ```python
 # 英文版
@@ -11,47 +11,47 @@ model.Extension.SelectByID2("Front Plane", "PLANE", 0, 0, 0, False, 0, None, 0)
 model.Extension.SelectByID2("前视基准面", "PLANE", 0, 0, 0, False, 0, None, 0)
 ```
 
-基准面对应关系：
-| 英文 | 中文 | 法线方向 |
+Reference plane mapping:
+| English | Chinese | Normal Direction |
 |---|---|---|
-| Front Plane | 前视基准面 | Z 轴 |
-| Top Plane | 上视基准面 | Y 轴 |
-| Right Plane | 右视基准面 | X 轴 |
+| Front Plane | 前视基准面 | Z-axis |
+| Top Plane | 上视基准面 | Y-axis |
+| Right Plane | 右视基准面 | X-axis |
 
-### 草图几何体方法速查
+### Sketch Geometry Methods Quick Reference
 
-| 方法 | 参数 | 说明 |
+| Method | Parameters | Description |
 |---|---|---|
-| `CreateLine(x1,y1,z1, x2,y2,z2)` | 起点终点坐标（米） | 直线 |
-| `CreateCircleByRadius(cx,cy,cz, r)` | 圆心+半径 | 圆 |
-| `CreateCenterRectangle(cx,cy,cz, rx,ry,rz)` | 中心+角点 | 中心矩形 |
-| `CreateCornerRectangle(x1,y1,z1, x2,y2,z2)` | 对角点 | 角点矩形 |
-| `CreateArc(cx,cy,cz, x1,y1,z1, x2,y2,z2, dir)` | 圆心+起终点+方向 | 圆弧 |
-| `CreatePolygon(cx,cy,cz, sx,sy,sz, sides, inscr)` | 中心+顶点+边数 | 正多边形 |
-| `CreateEllipse(cx,cy,cz, mx,my,mz, r)` | 中心+长轴端点+短轴半径 | 椭圆 |
-| `CreateSpline2(pointArray, closed)` | 点数组+是否闭合 | 样条曲线 |
-| `CreateSketchSlot(type, w, w, ...)` | 类型+宽度+端点 | 槽口 |
+| `CreateLine(x1,y1,z1, x2,y2,z2)` | Start and end coordinates (meters) | Line |
+| `CreateCircleByRadius(cx,cy,cz, r)` | Center + radius | Circle |
+| `CreateCenterRectangle(cx,cy,cz, rx,ry,rz)` | Center + corner point | Center rectangle |
+| `CreateCornerRectangle(x1,y1,z1, x2,y2,z2)` | Opposite corner points | Corner rectangle |
+| `CreateArc(cx,cy,cz, x1,y1,z1, x2,y2,z2, dir)` | Center + start/end points + direction | Arc |
+| `CreatePolygon(cx,cy,cz, sx,sy,sz, sides, inscr)` | Center + vertex + number of sides | Regular polygon |
+| `CreateEllipse(cx,cy,cz, mx,my,mz, r)` | Center + major axis endpoint + minor radius | Ellipse |
+| `CreateSpline2(pointArray, closed)` | Point array + closed flag | Spline |
+| `CreateSketchSlot(type, w, w, ...)` | Type + width + endpoints | Slot |
 
-### 草图约束
+### Sketch Relations (Constraints)
 
 ```python
 # 选中实体后添加约束
 model.SketchAddConstraints("sgHORIZONTAL")
 ```
 
-常用约束类型：`sgHORIZONTAL`, `sgVERTICAL`, `sgCOLINEAR`, `sgPARALLEL`, `sgPERPENDICULAR`, `sgTANGENT`, `sgCONCENTRIC`, `sgEQUAL`, `sgSYMMETRIC`, `sgMIDPOINT`, `sgCOINCIDENT`。`sgFIXED` 只用于明确固定参考的场景，不得批量使用以伪造参数化草图的完全定义。
+Common constraint types: `sgHORIZONTAL`, `sgVERTICAL`, `sgCOLINEAR`, `sgPARALLEL`, `sgPERPENDICULAR`, `sgTANGENT`, `sgCONCENTRIC`, `sgEQUAL`, `sgSYMMETRIC`, `sgMIDPOINT`, `sgCOINCIDENT`. `sgFIXED` must only be used for explicitly fixed references and must not be applied in bulk to fake a fully defined parametric sketch.
 
-坐标只定义初始几何位置，不等同于驱动尺寸和几何关系。圆/矩形基础草图可在编辑态调用 `sw_sketch_quality.fully_define_sketch(model)`；该方法用实际原点补充尺寸与关系，并回读约束状态、尺寸数量和 Fix 数量。复杂草图优先人工定义设计参数，再调用 `inspect_model_sketches(model)` 检查；没有尺寸、悬空或证据不足均需要复核。
+Coordinates only define initial geometric positions and are not equivalent to driving dimensions and geometric relations. For basic circular/rectangular sketches, call `sw_sketch_quality.fully_define_sketch(model)` while in sketch edit mode; this adds dimensions and relations relative to the actual origin and reads back the constraint status, dimension count, and Fix count. For complex sketches, manually define the design parameters first, then call `inspect_model_sketches(model)` to inspect them; any missing dimensions, dangling entities, or insufficient evidence require review.
 
-### 原生阵列
+### Native Patterns
 
-`sw_part.linear_pattern()` 委托 `sw_pattern`，选择精确母特征及与方向向量平行的真实直边，并使用 20 参数 `FeatureLinearPattern4`。方向向量无量纲，间距仍以米传入；选择失败立即停止。圆周阵列使用明确的轴名称/实体，不能把 `InsertAxis2` 当成 FeatureManager 成员。SolidWorks 2026 真机已验证保存重开后改变厚度、孔数与孔中心位置保持不变。
+`sw_part.linear_pattern()` delegates to `sw_pattern`, selecting the exact seed feature and a real straight edge parallel to the direction vector, and invokes the 20-parameter `FeatureLinearPattern4`. The direction vector is dimensionless while spacing is passed in meters; stop immediately if selection fails. Circular patterns use an explicit axis name or entity; do not treat `InsertAxis2` as a `FeatureManager` member. Verified on live SolidWorks 2026: after saving and reopening, changing plate thickness preserves hole count and hole center positions.
 
-### 草图选择稳定策略
+### Reliable Sketch Selection Strategy
 
-优先使用 `sw_part.sketch()` 上下文或 `end_sketch()` 返回值，不要手写 `SelectByID2("Sketch1", "SKETCH", ...)` 作为唯一选择方式。SolidWorks 2024 中文版反馈过 SKETCH 名称选择持续返回 `False` 的情况。
+Prefer using the `sw_part.sketch()` context manager or the return value of `end_sketch()`, rather than relying solely on hardcoded `SelectByID2("Sketch1", "SKETCH", ...)`. Chinese SolidWorks 2024 has reported cases where selecting by SKETCH name persistently returns `False`.
 
-推荐：
+Recommended:
 
 ```python
 with sketch(model, "Front Plane") as sketch_name:
@@ -59,7 +59,7 @@ with sketch(model, "Front Plane") as sketch_name:
 feature = extrude_boss(model, sketch_name, mm(50))
 ```
 
-手动流程：
+Manual workflow:
 
 ```python
 start_sketch(model, "Front Plane")
@@ -68,11 +68,11 @@ sketch_ref = end_sketch(model)
 feature = extrude_boss(model, sketch_ref, mm(50))
 ```
 
-内部规则：`extrude_boss()` / `extrude_cut()` 会按“活动草图引用 -> 创建时缓存引用 -> FeatureByName -> SelectByID2("SKETCH")”顺序选择草图；不再把残留选择集当作草图已选中的证据。
+Internal rule: `extrude_boss()` / `extrude_cut()` select the sketch in the following order: active sketch reference -> cached reference from creation -> `FeatureByName` -> `SelectByID2("SKETCH")`. Residual selections are no longer treated as evidence that the sketch is selected.
 
-## 特征操作
+## Feature Operations
 
-### FeatureExtrusion3 参数详解
+### FeatureExtrusion3 Parameter Details
 
 ```python
 feature_mgr.FeatureExtrusion3(
@@ -100,23 +100,23 @@ feature_mgr.FeatureExtrusion3(
 )
 ```
 
-终止条件枚举：
-| 值 | 名称 | 说明 |
+End condition enumeration:
+| Value | Name | Description |
 |---|---|---|
-| 0 | swEndCondBlind | 给定深度 |
-| 1 | swEndCondThroughAll | 完全贯穿 |
-| 2 | swEndCondThroughAllBoth | 两侧贯穿 |
-| 5 | swEndCondUpToSurface | 成形到一曲面 |
-| 6 | swEndCondMidPlane | 两侧对称 |
-| 7 | swEndCondUpToBody | 成形到实体 |
+| 0 | swEndCondBlind | Blind |
+| 1 | swEndCondThroughAll | Through All |
+| 2 | swEndCondThroughAllBoth | Through All - Both |
+| 5 | swEndCondUpToSurface | Up To Surface |
+| 6 | swEndCondMidPlane | Mid Plane |
+| 7 | swEndCondUpToBody | Up To Body |
 
-### FeatureCut4 参数详解
+### FeatureCut4 Parameter Details
 
-与 FeatureExtrusion3 类似，但用于切除操作。额外参数：
-- `NormalCut`: 法向切除
-- `FlipSide`: 翻转切除侧
+Similar to `FeatureExtrusion3`, but used for cut operations. Additional parameters:
+- `NormalCut`: Normal cut
+- `FlipSide`: Flip side to cut
 
-### FeatureRevolve2 参数
+### FeatureRevolve2 Parameters
 
 ```python
 feature_mgr.FeatureRevolve2(
@@ -143,19 +143,19 @@ feature_mgr.FeatureRevolve2(
 )
 ```
 
-### 阶梯轴建模推荐流程
+### Recommended Stepped Shaft Modeling Workflow
 
-轴类零件优先用“半剖轮廓 + 中心线 + 旋转凸台”一次生成主体，不要逐段拉伸圆柱再合并。这样特征树更短，轴肩位置和总长也更容易由参数表控制。
+For shaft components, prefer generating the main body in a single operation using a half-section profile + centerline + Revolved Boss/Base instead of extruding and merging cylinders segment by segment. This keeps the FeatureManager design tree shorter and makes shoulder positions and overall length easier to control from a parameter table.
 
-推荐做法：
+Recommended approach:
 
-1. 用毫米参数表描述轴段：`start_mm`、`end_mm`、`diameter_mm`。
-2. 在 `Front Plane` 上画中心线作为旋转轴。
-3. 按轴段半径生成一条闭合半剖轮廓。
-4. 调用 `FeatureRevolve2(..., 2*pi, ...)` 后立即检查返回特征不是 `None`。
-5. 将公差、形位公差、粗糙度作为工程要求记录到属性或交付说明，不要直接扰动名义实体尺寸。
+1. Define shaft segments in millimeters using a parameter table: `start_mm`, `end_mm`, `diameter_mm`.
+2. Draw a centerline on `Front Plane` as the axis of revolution.
+3. Generate a closed half-section profile based on the segment radii.
+4. Immediately verify that the returned feature from `FeatureRevolve2(..., 2*pi, ...)` is not `None`.
+5. Record dimensional tolerances, GD&T, and surface roughness as engineering requirements in custom properties or delivery notes; do not directly perturb nominal solid dimensions.
 
-最小模式：
+Minimal pattern:
 
 ```python
 segments = [
@@ -181,16 +181,16 @@ if feature is None:
     raise RuntimeError("阶梯轴旋转主体创建失败")
 ```
 
-### 圆柱表面长圆槽
+### Oblong Slots on Cylindrical Surfaces
 
-图纸中的键槽、长圆槽、局部沉槽如果位于圆柱外表面，不要直接在中心基准面上切除。中心面切除容易把轴“剖开”，预览看起来像大平面开口，而不是表面凹槽。
+When keyways, oblong slots, or local pockets in a drawing are located on an outer cylindrical surface, do not cut directly from the center reference plane. Cutting from the center plane can split the shaft open, making the preview look like a large planar opening rather than a surface pocket.
 
-稳定做法：
+Reliable approach:
 
-1. 按槽所在圆柱半径创建平行于 `Front Plane` 的偏置参考面，偏置量约等于目标圆柱半径。
-2. 在该切向参考面上用 `sketch_slot()` 画长圆槽。
-3. 用盲切深度表达槽深；先尝试一个方向，失败再翻转 `flip`。
-4. 创建成功后隐藏临时参考面，避免预览图被橙色基准面干扰。
+1. Create an offset reference plane parallel to `Front Plane` with an offset distance approximately equal to the target cylinder radius.
+2. Sketch the oblong slot on that tangent reference plane using `sketch_slot()`.
+3. Express slot depth with a blind cut; try one direction first, and toggle `flip` if it fails.
+4. Hide the temporary reference plane after creation so the orange plane does not clutter preview renders.
 
 ```python
 plane = model.FeatureManager.InsertRefPlane(8, mm(radius_mm), 0, 0, 0, 0)
@@ -209,9 +209,9 @@ if feature is None:
     raise RuntimeError("圆柱表面长圆槽创建失败")
 ```
 
-注意：`CreateSketchSlot` 参数中 `radius` 是槽宽相关参数，实际表现需用局部测试验证。对制造精确槽宽要求高时，导出后用测量或工程图复核。
+Note: In `CreateSketchSlot`, the `radius` parameter relates to the slot width; verify actual behavior with a local test. When manufacturing-grade slot width accuracy is critical, verify after export using measurement tools or a 2D drawing.
 
-### 圆角/倒角
+### Fillet / Chamfer
 
 ```python
 # 圆角 FeatureFillet 参数
@@ -238,30 +238,30 @@ feature_mgr.InsertFeatureChamfer(
 )
 ```
 
-### 圆角/倒角当前可靠边界
+### Current Reliability Boundary for Fillets and Chamfers
 
-圆角和倒角的核心难点不是 API 参数本身，而是**稳定选择目标边线/面**。不同 SolidWorks 版本、界面语言、特征顺序和草图轮廓都会改变自动命名的 `Edge`/`Face`，因此不要把“随机坐标 SelectByID2 选边 + FeatureFillet”当成高可靠流程。
+The main difficulty with fillets and chamfers is not the API parameters themselves, but **reliably selecting the target edges or faces**. Different SolidWorks versions, UI languages, feature orders, and sketch contours all change auto-generated `Edge`/`Face` names, so do not treat "arbitrary coordinate `SelectByID2` edge picking + `FeatureFillet`" as a high-reliability workflow.
 
-推荐策略：
+Recommended strategy:
 
-1. 基准 demo 和无人值守批量脚本不要把圆角/倒角作为成功标准。
-2. 需要圆角时，优先在建模阶段用更稳定的草图轮廓近似，例如圆弧、槽口、圆角矩形草图。
-3. 必须做特征圆角/倒角时，先通过 body/face/edge 枚举按几何条件过滤目标边，再选择实体对象调用特征，不要依赖临时的 `Edge1` 名称。
-4. 圆角失败应降级为保留直边模型，并在审查报告或最终说明中标注“外观圆角未应用”，不要让模型生成流程整体失败。
+1. Do not treat cosmetic fillets/chamfers as hard success criteria for baseline demos or unattended batch scripts.
+2. When fillets are needed, prefer approximating them at the modeling stage with more stable sketch contours such as arcs, slots, or filleted rectangles.
+3. When feature-level fillets or chamfers are mandatory, enumerate bodies/faces/edges and filter target edges by geometric criteria before selecting entity objects for the feature; never rely on transient `Edge1` names.
+4. If a fillet fails, fall back to preserving the sharp-edged model and note "cosmetic fillet not applied" in the review report or final summary rather than failing the entire model generation workflow.
 
-## SelectByID2 实体类型
+## SelectByID2 Entity Types
 
-| 类型字符串 | 说明 |
+| Type String | Description |
 |---|---|
-| `"PLANE"` | 基准面 |
-| `"FACE"` | 面 |
-| `"EDGE"` | 边线 |
-| `"VERTEX"` | 顶点 |
-| `"SKETCH"` | 草图 |
-| `"BODYFEATURE"` | 实体特征 |
-| `"COMPONENT"` | 组件 |
-| `"AXIS"` | 轴线 |
-| `"SKETCHSEGMENT"` | 草图线段 |
-| `"SKETCHPOINT"` | 草图点 |
-| `"EXTSKETCHSEGMENT"` | 外部草图线段 |
-| `"REFERENCECURVES"` | 参考曲线 |
+| `"PLANE"` | Reference Plane |
+| `"FACE"` | Face |
+| `"EDGE"` | Edge |
+| `"VERTEX"` | Vertex |
+| `"SKETCH"` | Sketch |
+| `"BODYFEATURE"` | Solid Body Feature |
+| `"COMPONENT"` | Component |
+| `"AXIS"` | Axis |
+| `"SKETCHSEGMENT"` | Sketch Segment |
+| `"SKETCHPOINT"` | Sketch Point |
+| `"EXTSKETCHSEGMENT"` | External Sketch Segment |
+| `"REFERENCECURVES"` | Reference Curves |

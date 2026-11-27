@@ -1,6 +1,6 @@
-# SolidWorks MCP Server 设计说明
+# SolidWorks MCP Server Design Notes
 
-## 架构
+## Architecture
 
 ```text
 Codex / Claude / 其他 MCP Client
@@ -10,78 +10,70 @@ mcp-server/server.py
 SolidWorks Desktop
 ```
 
-SolidWorks 是 Windows 桌面 COM 应用，不是原生 MCP 服务。MCP Server 的职责是把已经验证过的 `scripts/sw_*.py` 封装成受控工具，避免代理每次临时生成大段脚本。
+SolidWorks is a Windows desktop COM application, not a native MCP service. The MCP Server's role is to expose verified `scripts/sw_*.py` modules as controlled tools so agents do not have to synthesize large ad-hoc scripts on every run.
 
-## Transport 选择
+## Transport Selection
 
-默认使用 `stdio`：
+`stdio` is the default:
 
-- 适合本地桌面软件。
-- 客户端作为子进程启动 server，配置简单。
-- 不暴露网络端口，减少安全面。
+- Well suited for local desktop software.
+- The client launches the server as a child process with minimal configuration.
+- Exposes no network ports, minimizing attack surface.
 
-暂不默认使用 HTTP：
+HTTP is not enabled by default:
 
-- SolidWorks COM 一般绑定当前桌面用户会话。
-- 多客户端并发容易让 SolidWorks 文档状态混乱。
-- 远程访问还需要身份认证、Origin 校验和桌面会话隔离。
+- SolidWorks COM is typically bound to the active interactive desktop user session.
+- Concurrent multi-client calls easily corrupt SolidWorks document state.
+- Remote access would also require authentication, Origin checks, and desktop session isolation.
 
-## 工具发现与审批
+## Tool Discovery and Approval
 
-默认模式 `SW_MCP_DISCOVERY=search` 只暴露三个入口（`sw_search_tools` / `sw_describe_tool` /
-`sw_call_tool`），69 个原生命名工具按需检索。`SW_MCP_DISCOVERY=full` 保留全部命名工具，
-用于需要客户端逐工具权限提示的场景。
+Default mode `SW_MCP_DISCOVERY=search` exposes only three entry points (`sw_search_tools` / `sw_describe_tool` / `sw_call_tool`), allowing the 69 native named tools to be discovered on demand. `SW_MCP_DISCOVERY=full` exposes all named tools directly for clients that require per-tool permission prompts.
 
-使用 `sw_search_tools` 搜索“API 接口签名”，再调用 `solidworks_lookup_api`；提供 `interface` 和 `member`，或改为提供自然语言 `task`，可选 `version` / `process_id`。默认按需自动配置依赖，因此工具注解标记为可能修改环境；`auto_install=false` 禁用安装，`offline=true` 禁用联网和安装，服务端会按参数区分副作用级别，保留客户端与服务端原有授权模式。官网直读失败且本地无缓存时，默认使用匿名 Parallel 提取对应版本的官方页面，使用 `parallel_fallback=false` 关闭。Parallel 的版本依据弱于官网结构化数据；所有结果都不能代替目标版本的真机验证。详情见 `references/api-lookup.md`。
+Use `sw_search_tools` to search for "API signature" (or `"API 接口签名"`), then call `solidworks_lookup_api` with `interface` and `member`, or natural-language `task`, plus optional `version` / `process_id`. Because it may auto-configure dependencies by default, tool annotations mark it as potentially modifying the environment; set `auto_install=false` to disable installation and `offline=true` to disable networking and installation. The server differentiates side-effect levels by parameter while preserving existing client and server authorization modes. When direct official-site reads fail and no local cache exists, anonymous Parallel is used by default to extract the version-matched official page; disable with `parallel_fallback=false`. Parallel carries weaker version proof than structured official metadata, and no lookup result replaces live verification on the target version. See `references/api-lookup.md` for details.
 
-实现上把 FastMCP 的 `_tool_manager` 换成 `ToolGate` 代理。`list_tools` 和 `call_tool` 都在
-调用时读取这个属性，因此 stdio、streamable-http、以及客户端直接点名调用被隐藏工具，全部
-经过同一套检查：
+Implementation replaces FastMCP's `_tool_manager` with a `ToolGate` proxy. Both `list_tools` and `call_tool` read this attribute on every invocation, so `stdio`, `streamable-http`, and direct client calls to hidden tools all pass through the exact same enforcement pipeline:
 
-- `mcp-server/discovery.py`：离线检索，只读工具元数据，不承担授权与执行。
-- `mcp-server/policy.py`：副作用唯一真源（READ / WRITE / DESTRUCTIVE / UNKNOWN）；
-  未登记的工具默认拒绝，新增工具必须先补分级，`tests/test_mcp_discovery.py` 会强制对齐注册表。
-- `mcp-server/gate.py`：可见性控制、执行前策略检查、写操作审批。
-- `mcp-server/approval.py`：可选的 HMAC 签名一次性批准账本；批准绑定工具、参数摘要、服务端会话和有效期。严格模式可绑定已保存文档的进程 ID 与路径，但不能证明文档内容未改变。
-- `scripts/sw_mcp_approve.py`：通过交互式终端确认；模型在 MCP 参数里传 `approved: true` 不生效。TTY 不证明真人，同一操作系统用户的进程可模拟终端或访问账本，不能将它视作隔离不可信 Agent 的安全边界。
+- `mcp-server/discovery.py`: Offline search over read-only tool metadata; handles neither authorization nor execution.
+- `mcp-server/policy.py`: Single source of truth for side effects (`READ` / `WRITE` / `DESTRUCTIVE` / `UNKNOWN`); unregistered tools are denied by default, new tools must be classified first, and `tests/test_mcp_discovery.py` enforces registry alignment.
+- `mcp-server/gate.py`: Visibility control, pre-execution policy checks, and write-operation approval.
+- `mcp-server/approval.py`: Optional HMAC-signed one-time approval ledger binding tool name, argument digest, server session, and TTL. Strict mode can bind saved-document process ID and path, though it cannot prove document contents remain unchanged.
+- `scripts/sw_mcp_approve.py`: Interactive terminal confirmation; passing `approved: true` inside MCP tool arguments from a model has no effect. Note that a TTY does not prove a human operator—processes under the same OS user can emulate a terminal or access the ledger, so this is not a security boundary against an untrusted agent running under the same user account.
 
-审批模式 `SW_MCP_APPROVAL`：`auto`（默认，发现模式→`task`，完整模式→`client`）、
-`task`、`server`、`client`、`elicit`、`off`。`task` 信任客户端任务授权，服务端不会验证其是否经过用户确认。
-`elicit` 依赖客户端支持 MCP elicitation，且可能被
-agent 自动应答，不作为默认。服务端账本同样不隔离具有相同操作系统权限的进程。
+Approval mode `SW_MCP_APPROVAL`: `auto` (default: discovery mode -> `task`, full mode -> `client`), `task`, `server`, `client`, `elicit`, `off`. `task` trusts client task authorization without server-side proof of user confirmation. `elicit` relies on client MCP elicitation support and can be auto-answered by agents, so it is not default. The server ledger likewise does not isolate processes sharing the same OS privileges.
 
-## 多客户端注册策略
+## Multi-Client Registration Strategy
 
-安装器会调用 `mcp-server/register_all_ai_mcp.js`，尽量自动注册常见本地 AI 客户端：
+The installer runs `mcp-server/register_all_ai_mcp.js` to register common local AI clients automatically where possible:
 
-- Codex：通过 `codex mcp add solidworks -- <python> <server.py>` 注册。
-- Claude Code：通过 `claude mcp add --scope user solidworks -- <python> <server.py>` 注册。
-- Claude Desktop：写入用户级 `claude_desktop_config.json`。
-- Cursor：写入全局 `~/.cursor/mcp.json`。
-- Windsurf：写入全局 `~/.codeium/windsurf/mcp_config.json`。
+- Codex: registered via `codex mcp add solidworks -- <python> <server.py>`.
+- Claude Code: registered via `claude mcp add --scope user solidworks -- <python> <server.py>`.
+- Claude Desktop: written to user-level `claude_desktop_config.json`.
+- Cursor: written to global `~/.cursor/mcp.json`.
+- Windsurf: written to global `~/.codeium/windsurf/mcp_config.json`.
 
-注意：
+Notes:
 
-1. 只有执行 `npx` 安装器或注册脚本时，才能自动修改本机 MCP 配置；纯 skill 导入通常不会运行安装脚本。
-2. 不同客户端可能需要重启或人工确认信任后才会加载新 MCP。
-3. 云端网页产品没有本机配置入口时，skill 无法替用户直接安装本地 MCP。
-4. JSON 配置写入前会创建 `.bak-*` 备份；命令行客户端会先移除同名 server 再重新注册。
+1. Automatic local MCP config edits only run when executing the `npx` installer or registration script; importing a skill alone generally does not run install scripts.
+2. Clients may require a restart or manual trust confirmation before loading the new MCP server.
+3. Cloud web apps without a local configuration entry point cannot have a local MCP installed automatically by the skill.
+4. JSON configs create `.bak-*` backups before writing; CLI clients remove any existing server of the same name before re-registering.
 
-## 并发策略
+## Concurrency Strategy
 
-`mcp-server/server.py` 使用全局 `RLock` 串行执行所有工具。原因：
+`mcp-server/server.py` serializes all tool calls with a global `RLock` because:
 
-- SolidWorks COM 自动化不是线程安全的通用服务。
-- 多个工具同时切换活动文档、选择实体或保存文件，会互相破坏状态。
-- Motion Study / Mate 创建依赖当前选择集，必须避免并发污染。
+- SolidWorks COM automation is not a thread-safe concurrent service.
+- Concurrent tools switching active documents, selecting entities, or saving files corrupt each other's state.
+- Motion Study and Mate creation depend on the active selection set and must avoid concurrent interference.
 
-每个工具调用前会尝试 `pythoncom.CoInitialize()`，保证当前 MCP worker 线程可使用 COM。
+Each tool call invokes `pythoncom.CoInitialize()` to ensure COM is initialized on the active MCP worker thread.
 
-## 工具命名
+## Tool Naming
 
-工具名前缀按能力边界区分：`cadstudio_` 用于无头开放格式、DFM、Routing、FEA 和复杂几何门禁；`solidworks_` 用于真实 SolidWorks COM 操作。
+Tool prefixes reflect capability boundaries: `cadstudio_` covers headless open formats, DFM, Routing, FEA, and complex geometry gates; `solidworks_` covers live SolidWorks COM operations.
 
-CAD Studio 门禁工具：
+CAD Studio gate tools:
 
 - `cadstudio_resolve_backend`
 - `cadstudio_write_open_format`
@@ -97,7 +89,7 @@ CAD Studio 门禁工具：
 - `cadstudio_create_ocp_loft`
 - `cadstudio_create_ocp_surface`
 
-SolidWorks 原生工具：
+Native SolidWorks tools:
 
 - `solidworks_connect`
 - `solidworks_new_document`
@@ -111,47 +103,47 @@ SolidWorks 原生工具：
 - `solidworks_review_active`
 - `solidworks_add_rotary_motor`
 
-## 安全边界
+## Security Boundaries
 
-第一阶段不开放：
+Excluded from Phase 1:
 
-- 任意 Python 执行。
-- 任意 VBA 宏执行。
-- 直接删除文件。
-- 批量关闭/覆盖用户文件的隐藏动作。
+- Arbitrary Python execution.
+- Arbitrary VBA macro execution.
+- Direct file deletion.
+- Hidden batch closing or overwriting of user files.
 
-如需新增危险工具，至少要：
+Adding any hazardous tool requires at minimum:
 
-1. 明确工具名含 `delete` / `overwrite` / `close_all` 等动作。
-2. 输入 schema 限制路径和参数范围。
-3. 返回结构化结果，包含实际影响范围。
-4. 在文档中标注 `destructiveHint=True`。
+1. Explicit action keywords in the tool name (`delete` / `overwrite` / `close_all`, etc.).
+2. Input schemas restricting paths and parameter bounds.
+3. Structured return output detailing actual blast radius.
+4. Documenting `destructiveHint=True`.
 
-## 扩展顺序建议
+## Recommended Expansion Order
 
-优先扩展高价值、低歧义工具：
+Prioritize high-value, low-ambiguity tools:
 
-1. 文档与导出：打开、保存、导出、审查。
-2. 装配体：添加组件、按组件名查找、创建同心/重合 Mate。
-3. Motion Study：旋转马达、线性马达、计算/播放。
-4. 零件建模：受控草图原语和特征原语。
-5. 工程图：三视图、BOM、PDF 导出。
-6. 无头能力：DFM profile、Routing 中性复核、CalculiX 受限线性/非线性与网格序列、OCP 直纹/平滑 Loft、Sweep/Knit/Thicken 和其余复杂几何计划复核。
+1. Documents & Export: open, save, export, review.
+2. Assemblies: insert component, lookup by name, create Concentric/Coincident mates.
+3. Motion Study: rotary motor, linear motor, calculate/play.
+4. Part Modeling: controlled sketch and feature primitives.
+5. Engineering Drawings: standard three views, BOM, PDF export.
+6. Headless capabilities: DFM profiles, neutral Routing review, constrained linear/nonlinear CalculiX & mesh convergence sequences, OCP ruled/smooth Loft, Sweep/Knit/Thicken, and complex geometry plan review.
 
-暂缓扩展：
+Deferred for later:
 
-- 任意草图约束求解。
-- 平滑 Loft、复杂扫描、G1/G2/Class-A 和模具质量 B-Rep 生成。
-- 大型接触、自动穿透验收、碰撞等高阶仿真与安全认证。
+- Arbitrary sketch constraint solving.
+- Smooth Loft, complex sweeps, G1/G2/Class-A, and mold-grade B-Rep generation.
+- Large-scale contact, automated penetration sign-off, collision dynamics, and safety certification.
 
-## 返回格式
+## Return Format
 
-工具默认返回 JSON，便于 LLM 继续解析。也支持 `response_format="markdown"` 用于人工阅读。
+Tools default to JSON for downstream LLM parsing, and also support `response_format="markdown"` for human reading.
 
-错误返回应包含：
+Error responses must include:
 
 - `error_type`
 - `message`
 - `suggestion`
 
-不要把 Python traceback 原样暴露给 MCP 客户端。
+Never expose raw Python tracebacks to MCP clients.

@@ -1,30 +1,30 @@
-# 本轮交付文件门禁
+# Per-Run Deliverable Freshness Gate
 
-CAD Studio 的生产任务统一要求交付文件具备本轮新增或内容变化的证据，不区分 Agent、旧 Codex 入口和本地 CAD 后端。
+All CAD Studio production tasks require evidence that delivered files were newly created or modified in content during the current run, uniformly across Agent providers, legacy Codex entry points, and local CAD backends.
 
-worker 在调用执行器前生成 SHA-256 基线，并在写账本时使用该基线。执行器结果中的自报基线不能覆盖 worker 的取证结果。独立调用 Agent runner 时也会执行同样的扫描。
+Before invoking an executor, the worker computes a SHA-256 baseline and uses that baseline when writing the ledger. Self-reported baselines in executor output cannot override the worker's evidence. Standalone Agent runner invocations perform the same scan.
 
-基线包含文件记录、扫描根路径及其类型（单文件或目录）、完整性、截断标记和扫描错误。只有扫描完整、文件扩展名受扫描支持，且文件确实位于扫描范围内时，“基线中没有该文件”才能证明它是新增文件。路径按实际目标规范化；目录链接不会扩展扫描范围，扫描错误不能被当作空目录。
+The baseline records file entries, scan root paths and root types (single file or directory), completeness, truncation flags, and scan errors. "File absent from baseline" proves a file is newly created only when the scan completed cleanly, the file extension is covered by the scan, and the file actually lies within the scanned roots. Paths are canonicalized to their real targets; directory junctions/symlinks do not expand scan scope, and scan errors are never treated as empty directories.
 
-账本 `producedThisRun` 的含义：
+Meaning of ledger `producedThisRun`:
 
-| 值 | 证据 | 交付判断 |
+| Value | Evidence | Delivery Verdict |
 |---|---|---|
-| `true` | 旧文件 SHA-256 已变化，或完整覆盖的基线证明其为新文件 | 可进入后续格式与工程检查 |
-| `false` | 文件内容与执行前相同 | 拒绝作为本轮交付 |
-| `null` 或字段缺失 | 没有基线、基线不完整、范围外路径或未覆盖的格式 | 待复核，不自动交付 |
+| `true` | Prior file's SHA-256 changed, or a complete baseline proves the file is newly created | Eligible for downstream format and engineering checks |
+| `false` | File contents are identical to pre-execution state | Rejected as a current-run deliverable |
+| `null` or missing | No baseline, incomplete baseline, out-of-scope path, or uncovered file format | Requires review; never auto-delivered |
 
-只修改时间戳不会通过。新旧文件混在一个交付列表时，旧文件不能被新文件的通过结果掩盖。来自 `job.artifacts`、`result.outputs`、`result.artifacts` 的文件都遵守同一规则；修改 `kind` 也不能豁免真实 CAD 文件。
+Updating timestamps alone does not pass. When new and stale files are mixed in one deliverable list, passing new files cannot mask stale ones. Files from `job.artifacts`, `result.outputs`, and `result.artifacts` all obey the same rule; altering `kind` cannot exempt real CAD files.
 
-旧版纯字典基线仍可比较已记录文件的 SHA-256，但不能证明未记录文件为新增。旧任务缺少本轮证据时会转为待复核，建议在新的输出目录重新执行。预览清单不能仅凭源模型新鲜就自动视为新鲜，也不能替代实际交付文件。
+Legacy plain-dictionary baselines can still compare SHA-256 hashes of recorded files, but cannot prove unrecorded files are newly created. Legacy jobs lacking current-run evidence transition to review-required—re-running in a fresh output directory is recommended. Preview manifests cannot be treated as fresh merely because the source model is fresh, nor can they substitute for actual deliverable files.
 
-新鲜度只证明文件新增或发生内容变化，不证明模型尺寸正确、STEP 可原生打开或工程图满足制造要求。原生文件检查、几何审查和需要的人工复核继续适用。重新生成完全相同字节的文件与复用旧文件无法仅凭 SHA-256 区分，因此不会自动视为新增；建议每轮使用独立输出目录。
+Freshness proves only that a file was created or changed in content—not that model dimensions are accurate, STEP opens natively, or engineering drawings meet manufacturing standards. Native file checks, geometric reviews, and required human reviews still apply. Regenerating byte-for-byte identical files cannot be distinguished from reusing stale files by SHA-256 alone, so identical regenerations are not automatically treated as newly created; use an isolated output directory per run.
 
-回归命令：
+Regression commands:
 
 ```powershell
 python -m pytest -q tests/test_artifact_freshness.py tests/test_workbench_queue_worker.py
 python tests/solidworks_artifact_freshness_live.py
 ```
 
-真机脚本仅创建临时圆柱模型，保存原生文件、导出 STEP、保存重开及检查预览，再验证新增、旧文件、时间戳、缺基线、截断与范围外产物。它只关闭本轮文档，不关闭用户文档。
+The live test script creates only a temporary cylinder part, saves the native file, exports STEP, saves/reopens, checks previews, and verifies newly created, stale, timestamp-touched, missing-baseline, truncated, and out-of-scope artifacts. It closes only documents created in the current run and never closes pre-existing user documents.

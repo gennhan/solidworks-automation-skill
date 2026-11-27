@@ -1,32 +1,32 @@
-# Motion Study 与旋转马达自动化
+# Motion Study and Rotary Motor Automation
 
-本文沉淀 SolidWorks 2024 SP3.1 + Python 3.13 + pywin32 实测通过的 Motion Study 自动化流程。目标是创建真实运动算例和马达特征，而不是用脚本假动画替代机械自由度。
+This document captures the Motion Study automation workflow verified on SolidWorks 2024 SP3.1 + Python 3.13 + `pywin32`. The goal is to create real motion studies and motor features rather than faking mechanical degrees of freedom with scripted animations.
 
-## 适用场景
+## Applicable Scenarios
 
-- 用户要求“新建运动算例”“Motion Study”“添加马达”“60RPM 匀速旋转”。
-- 装配体已有真实 Mate，旋转件通过同心配合保留旋转自由度。
-- 需要在 SolidWorks 的运动算例时间轴中生成可计算、可播放的动画。
+- User asks to "create a motion study," "set up Motion Study," "add a motor," or "rotate at a constant 60 RPM."
+- The assembly already has real mates, with rotating components retaining rotational DOF via Concentric mates.
+- A calculable, playable timeline animation is needed inside SolidWorks Motion Study.
 
-不适用：
+Not applicable when:
 
-- 只想演示某个角度变化，可用 `sw_assembly.apply_component_transform_x()` 生成帧。
-- 需要复杂接触、摩擦、碰撞、力学结果时，应检查 Motion / Simulation 加载项和许可证，再做专门验证。
+- You only want to illustrate a pose angle change—use `sw_assembly.apply_component_transform_x()` to render frames.
+- Complex contact, friction, collision, or force/torque dynamics are required—verify Motion / Simulation add-ins and licenses first and run dedicated validation.
 
-## 推荐工作流
+## Recommended Workflow
 
-1. 先生成并保存零件。
-2. 新建装配体，添加组件。
-3. 解析组件，用 `GetCorresponding()` 选择装配体上下文实体。
-4. 对旋转件创建同心 Mate，`lock_rotation=False`。
-5. 用一个平面重合或距离 Mate 限制轴向窜动，但不要再用三基准面完全锁死旋转件。
-6. 固定静止件；旋转件保持浮动。
-7. 调用 `sw_motion.create_motion_study()` 创建算例。
-8. 调用 `add_constant_speed_rotary_motor_by_cylinders()` 添加匀速旋转马达。
-9. 调用 `calculate_and_play()` 计算并播放。
-10. 调用 `validate_motion_studies()`，只有 `validation.status == "pass"` 才能进入交付。
+1. Generate and save all parts first.
+2. Create a new assembly and insert components.
+3. Resolve components and use `GetCorresponding()` to select assembly-context entities.
+4. Add a Concentric mate to the rotating component with `lock_rotation=False`.
+5. Constrain axial float with a single planar Coincident or Distance mate; do not lock the rotating part with three reference plane mates.
+6. Fix stationary parts; leave rotating parts floating.
+7. Call `sw_motion.create_motion_study()` to create the study.
+8. Call `add_constant_speed_rotary_motor_by_cylinders()` to add a constant-speed rotary motor.
+9. Call `calculate_and_play()` to calculate and play the study.
+10. Call `validate_motion_studies()`; proceed to delivery only when `validation.status == "pass"`.
 
-## 最小示例
+## Minimal Example
 
 ```python
 import sys
@@ -69,30 +69,30 @@ audit = validate_motion_studies(
 print(ok, audit["validation"])
 ```
 
-## 结果验收门禁
+## Result Acceptance Gate
 
-`validate_motion_studies()` 会同时检查：
+`validate_motion_studies()` verifies all of the following simultaneously:
 
-- 目标算例真实存在且可读取。
-- `swmotionstudy.tlb` 已加载。
-- 算例时长不小于要求。
-- 马达数量不小于要求。
-- 可选的 `StudyType` 与任务一致。
-- `GetResults()` 返回结果对象。
-- `results_out_of_date` 明确为 `False`。
+- The target study exists and is readable.
+- `swmotionstudy.tlb` is loaded.
+- Study duration meets or exceeds the requirement.
+- Motor count meets or exceeds the requirement.
+- Optional `StudyType` matches the task.
+- `GetResults()` returns a valid results object.
+- `results_out_of_date` is explicitly `False`.
 
-只看到时间轴、马达图标、播放动画或 `Calculate=True` 都不能替代这组结果证据。任何检查失败时，Reviewer Gate 必须阻止交付并要求重新计算或修复装配自由度。
+Seeing a timeline, motor icon, animation playback, or `Calculate=True` alone cannot substitute for this evidence set. If any check fails, the Reviewer Gate must block delivery and require recalculation or fixing assembly degrees of freedom.
 
-## 类型库与动态 COM 坑
+## Type Library and Late-Bound COM Pitfalls
 
-Motion Study 的 `IMotionStudyManager` 位于 `swmotionstudy.tlb`，不在主 `SolidWorks.Interop.sldworks.dll` 类型库里。未生成 pywin32 包装时，动态对象常出现以下怪相：
+Motion Study's `IMotionStudyManager` resides in `swmotionstudy.tlb`, not in the main `SolidWorks.Interop.sldworks.dll` type library. Without generated `pywin32` wrappers, dynamic dispatch objects exhibit quirks:
 
-- `model.Extension.GetMotionStudyManager` 是属性，不是方法。
-- `motion_mgr.CreateMotionStudy` 是属性，读取即创建算例；调用 `CreateMotionStudy()` 反而报“找不到成员”。
-- `study.Activate`、`study.Calculate`、`study.Play` 可能是布尔属性，不是方法。
-- `study.SetDuration()`、`study.CreateDefinition()`、`study.CreateFeature()` 通常仍是方法。
+- `model.Extension.GetMotionStudyManager` behaves as a property rather than a method.
+- `motion_mgr.CreateMotionStudy` behaves as a property—reading it creates the study, whereas calling `CreateMotionStudy()` raises "Member not found."
+- `study.Activate`, `study.Calculate`, and `study.Play` may behave as boolean properties rather than methods.
+- `study.SetDuration()`, `study.CreateDefinition()`, and `study.CreateFeature()` typically remain methods.
 
-稳定做法：优先复用 `sw_motion.motion_member()` 和 `sw_motion.ensure_motion_type_library()`。
+Reliable pattern: reuse `sw_motion.motion_member()` and `sw_motion.ensure_motion_type_library()`.
 
 ```python
 from sw_motion import ensure_motion_type_library, motion_member
@@ -104,9 +104,9 @@ motion_member(study, "SetDuration", 4.0)
 calculated = motion_member(study, "Calculate")
 ```
 
-## 旋转马达关键 API
+## Key Rotary Motor API
 
-创建旋转马达使用 `MotionStudy.CreateDefinition(swFmAEMRotationalMotor)`：
+Create a rotary motor via `MotionStudy.CreateDefinition(swFmAEMRotationalMotor)`:
 
 ```python
 SW_FM_AEM_ROTATIONAL_MOTOR = 78
@@ -119,31 +119,31 @@ motor_data.LoadReferences = (rotor_face,)
 motor_feature = study.CreateFeature(motor_data)
 ```
 
-实测注意：
+Live-tested notes:
 
-- `DirectionReference` 选择静止轴的装配体上下文圆柱面最稳定。
-- `LoadReferences` 可传 tuple/list；部分环境需要 `VARIANT(VT_ARRAY | VT_VARIANT, [...])` 或 `VT_DISPATCH`。
-- `ConstantSpeedMotor(60.0)` 的参数单位为 RPM；不要换算成 rad/s。
-- 如果 `CreateFeature()` 返回 `None`，先检查方向引用和载荷引用是否都是装配体上下文实体。
+- Choosing the stationary shaft's assembly-context cylindrical face for `DirectionReference` is most reliable.
+- `LoadReferences` accepts a tuple/list; some environments require `VARIANT(VT_ARRAY | VT_VARIANT, [...])` or `VT_DISPATCH`.
+- `ConstantSpeedMotor(60.0)` takes RPM directly; do not convert to rad/s.
+- If `CreateFeature()` returns `None`, verify that both direction and load references are assembly-context entities.
 
-## 与 Mate 自由度的关系
+## Relationship to Mate Degrees of Freedom
 
-Motion Motor 只能驱动仍有旋转自由度的组件。常见失败原因：
+A Motion Motor can only drive components that still have a rotational degree of freedom. Common failure causes:
 
-- 叶轮组件被 `FixComponent()` 固定。
-- 同心 Mate 创建时 `lock_rotation=True`。
-- 叶轮又被多个基准面重合，绕轴自由度被锁死。
-- 选了零件上下文面，而不是 `component.GetCorresponding()` 后的装配体上下文面。
+- The rotor/impeller component is fixed via `FixComponent()`.
+- The Concentric mate was created with `lock_rotation=True`.
+- Additional coincident reference plane mates locked rotational DOF.
+- Part-context faces were selected instead of assembly-context faces mapped via `component.GetCorresponding()`.
 
-推荐约束：
+Recommended constraints:
 
-- 静止件：底座、立柱、防护盖固定。
-- 旋转件：只用同心 Mate + 一个轴向定位 Mate；组件保持浮动。
-- 同心 Mate：`lock_rotation=False`。
+- Stationary parts: fix the base, center post, and protective cover.
+- Rotating part: apply only a Concentric mate + one axial locating mate; keep the component floating.
+- Concentric mate: `lock_rotation=False`.
 
-## 会话清理与同标题文档
+## Session Cleanup and Same-Title Documents
 
-多次调试自动生成零件时，SolidWorks 会话里容易残留同名文档，导致：
+During repeated automated part generation runs, leftover documents with identical titles in the SolidWorks session can cause:
 
 ```text
 OpenDoc6 errors=65536
@@ -151,25 +151,25 @@ swFileWithSameTitleAlreadyOpen
 AddComponent4 返回 None
 ```
 
-稳定做法：
+Reliable approach:
 
-1. 批量脚本开始前，确认是否可以关闭当前文档；无人值守流程可调用 `sw.CloseAllDocuments(True)`。
-2. 每个零件保存后，用 `sw.CloseDoc(title)` 关闭，装配时再按路径添加。
-3. `OpenDoc6` 返回 `65536` 时不要直接判定为“文件损坏”，它通常表示同标题已打开。
+1. Before running a batch script, check whether open documents can be closed; unattended pipelines can call `sw.CloseAllDocuments(True)`.
+2. Close each part via `sw.CloseDoc(title)` right after saving, then insert by path during assembly.
+3. Do not treat `OpenDoc6` returning `65536` as file corruption—it usually indicates a document with the same title is already open.
 
-## 实测记录
+## Verification Record
 
-环境：
+Environment:
 
 - SolidWorks Premium 2024 SP3.1
 - Python 3.13
-- pywin32 动态 COM
+- `pywin32` dynamic COM
 
-已跑通案例：
+Verified benchmark case:
 
-- 4 零件桌面迷你散热风扇：底座、中心立柱、带叶片叶轮、圆形防护前盖。
-- 装配体 Mate：底座/立柱同轴+重合，叶轮/轴同轴未锁转+轴向重合，前盖同轴+角向定位。
-- 固定状态：底座/立柱/前盖固定，叶轮浮动。
-- Motion Study：创建 `叶轮_60RPM_循环转动`，添加 `叶轮旋转马达_60RPM`，`Calculate=True`。
+- 4-part desktop mini cooling fan: base, center post, bladed impeller, circular front guard.
+- Assembly mates: base/post concentric + coincident; impeller/shaft concentric (rotation unlocked) + axial coincident; front guard concentric + angular alignment.
+- Fix states: base/post/front guard fixed; impeller floating.
+- Motion Study: created `叶轮_60RPM_循环转动`, added `叶轮旋转马达_60RPM`, `Calculate=True`.
 
-仓库中的 `examples/08_mini_fan_motion_assembly.py` 是可重复运行的基准示例。该示例重点验证自动建模、装配、真实 Mate、Motion Study 和审查导出；圆角/倒角没有作为成功标准，叶片也采用稳定矩形叶片而非复杂弧面叶片。
+`examples/08_mini_fan_motion_assembly.py` in the repository is a repeatable benchmark example. It validates automated modeling, assembly, real mates, Motion Study, and review export; fillets/chamfers are not used as success criteria, and blades use reliable rectangular geometry rather than complex curved surfaces.

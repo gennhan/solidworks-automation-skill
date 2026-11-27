@@ -1,17 +1,16 @@
-# CAD 多语言后端路由
+# Multi-Language CAD Backend Routing
 
-## 核心原则
+## Core Principles
 
-不要把“某个 `I*` 方法不能由 Python 调用”扩大成“整个能力不能用 Python”。
-先确认目标是业务能力还是某个精确接口，再按以下顺序选择：
+Do not generalize "a specific `I*` method cannot be called from Python" into "the entire capability cannot use Python." First clarify whether the goal is a business capability or an exact interface signature, then select in this order:
 
-1. 有同名非 `I` 方法、`CreateMassProperty` 等 Automation 兼容接口时，优先 Python `pywin32`。
-2. 遇到 `SAFEARRAY`、`BYREF`、`object/out` 封送差异时，依次试显式 `VARIANT`、`comtypes`、C# PIA，并回读真实产物。
-3. 官方明确写明“in-process, unmanaged C++ only”且任务要求原始接口语义时，才使用隔离的原生 C++ Add-in/桥。
-4. 事件、PropertyManagerPage、TaskPane 和长期驻留回调优先 C# Add-in。
-5. 缺许可证、缺加载项或 API 根本没有暴露数据时，换语言不能解除阻塞。
+1. When an Automation-compatible counterpart exists (non-`I` method, `CreateMassProperty`, etc.), prefer Python `pywin32`.
+2. When encountering `SAFEARRAY`, `BYREF`, or `object/out` marshaling differences, try explicit `VARIANT`, `comtypes`, and C# PIA in turn, always reading back actual artifacts.
+3. Only when official documentation explicitly states "in-process, unmanaged C++ only" and the task strictly requires native interface semantics should an isolated native C++ Add-in/bridge be used.
+4. Events, `PropertyManagerPage`, `TaskPane`, and long-lived callbacks belong in a C# Add-in.
+5. Switching languages cannot bypass missing licenses, missing add-ins, or data that the API simply does not expose.
 
-## 可执行查询
+## Executable Queries
 
 ```powershell
 # 查看全部原子操作和候选后端
@@ -36,52 +35,50 @@ python scripts/backend_router.py `
   --solidworks-revision 34.1.1
 ```
 
-能力与路由的唯一真源是 `capabilities.yaml`。调用方应把实际检测到的后端、
-SolidWorks Revision、加载项和许可证条件传给路由器，不得把“清单中存在”误当作“本机可用”。
-未传 `--available` 时路由器会保守返回 `unavailable`，不会假定清单中的运行时已经安装。
+The single source of truth for capabilities and routing is `capabilities.yaml`. Callers should pass actually detected backends, SolidWorks Revision, add-ins, and license states to the router, never mistaking "listed in manifest" for "available on this machine." When `--available` is omitted, the router conservatively returns `unavailable` rather than assuming runtimes are installed.
 
-## 已核实的接口边界
+## Verified Interface Boundaries
 
-| 接口/场景 | 官方边界 | 首选策略 |
+| Interface / Scenario | Official Boundary | Preferred Strategy |
 |---|---|---|
-| `ISldWorks.IGetDocuments` | 返回指针数组，仅进程内非托管 C++ | 普通文档遍历用 Automation 接口；精确原始语义用 C++ |
-| `IModelDocExtension.IGetMassProperties` / `IBody2.IGetMassProperties` | 返回 double 指针数组，托管语言不支持 | 优先 `GetMassProperties` / `CreateMassProperty`；原始数组才用 C++ |
-| `IModelDocExtension.IListExternalFileReferences` | 多个指针数组，仅进程内非托管 C++ | 优先受支持的依赖/外部引用 Automation 路线；严格原始语义用 C++ |
-| `ISldWorks.IGetDocumentDependencies2` | 原生字符串指针，仅进程内非托管 C++ | 普通交付用 `GetDependencies2`；原始接口才用 C++ |
-| `IModelDoc2.IGetConfigurationNames` | 名称指针数组，仅进程内非托管 C++ | Python/C# 使用 `GetConfigurationNames` |
-| `ISimpleFilletFeatureData2.ISetHoldLines` | 仅进程内非托管 C++ | 原生 C++ 是唯一精确路径；SW2026 SP1.1 已知宿主故障继续 blocked |
-| `IPropertyManagerPage2` / 事件 / TaskPane | 需要稳定处理器与 Add-in 生命周期 | C# Add-in；Python 只做外部编排 |
-| `IAnnotation` 精确文字包围盒 | API 未提供所需数据 | 保守估算 + PDF/图像回读 + 人工目视复核，不能换语言伪造 |
+| `ISldWorks.IGetDocuments` | Returns pointer array; in-process unmanaged C++ only | Use Automation interface for general document traversal; C++ only for exact raw semantics |
+| `IModelDocExtension.IGetMassProperties` / `IBody2.IGetMassProperties` | Returns double pointer array; unsupported in managed languages | Prefer `GetMassProperties` / `CreateMassProperty`; C++ only for raw arrays |
+| `IModelDocExtension.IListExternalFileReferences` | Multiple pointer arrays; in-process unmanaged C++ only | Prefer supported Automation dependency/external-reference routes; C++ only for strict raw semantics |
+| `ISldWorks.IGetDocumentDependencies2` | Native string pointers; in-process unmanaged C++ only | Use `GetDependencies2` for standard delivery; C++ only for raw interface |
+| `IModelDoc2.IGetConfigurationNames` | Name pointer array; in-process unmanaged C++ only | Use `GetConfigurationNames` in Python/C# |
+| `ISimpleFilletFeatureData2.ISetHoldLines` | In-process unmanaged C++ only | Native C++ is the only exact path; SW2026 SP1.1 known host fault remains blocked |
+| `IPropertyManagerPage2` / Events / TaskPane | Requires stable handlers and Add-in lifecycle | C# Add-in; Python handles only external orchestration |
+| `IAnnotation` exact text bounding box | API does not expose required data | Conservative estimation + PDF/image readback + manual visual review; changing languages cannot fabricate it |
 
-官方依据：
+Official references:
 
 - [IGetDocuments](https://help.solidworks.com/2026/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.ISldWorks~IGetDocuments.html)
 - [IGetMassProperties](https://help.solidworks.com/2026/english/api/sldworksapi/SOLIDWORKS.Interop.sldworks~SOLIDWORKS.Interop.sldworks.IModelDocExtension~IGetMassProperties.html)
 - [IListExternalFileReferences](https://help.solidworks.com/2026/english/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IModelDocExtension~IListExternalFileReferences.html)
-- [IGetDocumentDependencies2](https://help.solidworks.com/2026/English/api/sldworksapi/SOLIDWORKS.Interop.sldworks~SolidWorks.Interop.sldworks.ISldWorks~IGetDocumentDependencies2.html)
-- [IGetConfigurationNames](https://help.solidworks.com/2026/English/api/sldworksapi/SOLIDWORKS.Interop.sldworks~SOLIDWORKS.Interop.sldworks.IModelDoc2~IGetConfigurationNames.html)
+- [IGetDocumentDependencies2](https://help.solidworks.com/2026/English/api/sldworksapi/SOLIDWORKS.Interop.sldworks~SOLIDWORKS.Interop.sldworks.ISldWorks~IGetDocumentDependencies2.html)
+- [IGetConfigurationNames](https://help.solidworks.com/2026/english/api/sldworksapi/SOLIDWORKS.Interop.sldworks~SOLIDWORKS.Interop.sldworks.IModelDoc2~IGetConfigurationNames.html)
 - [ISetHoldLines](https://help.solidworks.com/2025/English/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.ISimpleFilletFeatureData2~ISetHoldLines.html)
-- [C# Add-in 模板与事件结构](https://help.solidworks.com/2026/English/api/sldworksapiprogguide/Overview/Using_SolidWorks_C__Add-In_Wizard_to_Create_C__Add-In.htm)
+- [C# Add-in Template and Event Structure](https://help.solidworks.com/2026/English/api/sldworksapiprogguide/Overview/Using_SolidWorks_C__Add-In_Wizard_to_Create_C__Add-In.htm)
 - [PropertyManagerPage2](https://help.solidworks.com/2026/English/api/sldworksapi/SolidWorks.Interop.sldworks~SolidWorks.Interop.sldworks.IPropertyManagerPage2.html)
 
-## 当前能力分类
+## Current Backend Roles
 
-- Python 继续作为常规模型、装配、工程图、导出、配置族、属性和审计的默认编排语言。
-- C# PIA 是强类型 Automation 封送回退，不是非托管 `I*` 指针接口的替代品。
-- C# Add-in 专门承担事件、UI 与长期宿主生命周期。
-- 原生 C++ 仅承担官方限定接口和必要的底层高吞吐几何，必须做版本白名单、崩溃隔离和真机回归。
-- SWBasic/VBA 用于 SolidWorks 主线程最小复现和兼容性诊断，不能替代原生 C++。
-- Python/OCP 用于开放格式无头几何；它不能生成原生 SolidWorks 特征树。
-- AutoCAD 原生 DWG 数据库操作优先 C# .NET；不稳定的 ActiveX 不应继续由 Python 硬扛。
-- CalculiX/Elmer 使用 Python 生成输入、编排原生求解器并审计结果；通过不等于工程认证。
+- Python remains the default orchestration language for standard modeling, assemblies, drawings, export, configuration families, properties, and auditing.
+- C# PIA serves as a strongly typed Automation marshaling fallback, not a replacement for unmanaged `I*` pointer APIs.
+- C# Add-in owns events, UI integration, and long-lived host lifecycles.
+- Native C++ handles only officially restricted unmanaged interfaces and necessary low-level high-throughput geometry, requiring version allowlisting, crash isolation, and live regression tests.
+- SWBasic/VBA is used for minimal main-thread reproduction and compatibility diagnostics inside SolidWorks, not as a replacement for native C++.
+- Python/OCP handles headless open-format geometry; it cannot create native SolidWorks FeatureManager trees.
+- AutoCAD native DWG database operations should prefer C# .NET rather than forcing Python through unstable ActiveX paths.
+- CalculiX/Elmer uses Python to generate inputs, orchestrate native solvers, and audit outputs; passing checks do not equal engineering certification.
 
-## 仍需继续扩展
+## Planned Extensions
 
-优先级从高到低：
+Ordered from highest to lowest priority:
 
-1. C# Add-in 生产化：主线程任务队列、版本化安装器、Authenticode 和升级/回滚；基础事件、PropertyManagerPage、TaskPane 宿主已在 SW2026 真机通过。
-2. 原生 C++ 安全桥：仅封装已由官方文档确认的非托管接口，每个入口单独进程/版本门禁。
-3. 钣金后续：多折弯、折弯顺序、成形工具和更复杂展开干涉；U 型轮廓法兰与展开 DXF 已真机通过。
-4. 焊件后续：角撑板、端盖、复杂角部处理和多配置切割清单；HSS 矩形框架与长度/角度回读已真机通过。
-5. 配置族后续：派生配置、显示状态、配置专属抑制和设计表；不得沿用未经验证的旧签名。
-6. Routing/Simulation 原生适配器：只有加载项和许可证证据齐全时启用。
+1. Productionize the C# Add-in: main-thread task queue, versioned installer, Authenticode signing, and upgrade/rollback; basic events, PropertyManagerPage, and TaskPane host already pass live SW2026 tests.
+2. Safe native C++ bridge: wrap only unmanaged interfaces confirmed by official docs, with per-entry process/version gating.
+3. Sheet metal expansion: multi-bend sequences, forming tools, and complex flat-pattern interference; U-channel Base Flange and flat-pattern DXF already pass live tests.
+4. Weldment expansion: gussets, end caps, complex corner treatments, and multi-configuration cut lists; HSS rectangular frame with length/angle readback already passes live tests.
+5. Configuration family expansion: derived configurations, display states, per-configuration suppression, and design tables; never reuse unverified legacy signatures.
+6. Native Routing/Simulation adapters: enable only when complete add-in and license evidence is present.
