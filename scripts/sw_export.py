@@ -346,7 +346,7 @@ def batch_export_formats(
         "documents": documents,
         "summary": {"documents": len(documents), "outputs": output_count, "succeeded": success_count},
     }
-    print(f"批量导出完成: {success_count}/{output_count} 个输出成功")
+    print(f"Batch export completed: {success_count}/{output_count} outputs succeeded")
     return report
 
 
@@ -370,6 +370,6 @@ def _export_generic(model, output_path):
 def _print_result(format_name, path, success, errors, warnings):
     """打印导出结果"""
     if success:
-        print(f"{format_name} 导出成功: {path}")
+        print(f"{format_name} exported: {path}")
     else:
-        print(f"{format_name} 导出失败, 错误码: {errors.value}, 警告码: {warnings.value}")
+        print(f"{format_name} export failed (error code: {errors.value}, warning code: {warnings.value})")

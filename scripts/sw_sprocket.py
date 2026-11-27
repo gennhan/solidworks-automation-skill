@@ -74,6 +74,6 @@ def create_approximate_sprocket(model, spec: SprocketSpec, plane_name: str = "Fr
                 "pitch_diameter_mm": geometry.pitch_diameter_mm, "outside_diameter_mm": geometry.outside_diameter_mm,
                 "nominal_root_diameter_mm": geometry.root_diameter_mm,
                 "actual_profile_min_diameter_mm": geometry.profile_min_diameter_mm,
-                "limitations": ["仅用于外观及几何验证，未验证链条啮合、强度或制造标准", "草图轮廓是离散折线，非精确曲线",
-                                "轮廓草图尚未完全参数化或约束；修改参数需重新生成并复核"]}
+                "limitations": ["For visual and geometric verification only; chain meshing, strength, and manufacturing standards are not verified.", "Sketch profile is a discrete polyline approximation, not an exact curve.",
+                                "Profile sketch is not fully parameterized or constrained; regenerate and re-verify after changing parameters."]}
     return feature, evidence

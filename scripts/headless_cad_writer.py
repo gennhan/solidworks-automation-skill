@@ -89,7 +89,7 @@ def _run_occt_service(document_path: Path, out_dir: Path, formats: list[str]) ->
                 "backend": "headless_occt",
                 "status": "failed",
                 "artifacts": [],
-                "limitations": ["OCCT 隔离服务超过 180 秒未完成。"],
+                "limitations": ["Isolated OCCT service did not finish within 180 seconds."],
                 "error_code": "occt_timeout",
             }
         if result_path.is_file():
@@ -98,7 +98,7 @@ def _run_occt_service(document_path: Path, out_dir: Path, formats: list[str]) ->
             "backend": "headless_occt",
             "status": "failed",
             "artifacts": [],
-            "limitations": [f"OCCT 隔离服务未返回结果文件，退出码 {completed.returncode}。"],
+            "limitations": [f"Isolated OCCT service did not produce a result file (exit code {completed.returncode})."],
             "error_code": "occt_result_missing",
         }
 
@@ -174,14 +174,14 @@ def _triangles(document: dict[str, Any]) -> tuple[list[Triangle], list[str], boo
         kind = str(feature.get("type") or "").lower()
         operation = str(feature.get("operation") or "add").lower()
         if operation not in {"add", "new", "union"}:
-            limitations.append(f"网格后端暂不支持布尔操作: {feature.get('id')} ({operation})")
+            limitations.append(f"Mesh backend does not yet support boolean operation: {feature.get('id')} ({operation})")
             mesh_blocked = True
         elif kind == "box":
             triangles.extend(_box_mesh(float(params.get("length", 10)), float(params.get("width", 10)), float(params.get("height", 10))))
         elif kind == "cylinder":
             triangles.extend(_cylinder_mesh(float(params.get("radius", 5)), float(params.get("height", 10)), int(params.get("segments", 48))))
         else:
-            limitations.append(f"暂未无头写入特征: {feature.get('id') or kind}")
+            limitations.append(f"Feature not yet supported by headless writer: {feature.get('id') or kind}")
             mesh_blocked = True
     return triangles, limitations, mesh_blocked
 
@@ -584,11 +584,11 @@ def export_headless(document_path: Path, out_dir: Path, formats: list[str]) -> d
         blocked = [fmt for fmt in normalized_formats if fmt in ADVANCED_OCCT_FORMATS]
         occt_handled.update(blocked)
         missing_formats.extend(blocked)
-        limitations.append("未发现 OCP 运行时，STEP/IGES/BREP/GLB 保持 blocked。")
+        limitations.append("OCP runtime not found; STEP/IGES/BREP/GLB remain blocked.")
     if (not triangles or mesh_blocked) and any(fmt in {"stl", "obj"} and fmt not in occt_handled for fmt in normalized_formats):
         limitations.append("当前文档不能完整网格化，未写出 STL/OBJ，避免把部分几何当成完整交付。")
     if unsupported_2d and any(fmt in {"dxf", "svg", "pdf", "png"} for fmt in normalized_formats):
-        limitations.append("当前二维后端无法完整表达特征: " + ", ".join(unsupported_2d))
+        limitations.append("Current 2D backend cannot fully represent features: " + ", ".join(unsupported_2d))
     for normalized in normalized_formats:
         if normalized in occt_handled:
             continue
@@ -619,7 +619,7 @@ def export_headless(document_path: Path, out_dir: Path, formats: list[str]) -> d
                 write_rendered_dxf_format(target, document)
             except ImportError:
                 write_svg(target, document)
-                limitations.append("缺少 matplotlib，SVG 使用简化轮廓回退，不包含完整尺寸文字。")
+                limitations.append("matplotlib is missing; SVG fell back to simplified outlines without full dimension text.")
         elif normalized == "pdf":
             if unsupported_2d:
                 missing_formats.append(normalized)
@@ -628,7 +628,7 @@ def export_headless(document_path: Path, out_dir: Path, formats: list[str]) -> d
                 write_rendered_dxf_format(target, document)
             except ImportError:
                 write_pdf(target, document)
-                limitations.append("缺少 matplotlib，PDF 使用简化轮廓回退，不包含完整尺寸文字。")
+                limitations.append("matplotlib is missing; PDF fell back to simplified outlines without full dimension text.")
         elif normalized == "png":
             if unsupported_2d:
                 missing_formats.append(normalized)
@@ -637,9 +637,9 @@ def export_headless(document_path: Path, out_dir: Path, formats: list[str]) -> d
                 write_rendered_dxf_format(target, document)
             except ImportError:
                 write_png(target, document)
-                limitations.append("缺少 matplotlib，PNG 使用简化轮廓回退，不包含完整尺寸文字。")
+                limitations.append("matplotlib is missing; PNG fell back to simplified outlines without full dimension text.")
         else:
-            limitations.append(f"无头后端暂不支持写入格式: {normalized}")
+            limitations.append(f"Unsupported headless output format: {normalized}")
             missing_formats.append(normalized)
             continue
         artifacts.append({"kind": "cadstudio" if normalized in {"cadstudio", "cadstudio.json", "json"} else normalized, "path": str(target), "exists": True, "producedThisRun": True, "sha256": sha256_file(target), "sourceBackend": "headless_open_format"})
@@ -652,7 +652,7 @@ def export_headless(document_path: Path, out_dir: Path, formats: list[str]) -> d
             preview_scene_path = str(scene_target)
             artifacts.append({"kind": "preview_scene", "path": preview_scene_path, "exists": True, "producedThisRun": True, "sha256": sha256_file(scene_target), "sourceBackend": "ezdxf-preview-scene"})
         except (OSError, ValueError, ImportError) as exc:
-            limitations.append(f"DXF PreviewScene 生成失败: {exc}")
+            limitations.append(f"DXF PreviewScene generation failed: {exc}")
 
     preview_source = ""
     for preview_kind in ("glb", "preview_scene", "dxf", "stl", "obj"):
@@ -674,7 +674,7 @@ def export_headless(document_path: Path, out_dir: Path, formats: list[str]) -> d
                     limitations=[*manifest.limitations, *scene.get("limitations", [])],
                 )
             except (OSError, json.JSONDecodeError):
-                limitations.append("PreviewScene 清单读取失败，保留源文件预览。")
+                limitations.append("Failed to read PreviewScene manifest; retaining source file preview.")
         preview_manifest_path = str(write_json_contract(_versioned_target(out_dir, name, "preview.json"), manifest))
         artifacts.append({"kind": "preview_manifest", "path": preview_manifest_path, "exists": True, "producedThisRun": True, "sha256": sha256_file(preview_manifest_path)})
     status = "pass" if artifacts and not missing_formats else "pilot" if artifacts else "blocked"
@@ -693,7 +693,7 @@ def export_headless(document_path: Path, out_dir: Path, formats: list[str]) -> d
 
 def main(argv: list[str] | None = None) -> int:
     """@brief CLI 入口。"""
-    parser = argparse.ArgumentParser(description="CAD Studio 无头开放格式写入器")
+    parser = argparse.ArgumentParser(description="CAD Studio headless open-format writer")
     parser.add_argument("--input", type=Path, required=True, help="NeutralCadDocument .cadstudio.json")
     parser.add_argument("--out-dir", type=Path, required=True)
     parser.add_argument("--formats", nargs="+", default=["cadstudio", "step", "iges", "brep", "stl", "obj", "glb", "dxf", "svg", "pdf", "png"])

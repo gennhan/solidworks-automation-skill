@@ -222,19 +222,19 @@ def import_mesh_reference(
 def _build_parser() -> argparse.ArgumentParser:
     """@brief 构建命令行参数解析器。"""
     parser = argparse.ArgumentParser(
-        description="将 OBJ/STL 网格参考模型导入 SolidWorks 并保存为 SLDPRT。"
+        description="Import an OBJ/STL mesh reference model into SolidWorks and save as SLDPRT."
     )
-    parser.add_argument("mesh_path", help="输入 OBJ/STL 路径")
-    parser.add_argument("output_sldprt", help="输出 SLDPRT 路径")
-    parser.add_argument("--review-dir", help="审查输出目录")
+    parser.add_argument("mesh_path", help="Input OBJ/STL file path")
+    parser.add_argument("output_sldprt", help="Output SLDPRT file path")
+    parser.add_argument("--review-dir", help="Review output directory")
     parser.add_argument("--units", default="m", choices=sorted(SW_LENGTH_UNITS.keys()))
     parser.add_argument(
         "--model-type",
         default="graphics",
         choices=sorted(SW_MESH_MODEL_TYPES.keys()),
-        help="导入为图形体/曲面体/实体。高面数外观参考建议 graphics。",
+        help="Import as graphics body, surface body, or solid body; graphics is recommended for high-poly visual references.",
     )
-    parser.add_argument("--hidden", action="store_true", help="隐藏 SolidWorks 窗口")
+    parser.add_argument("--hidden", action="store_true", help="Hide the SolidWorks window")
     return parser
 
 

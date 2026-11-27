@@ -263,7 +263,7 @@ def annotate_copy(source, plan, output_dir):
     if output.exists() or output.is_symlink() or not output.parent.is_dir():
         raise ValueError("输出目录必须不存在，且父目录必须存在")
     report = {"status": "blocked", "reviewRequired": True, "source": str(source), "outputs": [], "error": None,
-              "limitations": ["仅 SW2026 的单页单零件 A3 图纸副本", "不求解设计公差，不证明制造或标准合规", "尺寸应事先完整；自动新建尺寸请使用 DrawingSpec 出图包入口"]}
+              "limitations": ["Supports SW2026 single-sheet, single-part A3 drawing copies only.", "Does not derive design tolerances or certify manufacturing/standard compliance.", "Dimensions must already exist; use the DrawingSpec drawing package entry point to create dimensions automatically."]}
     created_dir = False
     try:
         with SolidWorksReadGuard(), SolidWorksSession(version=2026, visible=True) as session:
@@ -338,9 +338,9 @@ def annotate_copy(source, plan, output_dir):
 
 def main(argv=None):
     import argparse
-    parser = argparse.ArgumentParser(description="在新目录的图纸副本中写入原生基准与 GD&T，并重开核验")
+    parser = argparse.ArgumentParser(description="Write native datums and GD&T into a drawing copy in a new directory and reopen to verify")
     parser.add_argument("--source", required=True)
-    parser.add_argument("--inspect", action="store_true", help="只读列出真实目标及源哈希")
+    parser.add_argument("--inspect", action="store_true", help="Read-only listing of resolved targets and source hash")
     parser.add_argument("--plan")
     parser.add_argument("--output-dir")
     args = parser.parse_args(argv)

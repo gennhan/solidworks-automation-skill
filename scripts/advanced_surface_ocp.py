@@ -250,7 +250,7 @@ def collect_surface_continuity_evidence(shape, *, skip_planar_faces: bool = Fals
         "maximumG1AngleDeg": max((item["g1AngleDeg"] for item in all_samples), default=None),
         "maximumG2CurvatureGap": max((item["g2CurvatureGap"] for item in all_samples), default=None),
         "edges": edge_records,
-        "limitations": ["只对拓扑共享边的离散采样点判定；不等于 Class-A 曲面认证。"],
+        "limitations": ["Evaluated only at discrete sample points along shared topological edges; does not constitute Class-A surface certification."],
     }
 
 
@@ -387,7 +387,7 @@ def collect_curvature_radius_evidence(shape) -> dict[str, Any]:
         "curvedSampleCount": len(radii),
         "minimumSampledCurvatureRadiusMm": min(radii, default=None),
         "faces": records,
-        "limitations": ["离散采样不能证明面内所有位置的全局最小曲率半径，也不能单独证明偏置无自交。"],
+        "limitations": ["Discrete sampling cannot prove the global minimum curvature radius across all face interior points, nor guarantee self-intersection-free offsets."],
     }
 
 
@@ -509,8 +509,8 @@ def _persist_result(request: dict[str, Any], shape, output_dir: str | Path, *, b
         "continuityEvidence": continuity,
         "manual_review_required": True, "retryable": False, "error_code": None,
         "limitations": [
-            "B-Rep 有效和共享边采样不能替代 Class-A、模具质量或可制造性认证。",
-            "只有 continuityEvidence 中全部采样边通过时，才能声明该采样范围内的 G1/G2。",
+            "Valid B-Rep topology and shared-edge sampling do not replace Class-A, mold-quality, or manufacturability certification.",
+            "G1/G2 continuity within the sampled scope may be claimed only when all sampled edges in continuityEvidence pass.",
         ],
     }
 

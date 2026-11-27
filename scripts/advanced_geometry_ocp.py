@@ -501,7 +501,7 @@ def execute_ocp_loft(value: str | Path | dict[str, Any], output_dir: str | Path)
                 artifact["reopened"] = True
             else:
                 artifact["reopened"] = False
-                artifact["limitations"] = ["STL 是离散网格，非 B-Rep；本轮只验证文件非空和来源哈希。"]
+                artifact["limitations"] = ["STL is a discrete mesh rather than B-Rep; this run only verifies non-empty output and source hash."]
     except Exception as exc:
         return _failed(
             "save_or_reopen",
@@ -515,7 +515,7 @@ def execute_ocp_loft(value: str | Path | dict[str, Any], output_dir: str | Path)
         "modelId": request["modelId"], "geometryProduced": True, "producedThisRun": True,
         "artifacts": artifacts, "geometryEvidence": {"original": original, "reopened": reopened},
         "manual_review_required": True, "retryable": False, "error_code": None, "generatedAt": _now_iso(),
-        "limitations": ["已验证真实封闭直纹 Loft B-Rep，但未证明平滑 G1/G2 连续性、模具质量、Class-A 曲面或可制造性。"],
+        "limitations": ["Verified as a closed ruled Loft B-Rep, but does not prove smooth G1/G2 continuity, mold quality, Class-A surfacing, or manufacturability."],
     }
 
 

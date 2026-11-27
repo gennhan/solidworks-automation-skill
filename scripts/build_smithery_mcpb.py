@@ -1,4 +1,4 @@
-"""为 Smithery 构建与运行模式一致的 MCPB 工具清单。"""
+"""Build a Smithery MCPB tool manifest matching the runtime discovery mode."""
 
 from __future__ import annotations
 
@@ -57,13 +57,13 @@ def build_smithery_bundle(source: Path, target: Path, mode: str = "search", repo
 def main() -> int:
     """@brief 执行 Smithery MCPB 构建命令。"""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("source", type=Path, help="mcpb pack 生成的标准 MCPB")
-    parser.add_argument("target", type=Path, help="供 Smithery 发布的 MCPB")
-    parser.add_argument("--mode", choices=("search", "full"), default="search", help="打包的工具模式")
-    parser.add_argument("--repo-root", type=Path, help="仓库根目录，默认从包的上级目录推断")
+    parser.add_argument("source", type=Path, help="Standard MCPB produced by mcpb pack")
+    parser.add_argument("target", type=Path, help="Output MCPB for Smithery publishing")
+    parser.add_argument("--mode", choices=("search", "full"), default="search", help="Tool exposure mode to package")
+    parser.add_argument("--repo-root", type=Path, help="Repository root; inferred from the package parent directory by default")
     args = parser.parse_args()
     count = build_smithery_bundle(args.source, args.target, mode=args.mode, repo_root=args.repo_root)
-    print(f"Smithery MCPB 已生成: {args.target} ({count} 个工具 schema)")
+    print(f"Smithery MCPB generated: {args.target} ({count} tool schemas)")
     return 0
 
 

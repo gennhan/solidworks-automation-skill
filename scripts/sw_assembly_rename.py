@@ -235,7 +235,7 @@ def copy_assembly(root: str | Path, plans: Sequence[Mapping[str, Any]], output_d
         raise ValueError("输出目录必须不存在，且其父目录必须存在")
     target.mkdir(mode=0o700, exist_ok=False)
     report = {"status": "blocked", "reviewRequired": True, "outputs": [], "mate_reference_checks": [], "error": None,
-              "limitations": ["只支持单配置、解析完成且无外部引用的零件和单配置装配体", "不更新源文件及其外部使用位置", "Toolbox、图纸、虚拟或压缩组件、多配置及其他外部引用未支持"]}
+              "limitations": ["Supports only single-configuration, fully resolved parts without external references and single-configuration assemblies.", "Source files and their external usages are not modified.", "Toolbox parts, drawings, virtual or suppressed components, multiple configurations, and other external references are unsupported."]}
     try:
         with SolidWorksReadGuard(), SolidWorksSession(version=2026, visible=True) as session:
             hashes, snapshots, dependencies = {}, {}, {}
@@ -306,10 +306,10 @@ def copy_assembly(root: str | Path, plans: Sequence[Mapping[str, Any]], output_d
 
 def main(argv=None) -> int:
     import argparse
-    parser = argparse.ArgumentParser(description="在新目录创建单配置装配体改名副本，并核对组件与配合。")
-    parser.add_argument("--root", required=True, help="源根装配体")
-    parser.add_argument("--plan", required=True, help="包含 plans 列表的 JSON 文件")
-    parser.add_argument("--output-dir", required=True, help="必须不存在的新目录")
+    parser = argparse.ArgumentParser(description="Create a renamed copy of a single-configuration assembly in a new directory and verify components and mates.")
+    parser.add_argument("--root", required=True, help="Source root assembly")
+    parser.add_argument("--plan", required=True, help="JSON file containing the plans list")
+    parser.add_argument("--output-dir", required=True, help="New directory (must not exist)")
     args = parser.parse_args(argv)
     path = Path(args.plan).expanduser()
     if path.stat().st_size > 4 * 1024 * 1024:

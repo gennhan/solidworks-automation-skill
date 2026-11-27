@@ -126,9 +126,9 @@ def probe_capabilities(check_solidworks: bool = True) -> dict:
         "type_libraries": {},
         "capabilities": {},
         "notes": [
-            "type_library_present 只证明本机安装包含接口定义，不证明许可证、当前文档或自动化实现已验证。",
-            "implementation_status=reference_only/not_implemented 的能力禁止自动宣称完成。",
-            "language_backend_matrix 只定义适用边界；具体运行时仍须由 backend_router.py 按版本、依赖和接口语义选择。",
+            "type_library_present only proves that local type library definitions exist; it does not verify licensing, active documents, or automation readiness.",
+            "Capabilities with implementation_status=reference_only or not_implemented must not be automatically claimed as complete.",
+            "language_backend_matrix defines applicability boundaries only; runtime selection must still be routed by backend_router.py based on version, dependencies, and interface semantics.",
         ],
     }
     if missing or not check_solidworks:
@@ -162,9 +162,9 @@ def probe_capabilities(check_solidworks: bool = True) -> dict:
 
 def main() -> int:
     """@brief 命令行入口。"""
-    parser = argparse.ArgumentParser(description="探测 SolidWorks 高级机械能力和本机类型库。")
-    parser.add_argument("--output", type=Path, help="可选 JSON 输出路径。")
-    parser.add_argument("--no-solidworks-check", action="store_true", help="仅校验能力清单，不访问本机 SolidWorks/类型库。")
+    parser = argparse.ArgumentParser(description="Probe SolidWorks advanced mechanical capabilities and local type libraries.")
+    parser.add_argument("--output", type=Path, help="Optional JSON output path.")
+    parser.add_argument("--no-solidworks-check", action="store_true", help="Validate only the capability manifest without probing local SolidWorks/type libraries.")
     args = parser.parse_args()
     report = probe_capabilities(check_solidworks=not args.no_solidworks_check)
     payload = json.dumps(report, ensure_ascii=False, indent=2)

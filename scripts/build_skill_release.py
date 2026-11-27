@@ -1,4 +1,4 @@
-"""构建可独立导入的技能 ZIP，并验证版本、来源提交及逐文件哈希。"""
+"""Build a standalone importable skill ZIP and verify version, source commit, and per-file hashes."""
 from __future__ import annotations
 
 import argparse

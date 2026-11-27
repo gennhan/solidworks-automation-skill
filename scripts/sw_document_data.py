@@ -73,7 +73,7 @@ def inspect_configurations(model) -> dict[str, Any]:
         "configurations": names,
         "active_configuration": current,
         "review_required": True,
-        "limitations": ["未执行设计表创建/编辑和大型配置族批量变更", "配置间尺寸、属性、抑制状态和几何差异仍需人工复核"],
+        "limitations": ["Design table authoring/editing and bulk configuration-family updates were not executed.", "Dimensional, property, suppression, and geometric differences across configurations still require manual review."],
     }
 
 

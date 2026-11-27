@@ -160,12 +160,12 @@ def main():
     check_skill_frontmatter()
     python_count = check_python_syntax()
     json_count = check_json_files()
-    print(f"验证通过: skill 文件完整，{python_count} 个 Python 文件和 {json_count} 个 JSON Schema 正常。")
+    print(f"Validation passed: skill files complete, {python_count} Python files and {json_count} JSON schemas OK.")
 
 
 if __name__ == "__main__":
     try:
         main()
     except Exception as exc:
-        print(f"验证失败: {exc}", file=sys.stderr)
+        print(f"Validation failed: {exc}", file=sys.stderr)
         sys.exit(1)

@@ -313,10 +313,10 @@ def run_doctor(*, probe_cad: bool = False, live_cad: bool = False) -> dict[str, 
 def main(argv: list[str] | None = None) -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
-    parser = argparse.ArgumentParser(description="诊断 CAD Studio 本地运行环境")
-    parser.add_argument("--probe-cad", action="store_true", help="在 COM 已注册时尝试连接 SolidWorks")
-    parser.add_argument("--live-cad", action="store_true", help="只握手已运行的 SolidWorks/AutoCAD 实例")
-    parser.add_argument("--output", type=Path, help="写入 JSON 文件")
+    parser = argparse.ArgumentParser(description="Diagnose the local CAD Studio runtime environment")
+    parser.add_argument("--probe-cad", action="store_true", help="Attempt to connect to SolidWorks when COM is registered")
+    parser.add_argument("--live-cad", action="store_true", help="Handshake only with already running SolidWorks/AutoCAD instances")
+    parser.add_argument("--output", type=Path, help="Write JSON output to file")
     args = parser.parse_args(argv)
     result = run_doctor(probe_cad=args.probe_cad, live_cad=args.live_cad)
     text = json.dumps(result, ensure_ascii=False, indent=2)

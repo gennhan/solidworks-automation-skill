@@ -104,10 +104,10 @@ def collect_entries(session: Any, folder: str | Path, properties: Sequence[str])
 
 def main(argv: list[str] | None = None) -> int:
     import argparse
-    parser = argparse.ArgumentParser(description="只读生成 SolidWorks 文件属性改名预览；不会执行改名。")
+    parser = argparse.ArgumentParser(description="Generate a read-only SolidWorks property-based rename preview without renaming files.")
     parser.add_argument("folder")
-    parser.add_argument("--template", required=True, help="例如 {图号}_{名称}")
-    parser.add_argument("--output", required=True, help="不覆盖已有文件的 JSON 报告路径")
+    parser.add_argument("--template", required=True, help="Naming template, e.g. {PartNo}_{Name}")
+    parser.add_argument("--output", required=True, help="Non-overwriting JSON report output path")
     args = parser.parse_args(argv)
     fields = template_fields(args.template)
     try:
@@ -121,7 +121,7 @@ def main(argv: list[str] | None = None) -> int:
             entries = collect_entries(session, Path(os.path.expandvars(args.folder)), fields)
             plans = plan_renames(entries, args.template)
     report = {"status": "review_required", "reviewRequired": True, "plans": plans,
-              "limitations": ["仅预览；不执行重命名、不修改引用或源文件", "属性、名称和所有引用需要人工复核"]}
+              "limitations": ["Preview only; does not rename files or modify references or source files.", "Properties, names, and all references require manual review."]}
     output = Path(args.output).expanduser().absolute()
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("x", encoding="utf-8") as handle:

@@ -30,22 +30,22 @@ def _format_time(timestamp: float | None) -> str:
 
 
 def _show_list(ledger: ApprovalLedger) -> int:
-    print(f"批准记录目录: {ledger.root}")
+    print(f"Approval ledger directory: {ledger.root}")
     pending = ledger.pending()
     if pending:
-        print("\n待批准:")
+        print("\nPending approvals:")
         for item in pending:
             remaining = max(0, int(item["expires_at"] - time.time()) // 60)
-            print(f"  [{item['id']}] {item['tool']} ({item['effect']}, 剩 {remaining} 分钟)")
-            print(f"        参数: {item['summary'][:300]}")
+            print(f"  [{item['id']}] {item['tool']} ({item['effect']}, {remaining} min left)")
+            print(f"        Args: {item['summary'][:300]}")
             if item.get("targets"):
-                print(f"        目标: {', '.join(item['targets'])}")
+                print(f"        Targets: {', '.join(item['targets'])}")
     else:
-        print("\n待批准: 无")
+        print("\nPending approvals: none")
 
     decisions = ledger.decisions(5)
     if decisions:
-        print("\n最近决定:")
+        print("\nRecent decisions:")
         for item in decisions:
             print(f"  [{item['id']}] {item['status']} {item['tool']} @ {_format_time(item.get('decided_at'))}")
     return 0
@@ -67,10 +67,10 @@ def _confirm(prompt: str) -> bool:
 
 def _show_request(ledger: ApprovalLedger, request_id: str) -> dict:
     record = ledger.request_record(request_id)
-    print(f"工具: {record['tool']}  等级: {record['effect']}  请求: {request_id}")
-    print(f"参数: {record['summary']}")
+    print(f"Tool: {record['tool']}  Effect: {record['effect']}  Request: {request_id}")
+    print(f"Args: {record['summary']}")
     if record.get("targets"):
-        print(f"目标: {', '.join(record['targets'])}")
+        print(f"Targets: {', '.join(record['targets'])}")
     return record
 
 
@@ -78,24 +78,24 @@ def main(argv: list[str] | None = None) -> int:
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")
-    parser = argparse.ArgumentParser(description="人工批准 SolidWorks MCP 写操作")
-    parser.add_argument("--dir", default=None, help="批准记录目录（默认取 SW_MCP_APPROVAL_DIR）")
+    parser = argparse.ArgumentParser(description="Manually approve SolidWorks MCP write operations")
+    parser.add_argument("--dir", default=None, help="Approval ledger directory (defaults to SW_MCP_APPROVAL_DIR)")
     sub = parser.add_subparsers(dest="command")
 
-    sub.add_parser("list", help="列出待批准请求和最近决定")
+    sub.add_parser("list", help="List pending approval requests and recent decisions")
 
-    approve = sub.add_parser("approve", help="批准一条待处理请求")
+    approve = sub.add_parser("approve", help="Approve a pending request")
     approve.add_argument("request_id")
-    approve.add_argument("--ttl", type=int, default=None, help="批准有效期（秒）")
+    approve.add_argument("--ttl", type=int, default=None, help="Approval lifetime in seconds")
 
-    deny = sub.add_parser("deny", help="拒绝一条待处理请求")
+    deny = sub.add_parser("deny", help="Deny a pending request")
     deny.add_argument("request_id")
 
-    scope = sub.add_parser("scope", help="范围授权已停用（仅保留命令兼容）")
-    scope.add_argument("--tool", action="append", required=True, help="工具名，可重复；* 表示全部写工具")
-    scope.add_argument("--path", action="append", default=[], help="允许的目录前缀，可重复；省略表示不限目录")
-    scope.add_argument("--ttl", type=int, default=None, help="有效期（秒）")
-    scope.add_argument("--uses", type=int, default=None, help="最多使用次数；省略表示不限")
+    scope = sub.add_parser("scope", help="Scoped grants are disabled (kept for CLI compatibility)")
+    scope.add_argument("--tool", action="append", required=True, help="Tool name (repeatable; * for all write tools)")
+    scope.add_argument("--path", action="append", default=[], help="Allowed directory prefix (repeatable; omit for unrestricted)")
+    scope.add_argument("--ttl", type=int, default=None, help="Lifetime in seconds")
+    scope.add_argument("--uses", type=int, default=None, help="Maximum number of uses; omit for unlimited")
 
     args = parser.parse_args(argv)
     ledger = ApprovalLedger(args.dir or default_root())
@@ -109,19 +109,19 @@ def main(argv: list[str] | None = None) -> int:
             if not _confirm(f"批准 {record['tool']} 这次调用？"):
                 return 1
             grant = ledger.approve(args.request_id, args.ttl, expected_record=record)
-            print(f"已批准，有效期至 {_format_time(grant['expires_at'])}，仅本次调用可用。")
+            print(f"Approved until {_format_time(grant['expires_at'])} (valid for this call only).")
             return 0
         if command == "deny":
             _show_request(ledger, args.request_id)
             if not _confirm("拒绝这次调用？"):
                 return 1
             ledger.deny(args.request_id)
-            print("已拒绝。")
+            print("Denied.")
             return 0
         if command == "scope":
             raise ApprovalError("范围授权已停用；请对具体调用逐次审批。")
     except ApprovalError as exc:
-        print(f"失败：{exc}", file=sys.stderr)
+        print(f"Failed: {exc}", file=sys.stderr)
         return 1
     parser.error(f"未知命令: {command}")
     return 2

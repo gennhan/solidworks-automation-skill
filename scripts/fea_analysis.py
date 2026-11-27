@@ -774,11 +774,11 @@ def run_analysis(value: str | Path | dict[str, Any], output_dir: str | Path, *, 
             error_code = "fea_contact_fields_missing"
         return {"schemaVersion": request["schemaVersion"], "status": "failed", "stage": "solve", "solver": "calculix", "artifacts": artifacts, "solverEvidence": solver_evidence, "resultEvidence": result_evidence, "manual_review_required": True, "retryable": True, "error_code": error_code, "exitCode": completed.returncode, "stdoutTail": completed.stdout[-4000:], "stderrTail": completed.stderr[-4000:], "generatedAt": _now_iso()}
     nonlinear = request["analysisType"] == "static_nonlinear"
-    limitations = ["单次结果已解析并验证有限值与求解增量，但仍需网格收敛、载荷合理性和工程安全复核，不能作为安全认证。"]
+    limitations = ["Single-run results were parsed and verified for finite values and solver increments, but still require mesh convergence, load sanity, and engineering safety review; this is not a safety certification."]
     if nonlinear:
-        limitations.append("非线性结果只证明本轮白名单 CalculiX 输入完成求解；接触穿透、塑性路径和增量敏感性仍需专门复核。")
+        limitations.append("Nonlinear results only confirm that the allowlisted CalculiX input solved; contact penetration, plasticity paths, and increment sensitivity still require dedicated review.")
     if request.get("contacts"):
-        limitations.append("接触开口/压力来自本轮最终输出；尚未自动证明所有载荷增量全过程的穿透上限、接触区域稳定性或工程允许值。")
+        limitations.append("Contact opening/pressure comes from the final output step; penetration bounds, contact-zone stability, and engineering allowables across all load increments are not automatically proven.")
     return {
         "schemaVersion": request["schemaVersion"], "status": "review_required", "stage": "review",
         "solver": "calculix", "analysisType": request["analysisType"], "artifacts": artifacts,
@@ -791,7 +791,7 @@ def run_analysis(value: str | Path | dict[str, Any], output_dir: str | Path, *, 
 
 def main(argv: list[str] | None = None) -> int:
     """@brief 命令行入口。"""
-    parser = argparse.ArgumentParser(description="CAD Studio 开放求解器 FEA")
+    parser = argparse.ArgumentParser(description="CAD Studio open-solver FEA")
     sub = parser.add_subparsers(dest="command", required=True)
     preflight = sub.add_parser("preflight")
     preflight.add_argument("--solver", choices=("auto", "calculix", "elmer"), default="auto")

@@ -24,14 +24,14 @@ except ImportError:
 
 def build_parser() -> argparse.ArgumentParser:
     """@brief 构造命令行参数解析器。"""
-    parser = argparse.ArgumentParser(description="按 CAD 原子操作选择 Python、C#、C++ 或无头后端。")
-    parser.add_argument("--operation", help="operation_routes 中的原子操作 ID。")
-    parser.add_argument("--list", action="store_true", help="列出全部操作路由及后端摘要。")
-    parser.add_argument("--available", action="append", default=[], help="本机可用后端 ID，可重复指定。")
-    parser.add_argument("--requirement", action="append", default=[], help="已满足的加载项/许可证条件，可重复指定。")
-    parser.add_argument("--solidworks-revision", help="SolidWorks Revision，例如 34.1.1。")
-    parser.add_argument("--exact-api", action="store_true", help="要求原始 I* 接口语义，不接受 Automation 等价方法。")
-    parser.add_argument("--manifest", type=Path, help="可选能力清单路径。")
+    parser = argparse.ArgumentParser(description="Select a Python, C#, C++, or headless backend by atomic CAD operation.")
+    parser.add_argument("--operation", help="Atomic operation ID from operation_routes.")
+    parser.add_argument("--list", action="store_true", help="List all operation routes and backend summaries.")
+    parser.add_argument("--available", action="append", default=[], help="Locally available backend ID (repeatable).")
+    parser.add_argument("--requirement", action="append", default=[], help="Satisfied add-in/license requirement (repeatable).")
+    parser.add_argument("--solidworks-revision", help="SolidWorks Revision, e.g. 34.1.1.")
+    parser.add_argument("--exact-api", action="store_true", help="Require exact raw I* interface semantics; reject Automation equivalents.")
+    parser.add_argument("--manifest", type=Path, help="Optional capability manifest path.")
     return parser
 
 

@@ -141,9 +141,9 @@ def write_csv(rows: list[dict[str, Any]], destination: str | Path) -> Path:
 def main(argv: list[str] | None = None) -> int:
     import argparse
     import json
-    parser = argparse.ArgumentParser(description="只读提取已显示尺寸的公差；输出必须是新文件。")
-    parser.add_argument("model", help="已保存的 SLDPRT、SLDASM 或 SLDDRW")
-    parser.add_argument("--output", required=True, help="不覆盖的 CSV 路径")
+    parser = argparse.ArgumentParser(description="Extract tolerances from displayed dimensions in read-only mode; output must be a new file.")
+    parser.add_argument("model", help="Saved SLDPRT, SLDASM, or SLDDRW file")
+    parser.add_argument("--output", required=True, help="Non-overwriting CSV output path")
     args = parser.parse_args(argv)
     try:
         from .sw_session import SolidWorksSession

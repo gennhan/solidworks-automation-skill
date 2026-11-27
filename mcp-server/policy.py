@@ -103,22 +103,22 @@ _DESTRUCTIVE: frozenset[str] = frozenset({
 })
 
 _NOTES: dict[str, str] = {
-    "solidworks_health_check": "start_solidworks=true 时会启动或连接 SolidWorks，需审批。",
-    "solidworks_lookup_api": "默认查询官方文档并按需配置依赖；直读失败且无缓存时使用匿名 Parallel，仅发送公开 API 标识及版本；offline=true 或 auto_install=false 可禁止安装。",
-    "cadstudio_check_dfm": "会将检查报告写入输出路径。",
-    "cadstudio_check_drc": "会将设计规则检查报告写入输出路径。",
-    "cadstudio_check_routing": "会将检查报告写入输出路径。",
-    "cadstudio_review_advanced_geometry": "会将预检报告写入输出路径。",
-    "solidworks_inspect_drawing": "会生成工程图预览和报告。",
-    "solidworks_document_units": "注解标为只读，但同一调用可改写文档单位。",
-    "solidworks_review_active": "会落盘预览图与审视报告。",
-    "solidworks_recover": "会解除阻塞对话框并重置会话状态。",
-    "solidworks_connect": "可能启动新的 SolidWorks 进程。",
-    "solidworks_close_documents": "可关闭全部文档，未保存修改会丢失。",
-    "solidworks_pack_and_go": "向目标目录批量复制，可能覆盖已有文件。",
-    "solidworks_batch_export_files": "批量落盘，可能覆盖已有输出。",
-    "solidworks_run_fea": "会启动本地求解器进程并写结果文件。",
-    "solidworks_run_fea_convergence": "会连续启动多次求解器。",
+    "solidworks_health_check": "Launches or attaches to SolidWorks when start_solidworks=true; requires approval.",
+    "solidworks_lookup_api": "Queries official docs and provisions dependencies by default; uses anonymous Parallel fallback with only public API identifiers and version when direct lookup and cache miss; set offline=true or auto_install=false to disable installation.",
+    "cadstudio_check_dfm": "Writes the DFM check report to the output path.",
+    "cadstudio_check_drc": "Writes the design rule check report to the output path.",
+    "cadstudio_check_routing": "Writes the routing check report to the output path.",
+    "cadstudio_review_advanced_geometry": "Writes the preflight review report to the output path.",
+    "solidworks_inspect_drawing": "Generates drawing previews and a structure report.",
+    "solidworks_document_units": "Annotated as read-only, but the same call can modify document units.",
+    "solidworks_review_active": "Writes preview images and a review report to disk.",
+    "solidworks_recover": "Dismisses blocking dialogs and resets session state.",
+    "solidworks_connect": "May launch a new SolidWorks process.",
+    "solidworks_close_documents": "Can close all open documents; unsaved changes will be lost.",
+    "solidworks_pack_and_go": "Copies files in bulk to the target directory and may overwrite existing files.",
+    "solidworks_batch_export_files": "Writes multiple exported files to disk and may overwrite existing outputs.",
+    "solidworks_run_fea": "Launches a local solver process and writes result files.",
+    "solidworks_run_fea_convergence": "Launches the solver repeatedly across mesh refinement levels.",
 }
 
 _EFFECTS: dict[str, Effect] = {

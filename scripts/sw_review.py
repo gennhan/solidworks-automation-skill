@@ -368,8 +368,8 @@ def inspect_pdf_text_layout(path, *, maximum_spans=20000, minimum_overlap_area_p
         "retryable": False,
         "error_code": None,
         "limitations": [
-            "PDF 文字框属于导出产物证据，不是 IAnnotation/IDisplayDimension 原生包围盒。",
-            "只能检查可提取矢量文字之间的重叠，不能证明文字与尺寸线、几何线或标题栏边框无碰撞。",
+            "PDF text boxes are exported artifact evidence, not native IAnnotation/IDisplayDimension bounding boxes.",
+            "Only overlaps among extractable vector text spans are checked; collisions between text and dimension lines, geometry lines, or title-block borders are not proven absent.",
         ],
     }
     if source.suffix.lower() != ".pdf" or not source.is_file() or not 0 < source.stat().st_size <= 256 * 1024 * 1024:
@@ -957,9 +957,9 @@ def build_review_report(model, output_dir, basename="review", views=None, expect
     }
 
     review_notes = [
-        "人工或视觉模型仍需检查预览图中的主体、比例、方向、关键部件、重叠/悬空问题。",
-        "若 previews_not_blank 为 false，优先检查视图缩放、模型是否为空、SaveBMP 是否成功。",
-        "若 expected_outputs_exist 为 false，优先检查保存/导出路径和 COM 错误码。",
+        "A human or vision model must still inspect preview images for main body, proportions, orientation, key features, and overlapping or floating parts.",
+        "If previews_not_blank is false, check view zoom, whether the model is empty, and whether SaveBMP succeeded.",
+        "If expected_outputs_exist is false, check save/export paths and COM error codes.",
     ]
 
     report = {
@@ -1238,15 +1238,15 @@ def run_review(model, output_dir, basename="review", views=None, expected_output
 
 def _parse_args():
     """解析命令行参数。"""
-    parser = argparse.ArgumentParser(description="导出 SolidWorks 多视角预览图并生成结构化自审查报告。")
-    parser.add_argument("--file", help="要打开并审查的 SolidWorks 文件；不传则审查当前活动文档。")
-    parser.add_argument("--output-dir", required=True, help="预览图和 review_report.json 输出目录。")
-    parser.add_argument("--basename", default="review", help="输出文件名前缀。")
-    parser.add_argument("--views", default="isometric,front,top,right", help="逗号分隔的视图列表。")
-    parser.add_argument("--expected", action="append", default=[], help="期望存在的输出文件，可重复传入。")
-    parser.add_argument("--version", type=int, help="SolidWorks 年份，例如 2024。")
-    parser.add_argument("--silent-open", action="store_true", help="静默打开 --file。")
-    parser.add_argument("--fail-on-warn", action="store_true", help="warn 也返回非零退出码。")
+    parser = argparse.ArgumentParser(description="Export multi-view SolidWorks previews and generate a structured self-review report.")
+    parser.add_argument("--file", help="SolidWorks file to open and review; omit to review the active document.")
+    parser.add_argument("--output-dir", required=True, help="Output directory for previews and review_report.json.")
+    parser.add_argument("--basename", default="review", help="Output filename prefix.")
+    parser.add_argument("--views", default="isometric,front,top,right", help="Comma-separated list of views.")
+    parser.add_argument("--expected", action="append", default=[], help="Expected output file path (repeatable).")
+    parser.add_argument("--version", type=int, help="SolidWorks release year, e.g. 2024.")
+    parser.add_argument("--silent-open", action="store_true", help="Open --file silently.")
+    parser.add_argument("--fail-on-warn", action="store_true", help="Return non-zero exit code on warn status as well.")
     return parser.parse_args()
 
 
@@ -1268,11 +1268,11 @@ def main():
         expected_outputs=args.expected,
     )
     evaluation = report["evaluation"]
-    print(f"报告: {report_path}")
-    print(f"摘要: {report.get('summary_path')}")
-    print(f"状态: {evaluation['status']} / 分数: {evaluation['score']}")
+    print(f"Report: {report_path}")
+    print(f"Summary: {report.get('summary_path')}")
+    print(f"Status: {evaluation['status']} / Score: {evaluation['score']}")
     if evaluation["issues"]:
-        print("问题:")
+        print("Issues:")
         for issue in evaluation["issues"]:
             print(f"- [{issue['severity']}] {issue['code']}: {issue['message']}")
     if evaluation["status"] == "fail":

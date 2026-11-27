@@ -961,7 +961,7 @@ def build_dfm_report(
         "retryable": False,
         "error_code": None,
         "limitations": [
-            "DFM 规则检查不等于制造认证，必须由工程师结合供应商能力、材料批次、公差和载荷复核。",
+            "DFM rule checks do not replace manufacturing certification; an engineer must review supplier capabilities, material lot, tolerances, and loads.",
         ],
         "profiles": [],
         "effectiveProfileLimits": {},
@@ -1003,7 +1003,7 @@ def build_dfm_report(
                 "status": "blocked",
                 "error_code": "dfm_invalid_profile",
                 "checks": [_check("dfm_profile_validation", "fail", "critical", str(exc))],
-                "limitations": report["limitations"] + ["无效 Profile 未参与 DFM 判断。"],
+                "limitations": report["limitations"] + ["Invalid profile was excluded from DFM evaluation."],
             }
         )
         return report
@@ -1018,7 +1018,7 @@ def build_dfm_report(
                 "status": "blocked",
                 "error_code": "dfm_invalid_brep_evidence",
                 "checks": [_check("dfm_brep_evidence", "fail", "critical", str(exc))],
-                "limitations": report["limitations"] + ["未经验证的 B-Rep 证据未参与 DFM 判断。"],
+                "limitations": report["limitations"] + ["Unverified B-Rep evidence was excluded from DFM evaluation."],
             }
         )
         return report
@@ -1042,7 +1042,7 @@ def build_dfm_report(
         )
         return report
     if brep.get("available"):
-        report["limitations"].append("B-Rep 证据仅覆盖报告中记录的包络/拓扑范围，不等于完整制造认证。")
+        report["limitations"].append("B-Rep evidence covers only the envelope/topology recorded in this report and does not constitute full manufacturing certification.")
     else:
         report["limitations"].append("未提供 B-Rep 证据；包络来自 NeutralCadDocument 参数估算，不能证明 SolidWorks 实体拓扑。")
 
@@ -1091,7 +1091,7 @@ def build_dfm_report(
         report["checks"] = _printing_checks(document, manufacturing_for_checks, brep)
     elif normalized_process == "injection_molding":
         report["checks"] = _injection_molding_checks(document, manufacturing_for_checks, brep)
-        report["limitations"].append("注塑检查基于声明元数据，不自动识别真实拔模、倒扣或模流；阈值来自明确工艺/供应商约束。")
+        report["limitations"].append("Injection molding checks rely on declared metadata and do not automatically detect actual draft, undercuts, or mold flow; thresholds come from explicit process/supplier constraints.")
     report["checks"].extend(_profile_checks(document, manufacturing, normalized_process, effective_limits, brep))
     report["reviewFindings"] = [
         item for item in report["checks"] if item.get("status") in {"warning", "fail"}
@@ -1132,12 +1132,12 @@ def write_dfm_report(
 
 def main(argv: list[str] | None = None) -> int:
     """@brief 命令行入口。"""
-    parser = argparse.ArgumentParser(description="CAD Studio NeutralCadDocument DFM 复核")
+    parser = argparse.ArgumentParser(description="CAD Studio NeutralCadDocument DFM review")
     parser.add_argument("--input", type=Path, required=True, help="NeutralCadDocument .cadstudio.json")
-    parser.add_argument("--output", type=Path, required=True, help="版本化 DFM report JSON 输出路径")
+    parser.add_argument("--output", type=Path, required=True, help="Versioned DFM report JSON output path")
     parser.add_argument("--process", choices=sorted(DFM_PROCESSES | {"auto", "CNC", "FDM", "SLA"}), default="auto")
-    parser.add_argument("--profile", action="append", default=[], help="可重复指定 DFM Profile JSON，按能力交集合并")
-    parser.add_argument("--brep-evidence", type=Path, help="可选 SolidWorks/OCCT B-Rep 证据 JSON")
+    parser.add_argument("--profile", action="append", default=[], help="DFM Profile JSON (repeatable; merged by capability intersection)")
+    parser.add_argument("--brep-evidence", type=Path, help="Optional SolidWorks/OCCT B-Rep evidence JSON")
     args = parser.parse_args(argv)
     result = write_dfm_report(
         args.input,

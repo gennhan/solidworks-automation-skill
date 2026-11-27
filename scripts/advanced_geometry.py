@@ -220,7 +220,7 @@ def geometry_preflight(value: str | Path | dict[str, Any]) -> dict[str, Any]:
         "error_code": "advanced_geometry_backend_unverified" if ocp_available else "advanced_geometry_runtime_missing",
         "planId": plan["planId"], "operationTypes": kinds, "backend": "headless_ocp" if ocp_available else None,
         "geometryProduced": False, "generatedAt": _now_iso(),
-        "limitations": ["结构化计划不是 B-Rep 产物；必须生成、重新打开、检查拓扑/连续性并通过黄金样件后才可宣称几何完成。"],
+        "limitations": ["A structured plan is not a B-Rep artifact; geometry must be generated, reopened, inspected for topology/continuity, and verified against golden samples before claiming completion."],
     }
 
 
@@ -240,7 +240,7 @@ def write_preflight_report(value: str | Path | dict[str, Any], output_path: str 
 
 def main(argv: list[str] | None = None) -> int:
     """@brief 命令行入口。"""
-    parser = argparse.ArgumentParser(description="CAD Studio 复杂曲面/模具中性计划前置检查")
+    parser = argparse.ArgumentParser(description="CAD Studio preflight check for complex surface and mold neutral plans")
     parser.add_argument("--input", type=Path, required=True)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)

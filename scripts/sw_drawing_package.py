@@ -137,7 +137,7 @@ def generate_package(spec_source, output_dir, drawing_filename="drawing.slddrw",
 
 def main(argv=None):
     import argparse
-    parser = argparse.ArgumentParser(description="从结构化 DrawingSpec 自动创建并重开核验原生工程图")
+    parser = argparse.ArgumentParser(description="Create and reopen-verify a native engineering drawing from a structured DrawingSpec")
     parser.add_argument("--spec", required=True)
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--filename", default="drawing.slddrw")

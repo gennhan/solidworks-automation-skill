@@ -139,7 +139,7 @@ def export_assembly_bom_csv(
         "sha256": _sha256(target) if produced else "",
         "produced_this_run": produced,
         "review_required": True,
-        "limitations": ["CSV 为装配组件属性清单，必须与 SolidWorks 原生 BOM 和工程图人工核对"],
+        "limitations": ["CSV is an assembly component property list and must be manually verified against the native SolidWorks BOM and drawings."],
     }
 
 
@@ -602,8 +602,8 @@ def _stage_pack_and_go_dependencies(
         "dependencies": [str(Path(item).expanduser().resolve()) for item in dependencies],
         "files": staged_files,
         "limitations": [
-            "这是基于 SolidWorks GetDependencies2 的本地暂存包，不是原生 IPackAndGo 清单",
-            "外部引用、Toolbox、配置和工程图仍需人工在 SolidWorks 中复核",
+            "This is a local staged package built from SolidWorks GetDependencies2, not a native IPackAndGo manifest.",
+            "External references, Toolbox components, configurations, and drawings still require manual review in SolidWorks.",
         ],
     }
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -1194,7 +1194,7 @@ def pack_and_go(
         error_code = None
         retryable = False
         manual_review_required = True
-        limitations = ["Pack and Go 产物仍需人工抽查外部引用、Toolbox 和工程图"]
+        limitations = ["Pack and Go outputs still require manual spot-checking of external references, Toolbox components, and drawings."]
     elif (missing_dependencies or native_audit["blocking_error_codes"]) and fallback_policy == "stage_dependencies":
         try:
             staged = _stage_pack_and_go_dependencies(
@@ -1215,8 +1215,8 @@ def pack_and_go(
             retryable = True
             manual_review_required = True
             limitations = [
-                "原生 IPackAndGo 未枚举全部依赖；已生成基于 GetDependencies2 的暂存包",
-                "暂存包不是原生 Pack and Go，外部引用、Toolbox、配置和工程图必须人工复核",
+                "Native IPackAndGo did not enumerate all dependencies; generated a staged package from GetDependencies2.",
+                "A staged package is not native Pack and Go; external references, Toolbox components, configurations, and drawings must be manually reviewed.",
             ]
             result = {
                 **result,
@@ -1233,7 +1233,7 @@ def pack_and_go(
             error_code = "SW_PACK_AND_GO_DEPENDENCY_ENUMERATION_INCOMPLETE"
             retryable = True
             manual_review_required = True
-            limitations = ["SolidWorks 原生 Pack and Go 未枚举全部依赖，暂存回退也未完成"]
+            limitations = ["Native SolidWorks Pack and Go did not enumerate all dependencies, and the staged fallback did not complete."]
     elif (missing_dependencies or native_audit["blocking_error_codes"]) and result["status_codes"] and all(code == 0 for code in result["status_codes"]):
         # 严格原生策略：保留证据并阻止误交付。
         status = "blocked"
@@ -1241,7 +1241,7 @@ def pack_and_go(
         error_code = "SW_PACK_AND_GO_DEPENDENCY_ENUMERATION_INCOMPLETE"
         retryable = True
         manual_review_required = True
-        limitations = ["SolidWorks 原生 Pack and Go 未枚举全部依赖；fallback_policy=blocked，未复制补齐"]
+        limitations = ["Native SolidWorks Pack and Go did not enumerate all dependencies; fallback_policy=blocked prevented fallback copying."]
     else:
         if fallback_policy == "stage_dependencies" and (required_dependencies or native_audit["blocking_error_codes"]):
             try:
@@ -1263,8 +1263,8 @@ def pack_and_go(
                 retryable = True
                 manual_review_required = True
                 limitations = [
-                    "原生 Pack and Go 调用失败；已按 GetDependencies2 生成暂存包",
-                    "暂存包不是原生 Pack and Go，必须人工复核",
+                    "Native Pack and Go call failed; generated a staged package from GetDependencies2.",
+                    "A staged package is not native Pack and Go and must be manually reviewed.",
                 ]
                 result = {
                     **result,

@@ -241,7 +241,7 @@ def run_convergence_study(
         "retryable": not converged,
         "error_code": None if converged else "fea_mesh_convergence_not_reached",
         "limitations": [
-            "收敛比较最后两档网格的位移/应力，并在存在时同时比较塑性应变、接触穿透和接触压力；仍需检查奇异点、载荷路径和局部结果。",
+            "Convergence compares displacement/stress across the last two mesh levels and, when present, plastic strain, contact penetration, and contact pressure; singularities, load paths, and local results must still be reviewed.",
         ],
         "generatedAt": _now_iso(),
     }

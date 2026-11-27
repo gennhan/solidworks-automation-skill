@@ -308,19 +308,19 @@ def write_macro_file(code: str, output_path: str) -> str:
 
 def _parse_args():
     """解析命令行参数。"""
-    parser = argparse.ArgumentParser(description="SolidWorks VBA 宏提示词、校验与本地模板工具。")
+    parser = argparse.ArgumentParser(description="SolidWorks VBA macro prompt builder, validator, and local template utility.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    prompt_parser = subparsers.add_parser("prompt", help="按模型族输出提示词。")
-    prompt_parser.add_argument("--model", default="", help="模型名称，如 gpt-4.1、kimi、claude。")
-    prompt_parser.add_argument("request", help="用户建模需求。")
+    prompt_parser = subparsers.add_parser("prompt", help="Output a prompt tailored to the model family.")
+    prompt_parser.add_argument("--model", default="", help="Model name, e.g. gpt-4.1, kimi, claude.")
+    prompt_parser.add_argument("request", help="User modeling request.")
 
-    validate_parser = subparsers.add_parser("validate", help="校验 VBA 文件。")
-    validate_parser.add_argument("file", help="VBA 文件路径。")
+    validate_parser = subparsers.add_parser("validate", help="Validate a VBA file.")
+    validate_parser.add_argument("file", help="Path to the VBA file.")
 
-    template_parser = subparsers.add_parser("template", help="按关键词输出本地模板。")
-    template_parser.add_argument("request", help="用户建模需求。")
-    template_parser.add_argument("--output", help="写入输出文件。")
+    template_parser = subparsers.add_parser("template", help="Output a local macro template by keyword.")
+    template_parser.add_argument("request", help="User modeling request.")
+    template_parser.add_argument("--output", help="Write result to an output file.")
     return parser.parse_args()
 
 
@@ -340,7 +340,7 @@ def main() -> int:
     if args.command == "template":
         code = fallback_macro_for_request(args.request)
         if not code:
-            print("未匹配到本地模板。")
+            print("No matching local template found.")
             return 1
         if args.output:
             path = write_macro_file(code, args.output)

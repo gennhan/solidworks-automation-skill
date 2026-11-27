@@ -843,9 +843,9 @@ def build_drc_report(
             "customRuleCount": len(profile.get("customRules", [])),
         },
         "limitations": [
-            "DRC 只审查中性文档中已提供的证据；缺失的截面按 info 跳过，不代表合格",
-            "报告始终 reviewRequired=true，不得作为无人值守放行依据；风险评分与让步单不替代工程签署",
-            "从活动 SolidWorks 模型抽取快照为 pilot，需真机与工程复核",
+            "DRC only inspects evidence present in the neutral document; missing sections are skipped as info and do not indicate compliance.",
+            "Reports always set reviewRequired=true and must not be used for unattended sign-off; risk scores and waivers do not replace engineering approval.",
+            "Extracting snapshots from an active SolidWorks model is pilot functionality and requires live machine and engineering review.",
         ],
         "generatedAt": _now_iso(),
     }
@@ -916,18 +916,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     """@brief 命令行入口。"""
     import argparse
 
-    parser = argparse.ArgumentParser(description="对 NeutralCadDocument 运行设计规则检查（DRC）。")
-    parser.add_argument("input", nargs="?", help="NeutralCadDocument (.cadstudio.json) 路径。")
-    parser.add_argument("--output", help="DRC 报告 JSON 输出路径。")
-    parser.add_argument("--profile", action="append", default=[], help="DRC Profile JSON 路径，可多次传入。")
-    parser.add_argument("--rule-pack", action="append", default=[], help="行业规则包名（machined_bracket/injection_shell/sheet_metal_panel/drilling_panel），可多次。")
-    parser.add_argument("--baseline", help="上一版 DRC 报告 JSON 路径，用于增量 diff。")
-    parser.add_argument("--waivers", help="让步单 JSON 数组文件（含 fingerprint 或 ruleId、reason、owner、可选 expiresOn）。")
-    parser.add_argument("--as-of", help="让步单过期判定的当前日期 ISO，如 2026-09-08。")
-    parser.add_argument("--fail-on-regression", action="store_true", help="回归门禁：相对 --baseline 风险分变差或新增 critical 时以非零码退出。")
-    parser.add_argument("--regression-tolerance", type=float, default=0.0, help="回归门禁允许的风险分上升容差，默认 0。")
-    parser.add_argument("--list-rules", action="store_true", help="打印内置规则目录与默认阈值后退出。")
-    parser.add_argument("--list-rule-packs", action="store_true", help="打印内置行业规则包后退出。")
+    parser = argparse.ArgumentParser(description="Run Design Rule Checks (DRC) on a NeutralCadDocument.")
+    parser.add_argument("input", nargs="?", help="Path to NeutralCadDocument (.cadstudio.json).")
+    parser.add_argument("--output", help="Output path for the DRC report JSON.")
+    parser.add_argument("--profile", action="append", default=[], help="Path to a DRC Profile JSON (repeatable).")
+    parser.add_argument("--rule-pack", action="append", default=[], help="Industry rule pack name (machined_bracket/injection_shell/sheet_metal_panel/drilling_panel), repeatable.")
+    parser.add_argument("--baseline", help="Previous DRC report JSON path for incremental diff.")
+    parser.add_argument("--waivers", help="Waivers JSON array file (containing fingerprint or ruleId, reason, owner, optional expiresOn).")
+    parser.add_argument("--as-of", help="Current ISO date for waiver expiration checks, e.g. 2026-09-08.")
+    parser.add_argument("--fail-on-regression", action="store_true", help="Regression gate: exit non-zero if risk score worsens or new critical findings appear vs --baseline.")
+    parser.add_argument("--regression-tolerance", type=float, default=0.0, help="Allowed risk score increase tolerance for regression gate (default: 0).")
+    parser.add_argument("--list-rules", action="store_true", help="Print built-in rule catalog and default thresholds, then exit.")
+    parser.add_argument("--list-rule-packs", action="store_true", help="Print built-in industry rule packs, then exit.")
     args = parser.parse_args(argv)
 
     if args.list_rules:

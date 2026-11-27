@@ -313,10 +313,10 @@ def evaluate_drive(spec: Mapping[str, Any], limits: Mapping[str, float] | None =
     return {"result": {k: v for k, v in r.items() if k != "spec"}, "checks": checks,
             "controlling": controlling, "limits": lim, "driveId": tid,
             "reviewRequired": True,
-            "limitations": ["仅为选型初筛，需工程师核对实际负载与电机转矩-转速曲线",
-                            "减速和反向驱动效率未单独建模；峰值及 RMS 转矩满足阈值时仍需复核，不视为通过",
-                            "未建模自锁、丝杠临界转速、皮带张力及寿命",
-                            "未提供转子或传动惯量时，转矩计算可能偏低；驻留假设已声明抱闸投入"]}
+            "limitations": ["Preliminary sizing only; an engineer must verify actual loads against the motor torque-speed curve.",
+                            "Deceleration and back-driving efficiency are not modeled separately; meeting peak and RMS torque thresholds still requires review and is not a pass.",
+                            "Self-locking, leadscrew critical speed, belt tension, and service life are not modeled.",
+                            "Torque may be underestimated when rotor or drivetrain inertia is omitted; dwell assumes the declared brake is engaged."]}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -325,8 +325,8 @@ def main(argv: list[str] | None = None) -> int:
     import json
     from pathlib import Path
 
-    parser = argparse.ArgumentParser(description="电机扭矩核验（选型初筛与审计辅助）。")
-    parser.add_argument("spec", help="drive-spec JSON 路径。")
+    parser = argparse.ArgumentParser(description="Motor torque sizing check (preliminary screening and audit aid).")
+    parser.add_argument("spec", help="Path to drive-spec JSON.")
     args = parser.parse_args(argv)
     out = evaluate_drive(json.loads(Path(args.spec).read_text(encoding="utf-8")))
     print(json.dumps(out, ensure_ascii=False, indent=2))

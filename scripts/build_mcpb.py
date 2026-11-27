@@ -1,4 +1,4 @@
-"""使用发布运行时清单构建 Windows MCP Bundle。"""
+"""Build the Windows MCP Bundle using the release runtime manifest."""
 
 from __future__ import annotations
 

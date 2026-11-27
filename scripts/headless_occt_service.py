@@ -292,7 +292,7 @@ def export_occt(
         "stage": "save",
         "artifacts": artifacts,
         "geometryEvidence": evidence,
-        "limitations": ["FEA、安全认证和制造性结论不由几何写入器提供。"],
+        "limitations": ["FEA, safety certification, and manufacturability conclusions are not provided by the geometry writer."],
         "retryable": False,
     }
 
@@ -304,7 +304,7 @@ def _write_result(path: Path, payload: dict[str, Any]) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     """@brief 独立子进程 CLI 入口。"""
-    parser = argparse.ArgumentParser(description="CAD Studio OCCT/OCP 隔离几何服务")
+    parser = argparse.ArgumentParser(description="CAD Studio isolated OCCT/OCP geometry service")
     parser.add_argument("--input", type=Path, required=True)
     parser.add_argument("--out-dir", type=Path, required=True)
     parser.add_argument("--formats", nargs="+", required=True)

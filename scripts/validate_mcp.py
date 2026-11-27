@@ -169,20 +169,20 @@ async def _main(mode: str) -> int:
     if not SERVER_PATH.exists():
         raise FileNotFoundError(f"找不到 MCP Server: {SERVER_PATH}")
     if mode in ("both", "full"):
-        print("MCP 验证通过: " + await _with_session("full", _check_full))
+        print("MCP validation passed: " + await _with_session("full", _check_full))
     if mode in ("both", "search"):
-        print("MCP 验证通过: " + await _with_session("search", _check_search))
+        print("MCP validation passed: " + await _with_session("search", _check_search))
     return 0
 
 
 if __name__ == "__main__":
     _configure_stdio_utf8()
-    parser = argparse.ArgumentParser(description="校验 SolidWorks MCP 的 tools/list 表面")
+    parser = argparse.ArgumentParser(description="Validate the SolidWorks MCP tools/list surface")
     parser.add_argument("--mode", choices=("both", "full", "search"), default="both",
-                        help="校验哪种模式（默认 both）")
+                        help="Validation mode (default: both)")
     options = parser.parse_args()
     try:
         raise SystemExit(asyncio.run(_main(options.mode)))
     except Exception as exc:
-        print(f"MCP 验证失败: {exc}", file=sys.stderr)
+        print(f"MCP validation failed: {exc}", file=sys.stderr)
         raise SystemExit(1)

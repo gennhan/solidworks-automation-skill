@@ -160,7 +160,7 @@ def dxf_to_preview_scene(source: str | Path, output: str | Path | None = None) -
         "entities": entities,
         "layers": layers,
         "warnings": warnings,
-        "limitations": ["只读 PreviewScene，不修改 DXF", *warnings],
+        "limitations": ["Read-only PreviewScene; DXF source is not modified.", *warnings],
     }
     if output is not None:
         target = Path(output).expanduser().resolve()
@@ -175,7 +175,7 @@ def dxf_to_preview_scene(source: str | Path, output: str | Path | None = None) -
 
 def main(argv: list[str] | None = None) -> int:
     """@brief 命令行入口。"""
-    parser = argparse.ArgumentParser(description="将 DXF 转换为安全 PreviewScene JSON")
+    parser = argparse.ArgumentParser(description="Convert a DXF file into a safe PreviewScene JSON")
     parser.add_argument("source", type=Path)
     parser.add_argument("output", type=Path)
     args = parser.parse_args(argv)

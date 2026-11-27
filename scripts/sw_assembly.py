@@ -187,10 +187,10 @@ def add_component(asm_model, part_path, x=0, y=0, z=0, config_name="", sw=None):
             errors.append("GetActiveObject(SldWorks.Application): 返回 None")
 
     if component:
-        print(f"已添加组件: {component_path}")
+        print(f"Added component: {component_path}")
     else:
-        detail = "；".join(errors) if errors else "AddComponent5/AddComponent4 均返回 None"
-        print(f"添加组件失败: {component_path} ({detail})")
+        detail = "; ".join(errors) if errors else "Both AddComponent5 and AddComponent4 returned None"
+        print(f"Failed to add component: {component_path} ({detail})")
     return component
 
 

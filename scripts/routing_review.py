@@ -434,8 +434,8 @@ def build_routing_report(document: dict[str, Any]) -> dict[str, Any]:
         "retryable": status == "blocked",
         "error_code": "routing_document_invalid" if status == "blocked" else None,
         "limitations": [
-            "中性路线校验不等于 SOLIDWORKS Routing 原生特征。",
-            "碰撞与间隙需要装配体 B-Rep 和真实路由特征回归后才能验收。",
+            "Neutral route validation is not equivalent to native SOLIDWORKS Routing features.",
+            "Interference and clearance require assembly B-Rep and native routing feature regression before acceptance.",
         ],
         "generatedAt": _now_iso(),
     }
@@ -501,7 +501,7 @@ def review_routing_file(input_path: str | Path, output_path: str | Path) -> dict
 
 def main(argv: list[str] | None = None) -> int:
     """@brief 命令行入口。"""
-    parser = argparse.ArgumentParser(description="CAD Studio Routing 中性校验与 SOLIDWORKS 前置探测")
+    parser = argparse.ArgumentParser(description="CAD Studio neutral routing validation and SOLIDWORKS preflight probe")
     parser.add_argument("--preflight", action="store_true")
     parser.add_argument("--input", type=Path)
     parser.add_argument("--output", type=Path)

@@ -95,12 +95,12 @@ def register_tools(mcp, connect, run_locked, response_enum):
 
     @mcp.tool(name='solidworks_inspect_native_geometry',annotations={'readOnlyHint':True,'destructiveHint':False})
     def inspect(params:Target)->str:
-        """读取实体名称、包围盒、体积、错误和组件变换，不保存。"""
+        """Read body names, bounding boxes, volumes, errors, and component transforms without saving."""
         return run(params,'inspect')
 
     @mcp.tool(name='solidworks_build_round_sweeps',annotations={'readOnlyHint':False,'destructiveHint':False})
     def build(params:BuildInput)->str:
-        """创建原生方程路径圆截面扫描及矩形拉伸；严格规格，无任意表达式，不保存。"""
+        """Create native equation-driven round sweeps and rectangular extrusions from a strict spec (no arbitrary expressions); does not save."""
         path=Path(params.spec_path)
         if not path.is_absolute(): raise ValueError('Absolute spec path required')
         spec=BuildSpec.model_validate_json(path.read_text(encoding='utf-8-sig'))
@@ -108,7 +108,7 @@ def register_tools(mcp, connect, run_locked, response_enum):
 
     @mcp.tool(name='solidworks_import_step_part',annotations={'readOnlyHint':False,'destructiveHint':False})
     def import_step(params:ImportInput)->str:
-        """导入 STEP 为新多实体零件，保存到新文件并恢复导入选项；不改源文件。"""
+        """Import a STEP file as a new multibody part, save to a new file, and restore import options without modifying the source."""
         src,dst=Path(params.step_path),Path(params.output_path)
         if not src.is_absolute() or not src.is_file() or src.suffix.lower() not in {'.step','.stp'}: raise ValueError('Existing absolute STEP path required')
         if not dst.is_absolute() or dst.exists() or dst.suffix.lower()!='.sldprt' or not dst.parent.is_dir(): raise ValueError('New absolute SLDPRT path in existing directory required')
@@ -116,13 +116,13 @@ def register_tools(mcp, connect, run_locked, response_enum):
 
     @mcp.tool(name='solidworks_replace_component_preserving_transform',annotations={'readOnlyHint':False,'destructiveHint':False})
     def replace(params:ReplaceInput)->str:
-        """按精确实例名替换一个固定组件，保留变换并校验其余组件；不保存。"""
+        """Replace a fixed component by exact instance name while preserving its transform and verifying remaining components; does not save."""
         path=Path(params.replacement_path)
         if not path.is_absolute() or not path.is_file() or path.suffix.lower() not in {'.sldprt','.sldasm'}: raise ValueError('Existing absolute native component required')
         return run(params,'replace',component_name=params.component_name,replacement_path=str(path),configuration=params.configuration)
 
     @mcp.tool(name='solidworks_exclude_reviewed_bodies',annotations={'readOnlyHint':False,'destructiveHint':False})
     def exclude(params:DeleteInput)->str:
-        """通过原生删除实体特征排除明确指定的实体，保留可编辑历史，不保存。"""
+        """Exclude explicitly named bodies using a native Delete Body feature while preserving editable history; does not save."""
         if len(set(params.body_names))!=len(params.body_names): raise ValueError('Duplicate body name')
         return run(params,'exclude',body_names=params.body_names,feature_name=params.feature_name)

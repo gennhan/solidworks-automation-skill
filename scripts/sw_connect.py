@@ -337,7 +337,7 @@ def connect_solidworks(
         before = solidworks_processes()
         try:
             sw = win32com_client.GetActiveObject(prog_id)
-            print(f"已连接到运行中的 SolidWorks 实例（ProgID: {prog_id}）")
+            print(f"Attached to running SolidWorks instance (ProgID: {prog_id})")
         except Exception as attach_error:
             try:
                 if before is None:
@@ -367,7 +367,7 @@ def connect_solidworks(
                 # visible/UserControl 默认适用于本轮新启动的实例；附着时仅在显式请求时写入。
                 if launched_here:
                     ensure_visible_user_control(sw, visible=bool(visible), user_control=resolved_user_control)
-                print(f"已连接 SolidWorks（ProgID: {prog_id}）")
+                print(f"Connected to SolidWorks (ProgID: {prog_id})")
                 _wait_until_ready(sw, wait_seconds)
             except SolidWorksConnectionError:
                 close_owned_solidworks(sw, launched_here)
@@ -394,12 +394,12 @@ def connect_solidworks(
 
     model = _read_active_document(sw)
     if model:
-        doc_types = {1: "零件", 2: "装配体", 3: "工程图"}
+        doc_types = {1: "Part", 2: "Assembly", 3: "Drawing"}
         doc_type = get_com_member(model, "GetType")
         title = get_com_member(model, "GetTitle")
-        print(f"当前文档: {title} (类型: {doc_types.get(doc_type, '未知')})")
+        print(f"Active document: {title} (type: {doc_types.get(doc_type, 'Unknown')})")
     else:
-        print("当前没有打开的文档")
+        print("No active document open")
 
     metadata = {
         "prog_id": prog_id,
@@ -483,7 +483,7 @@ def ensure_default_templates(sw):
     try:
         sw.SetUserPreferenceToggle(SW_ALWAYS_USE_DEFAULT_TEMPLATES, True)
     except Exception as exc:
-        print(f"提示: 无法设置始终使用默认模板: {exc}")
+        print(f"Note: unable to enable always-use-default-templates: {exc}")
     return templates
 
 
@@ -587,7 +587,7 @@ def new_document(sw, doc_type="part", template_path=None, *, max_documents=None)
             f"请确认模板可用（{template_path}）且未弹出模态对话框阻塞自动化。"
         )
 
-    print(f"已创建新{DOC_TYPE_LABELS.get(doc_type, doc_type)}文档")
+    print(f"Created new {doc_type} document")
     return model
 
 
@@ -620,7 +620,7 @@ def open_document(sw, file_path, read_only=False, silent=False, raise_on_error=F
     except Exception:
         existing_model = None
     if existing_model is not None:
-        print(f"已复用打开文档: {file_path}")
+        print(f"Reusing open document: {file_path}")
         return existing_model
 
     ext = os.path.splitext(file_path)[1].lower()
@@ -635,9 +635,9 @@ def open_document(sw, file_path, read_only=False, silent=False, raise_on_error=F
 
     if ext in foreign_exts:
         if read_only:
-            print("提示: LoadFile4 导入外来 CAD 文件时不支持 read_only，已忽略该参数")
+            print("Note: LoadFile4 does not support read_only for foreign CAD imports; ignoring parameter")
         if silent:
-            print("提示: LoadFile4 导入外来 CAD 文件时不支持 OpenDoc6 silent 选项，已忽略该参数")
+            print("Note: LoadFile4 does not support OpenDoc6 silent mode for foreign CAD imports; ignoring parameter")
         ensure_default_templates(sw)
         import_data = sw.GetImportFileData(file_path)
         if import_data is None:
@@ -680,7 +680,7 @@ def open_document(sw, file_path, read_only=False, silent=False, raise_on_error=F
             if len(values) > 2 and values[2] is not None:
                 warnings.value = int(values[2])
     if model:
-        print(f"已打开: {file_path}")
+        print(f"Opened: {file_path}")
     else:
         message = f"打开失败, 错误码: {errors.value} ({classify_sw_file_load_errors(errors.value)}), 警告码: {warnings.value} ({classify_sw_file_load_warnings(warnings.value)})"
         if raise_on_error:
@@ -716,9 +716,9 @@ def save_document(model, file_path=None, *, zoom_to_fit=True):
     if success:
         if zoom_to_fit:
             zoom_document_to_fit(model)
-        print(f"保存成功: {file_path or get_com_member(model, 'GetPathName')}")
+        print(f"Saved: {file_path or get_com_member(model, 'GetPathName')}")
     else:
-        print(f"保存失败, 错误码: {errors.value}, 警告码: {warnings.value}")
+        print(f"Save failed (error code: {errors.value}, warning code: {warnings.value})")
     return bool(success)
 
 

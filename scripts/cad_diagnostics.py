@@ -48,9 +48,9 @@ def create_diagnostic_bundle(output: Path, *, events: Any = None) -> Path:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="导出脱敏 CAD Studio 诊断包")
+    parser = argparse.ArgumentParser(description="Export a sanitized CAD Studio diagnostic bundle")
     parser.add_argument("--output", type=Path, default=Path.cwd() / "cad-studio-diagnostics.zip")
-    parser.add_argument("--events", type=Path, help="可选的本地事件 JSON，不会包含敏感字段")
+    parser.add_argument("--events", type=Path, help="Optional local events JSON (sensitive fields excluded)")
     args = parser.parse_args(argv)
     events = None
     if args.events and args.events.is_file():

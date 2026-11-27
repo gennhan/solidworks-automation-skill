@@ -446,7 +446,7 @@ def compare_verification(actual: Dict[str, Any], expected: Dict[str, Any]) -> Di
             "expected": list(expected_envelope),
             "actual": None,
             "passed": False,
-            "note": "未能回读包围盒，无法验证尺寸。",
+            "note": "Failed to read back bounding box; cannot verify dimensions.",
         })
 
     if expected.get("hole_count") is not None:
@@ -475,7 +475,7 @@ def compare_verification(actual: Dict[str, Any], expected: Dict[str, Any]) -> Di
         })
 
     if not checks:
-        return {"status": "skipped", "checks": [], "note": "规格未提供 verify 段，跳过几何验证。"}
+        return {"status": "skipped", "checks": [], "note": "No verify section in spec; skipping geometry verification."}
 
     failed = [check for check in checks if not check["passed"]]
     return {

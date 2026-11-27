@@ -990,7 +990,7 @@ class SolidWorksPackAndGoInput(BaseInput):
     overwrite: bool = Field(default=False)
     fallback_policy: Literal["stage_dependencies", "blocked"] = Field(
         default="stage_dependencies",
-        description="原生依赖枚举缺失时生成可审计暂存包，或严格阻断",
+        description="Generate an auditable staged package when native dependency enumeration is incomplete, or strictly block.",
     )
     response_format: ResponseFormat = Field(default=ResponseFormat.JSON, description="Return format.")
 
@@ -1388,8 +1388,8 @@ def _run_locked(operation, response_format: ResponseFormat, load_automation: boo
             ),
             "holder": dict(_lock_state),
             "suggestion": (
-                "检查 SolidWorks 主窗口是否有等待确认的对话框（模板选择/许可证/文件覆盖），"
-                "手动关闭后调用 solidworks_recover 复检；必要时重启 SolidWorks。"
+                "Check the SolidWorks main window for pending confirmation dialogs (template selection, license, or file overwrite), "
+                "close them manually, and call solidworks_recover to recheck; restart SolidWorks if needed."
             ),
         }
         return _result(payload, response_format)
@@ -1848,11 +1848,11 @@ def solidworks_connect(params: SolidWorksConnectInput = SolidWorksConnectInput()
 
 @mcp.tool(
     name="solidworks_lookup_api",
-    title="查证 SolidWorks API 接口",
+    title="Lookup SolidWorks API Reference",
     annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
 )
 async def solidworks_lookup_api(params: SolidWorksApiLookupInput) -> str:
-    """按接口或自然语言任务查证目标版本 API；默认按需配置依赖，可关闭自动安装和联网。"""
+    """Verify target-version SolidWorks APIs by interface or natural-language task; provisions dependencies on demand unless offline or auto_install=false."""
     from scripts.sw_api_lookup import lookup_api, lookup_task
 
     cancelled = threading.Event()
@@ -2045,14 +2045,14 @@ def solidworks_recover(params: SolidWorksRecoverInput = SolidWorksRecoverInput()
         probe["com_detail"] = com_detail
 
         if com_status == "responsive":
-            next_step = "会话正常，可以继续调用建模工具。"
+            next_step = "Session is healthy; you can continue calling modeling tools."
         elif com_status == "locked":
             next_step = (
-                "会话仍被占用。请切到 SolidWorks 窗口手动关闭对话框；若窗口无响应，"
-                "在任务管理器中结束 SolidWorks 进程后重新调用 solidworks_connect。"
+                "Session is still busy. Switch to the SolidWorks window and dismiss any blocking dialog manually; "
+                "if unresponsive, terminate the SolidWorks process in Task Manager and call solidworks_connect again."
             )
         else:
-            next_step = "COM 未恢复，建议重启 SolidWorks 后重新连接。"
+            next_step = "COM did not recover; restart SolidWorks and reconnect."
 
         return {
             "status": com_status,
@@ -3361,7 +3361,7 @@ def _drawing_report_path(output_dir: Path, basename: str) -> Path:
     },
 )
 def solidworks_generate_drawing(params: SolidWorksGenerateDrawingInput) -> str:
-    """按 DrawingSpec 自动创建工程图、原生尺寸/基本尺寸、基准及单框/复合 GD&T（公共基准、投影公差带、轮廓偏置、CZ/SZ），保存重开核验并导出 PDF、预览和审视报告（原生标注限 SW2026，设计公差须明确）。"""
+    """Generate a SolidWorks drawing from DrawingSpec with native/basic dimensions, datums, and single/composite GD&T (common datums, projected tolerance zones, unequally disposed profiles, CZ/SZ), reopen to verify, and export PDF, previews, and a review report (native annotations require SW2026; design tolerances must be explicit)."""
 
     def op():
         return drawing_generate_package(params.spec_path, params.output_dir, params.drawing_filename, overwrite=params.overwrite)
@@ -3380,7 +3380,7 @@ def solidworks_generate_drawing(params: SolidWorksGenerateDrawingInput) -> str:
     },
 )
 def solidworks_review_drawing(params: SolidWorksReviewDrawingInput) -> str:
-    """打开工程图并执行 DrawingSpec、布局、尺寸、孔槽和 PDF 证据审视。"""
+    """Open a drawing and review it against DrawingSpec for layout, dimensions, holes/slots, and PDF evidence."""
 
     def op():
         output_dir = Path(os.path.expandvars(params.output_dir)).expanduser().resolve()
@@ -3420,7 +3420,7 @@ def solidworks_review_drawing(params: SolidWorksReviewDrawingInput) -> str:
     },
 )
 def solidworks_inspect_drawing(params: SolidWorksInspectDrawingInput) -> str:
-    """只读读取工程图页、视图、尺寸、注释和表格结构，并生成预览证据。"""
+    """Inspect drawing sheets, views, dimensions, annotations, and tables in read-only mode and generate preview evidence."""
 
     def op():
         output_dir = Path(os.path.expandvars(params.output_dir)).expanduser().resolve()
@@ -3719,7 +3719,7 @@ mcp._tool_manager = _gate
     annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False},
 )
 def sw_search_tools(query: str, limit: int = 5) -> str:
-    """按中英文 CAD 术语、命令名或别名检索工具，返回少量候选及其副作用等级；不执行任何操作。"""
+    """Search tools by Chinese/English CAD terms, command names, or aliases; returns top candidates with side-effect levels without executing anything."""
     try:
         results = _gate.search(query, limit)
     except ValueError as exc:
@@ -3736,7 +3736,7 @@ def sw_search_tools(query: str, limit: int = 5) -> str:
     annotations={"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False},
 )
 def sw_describe_tool(name: str) -> str:
-    """返回一个工具的完整输入 Schema、副作用等级，以及执行前是否需要人工批准。"""
+    """Return a tool's full input schema, side-effect level, and whether manual approval is required before execution."""
     tool = _gate.describe(name)
     if tool is None:
         raise ToolError(f"未知工具: {name}。先用 sw_search_tools 检索。")
@@ -3750,7 +3750,7 @@ def sw_describe_tool(name: str) -> str:
 )
 async def sw_call_tool(name: str, arguments: Dict[str, Any] | None = None,
                        document_target: Dict[str, Any] | None = None, ctx: Context = None) -> Any:
-    """按名称执行工具；可选提供已保存文档路径和 SolidWorks 进程 ID 以核验目标。"""
+    """Execute a tool by name; optionally provide a saved document path and SolidWorks process ID to verify the target."""
     if name in DISCOVERY_TOOLS:
         raise ToolError("sw_call_tool 不能调用发现入口自身。")
     if _gate.get_tool(name) is None:
@@ -3798,9 +3798,9 @@ def main() -> None:
         default=None,
         help="Bind port for streamable-http (default: 8000)",
     )
-    parser.add_argument("--allow-host", action="append", default=[], help="允许的远端 Host，例如 cad.example:*，可重复")
-    parser.add_argument("--allow-origin", action="append", default=[], help="允许的浏览器 Origin，可重复")
-    parser.add_argument("--output-root", default=os.environ.get("SW_MCP_OUTPUT_ROOT"), help="允许客户端取回的产物目录")
+    parser.add_argument("--allow-host", action="append", default=[], help="Allowed remote Host pattern, e.g. cad.example:* (repeatable)")
+    parser.add_argument("--allow-origin", action="append", default=[], help="Allowed browser Origin (repeatable)")
+    parser.add_argument("--output-root", default=os.environ.get("SW_MCP_OUTPUT_ROOT"), help="Artifact output directory clients are allowed to read")
     args = parser.parse_args()
 
     if sys.stdout is not _MCP_STDOUT:

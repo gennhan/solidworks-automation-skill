@@ -113,7 +113,7 @@ def sync_bundled_skill(root: Path = ROOT, target: Path = BUNDLED_SKILL) -> dict[
 
 def main() -> int:
     """@brief 命令行入口。"""
-    parser = argparse.ArgumentParser(description="同步 CAD Studio 内嵌 Skill")
+    parser = argparse.ArgumentParser(description="Sync bundled CAD Studio skill")
     parser.parse_args()
     print(json.dumps(sync_bundled_skill(), ensure_ascii=False, indent=2))
     return 0

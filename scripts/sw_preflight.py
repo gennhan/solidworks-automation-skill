@@ -247,10 +247,10 @@ def run_preflight(
 
 def _parse_args():
     """解析命令行参数。"""
-    parser = argparse.ArgumentParser(description="SolidWorks 自动化技能运行前自检。")
-    parser.add_argument("--yes", action="store_true", help="检测到缺失依赖时直接授权安装。")
-    parser.add_argument("--no-install", action="store_true", help="检测到缺失依赖时不自动安装。")
-    parser.add_argument("--no-solidworks-check", action="store_true", help="跳过 SolidWorks 安装检测。")
+    parser = argparse.ArgumentParser(description="Preflight check for the SolidWorks automation skill.")
+    parser.add_argument("--yes", action="store_true", help="Automatically install missing dependencies without prompting.")
+    parser.add_argument("--no-install", action="store_true", help="Do not automatically install missing dependencies.")
+    parser.add_argument("--no-solidworks-check", action="store_true", help="Skip SolidWorks installation check.")
     return parser.parse_args()
 
 
@@ -262,9 +262,9 @@ def main() -> int:
         allow_install=allow_install,
         check_solidworks=not args.no_solidworks_check,
     )
-    print("SolidWorks 自动化技能自检通过。")
+    print("SolidWorks automation skill preflight passed.")
     if result.missing_packages:
-        print("已补齐依赖: " + ", ".join(result.missing_packages))
+        print("Installed missing dependencies: " + ", ".join(result.missing_packages))
     return 0
 
 

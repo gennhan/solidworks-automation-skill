@@ -147,7 +147,7 @@ class ToolGate:
         if (self.approval_mode not in _EXTERNAL_APPROVAL_MODES
                 and policy.supports_document_identity(name)):
             view["document_target_required"] = True
-            view["document_target_note"] = "通过 sw_call_tool 提供已保存文档的绝对路径和 SolidWorks 进程 ID。"
+            view["document_target_note"] = "Provide the saved document absolute path and SolidWorks process ID via sw_call_tool."
         if note:
             view["policy_note"] = note
         blocked = self._blocked_reason(name)
@@ -234,7 +234,7 @@ class ToolGate:
         # 转入带外审批，让审批端展示完整参数，而不是静默截断。
         parameters = json.dumps(arguments, ensure_ascii=False, sort_keys=True, default=str)
         if len(parameters) > 4000:
-            logger.warning("审批参数过长，不能通过 elicitation 完整展示")
+            logger.warning("Approval arguments exceed elicitation display limit")
             return False
         targets = policy.targets(arguments)
         message = (
@@ -246,7 +246,7 @@ class ToolGate:
         try:
             result = await context.elicit(message=message, schema=_Confirm)
         except Exception as exc:  # 客户端可能在运行中拒绝交互
-            logger.warning("elicitation 失败: %s", exc)
+            logger.warning("elicitation failed: %s", exc)
             return False
         return result.action == "accept" and bool(result.data.approve)
 

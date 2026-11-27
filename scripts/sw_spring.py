@@ -153,5 +153,5 @@ def create_open_helical_spring(model, spec: OpenHelicalSpringSpec, plane_name: s
                      "actual_volume_mm3": volume, "actual_extreme_bounds_mm": actual_bounds,
                      "helix_feature": helixes[0]["name"], "helix_readback": helix_data,
                      "sweep_feature": str(get_com_member(feature, "Name")), "sketch_quality": sketch_quality,
-                     "limitations": ["开放端、等螺距，端圈未并紧或磨平", "中心线高度不等于实体自由高度",
-                                     "未验证材料、刚度、疲劳、压并高度或制造标准", "只验证有限尺寸与 SW2026 示例"]}
+                     "limitations": ["Open-end, constant-pitch helix; end coils are not closed or ground.", "Centerline height does not equal solid free length.",
+                                     "Material, stiffness, fatigue, solid height, and manufacturing standards are not verified.", "Verified only on limited sizes and SW2026 examples."]}

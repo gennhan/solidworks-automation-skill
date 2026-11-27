@@ -558,15 +558,15 @@ def lookup_task(task: str, version: int | None = None, *, process_id: int | None
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="只读查询目标 SolidWorks 版本的 API 接口")
-    parser.add_argument("interface", nargs="?", help="例如 ISketchManager")
-    parser.add_argument("member", nargs="?", help="例如 CreateCircleByRadius")
-    parser.add_argument("--task", help="根据自然语言识别候选，最多查询两个；任务全文不会发送到在线查证服务")
-    parser.add_argument("--version", type=int, help="目标 SolidWorks 年份")
-    parser.add_argument("--process-id", type=int, help="目标运行实例 PID")
-    parser.add_argument("--offline", action="store_true", help="不访问网络，使用本地资料及历史缓存")
-    parser.add_argument("--no-parallel", action="store_true", help="仅访问官方网页，不使用 Parallel 备用服务")
-    parser.add_argument("--no-auto-install", action="store_true", help="不自动安装依赖或恢复本地帮助")
+    parser = argparse.ArgumentParser(description="Read-only lookup of SolidWorks API interfaces for a target version")
+    parser.add_argument("interface", nargs="?", help="Interface name, e.g. ISketchManager")
+    parser.add_argument("member", nargs="?", help="Member name, e.g. CreateCircleByRadius")
+    parser.add_argument("--task", help="Identify up to two candidate APIs from natural language; full task text is never sent to online lookup services")
+    parser.add_argument("--version", type=int, help="Target SolidWorks release year")
+    parser.add_argument("--process-id", type=int, help="Target running SolidWorks process ID")
+    parser.add_argument("--offline", action="store_true", help="Do not access the network; use local docs and cached history")
+    parser.add_argument("--no-parallel", action="store_true", help="Query official web docs only; disable Parallel fallback")
+    parser.add_argument("--no-auto-install", action="store_true", help="Do not automatically install dependencies or restore local API help")
     args = parser.parse_args()
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
