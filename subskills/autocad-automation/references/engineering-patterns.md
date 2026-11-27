@@ -24,12 +24,12 @@
 - For dense holes or slots, prefer a hole table, slot table, or hole/slot schedule; every table entry must tie back to datum dimensions in the views rather than merely stating "see drawing" or quantity only.
 - Leaders are for brief callouts only, never substitutes for critical dimensions. Leaders must not cross other views, holes, centerlines, dimension text, or the title block.
 
-## Chinese Mechanical Drafting Convention Checklist
+## Mechanical Drafting Convention Checklist (TCVN/ISO Default; GB/T Reference Only)
 
-When the user requests GB/T style, strict standards, or Chinese mechanical drafting conventions, check at least the following:
+By default (including when the user requests strict standards or standard mechanical drawings), load `references/tcvn_mechanical.md` (from the root skill directory) and follow the **TCVN/ISO** baseline (`ISO` drafting standard, `MMGS`, First-Angle projection). Treat `GB/T`, `GB`, and `JB/T` conventions below as **reference only** unless the user explicitly requests Chinese mechanical drafting / GB/T style:
 
-- Sheet size and border: A3 landscape typically uses `420×297`, left binding margin `25`, other margins `5`; title block in the lower-right corner, typically `180` wide.
-- Fonts and text: Prefer FangSong (仿宋) for Chinese text; do not mix arbitrary fonts across technical notes, title block, view labels, and hole/slot tables.
+- Sheet size and border: Under TCVN/ISO (`TCVN 7285:2003` / `ISO 5457`), A3 landscape (`420×297`) uses a `20 mm` left binding margin and `10 mm` top/bottom/right margins with a lower-right title block (max width `180 mm`). (GB/T reference only, when explicitly requested: left margin `25`, other margins `5`.)
+- Fonts and text: Under TCVN/ISO, use Unicode-safe technical fonts (`ISOCPEUR`, `Arial`, or company template font); prefer FangSong (仿宋) only when Chinese GB/T text is explicitly requested. Do not mix arbitrary fonts across technical notes, title block, view labels, and hole/slot tables.
 - Layers and linetypes: Separate thick solid lines, thin solid lines, centerlines, hidden lines, dimensions, text, borders, and cutouts/sections onto distinct layers; centerlines and hidden lines must not be drawn as plain continuous lines.
 - Dimension entities: Linear dimensions must use real AutoCAD dimension entities such as `AcDbRotatedDimension`; do not fake dimensions with plain lines and text.
 - Cutout deliverables: 3D-printed enclosures must clearly specify overall dimensions, wall/base thickness, screen cutout, port cutouts, spigots, ventilation slots, and screw hole/boss sizes and locations.

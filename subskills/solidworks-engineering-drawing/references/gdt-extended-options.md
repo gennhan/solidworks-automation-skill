@@ -1,7 +1,7 @@
 # SW2026 Extended GD&T Structured Inputs
 
 See [native-gdt.md](native-gdt.md) for entry points, source-file protection, and save-and-reopen rules. The fields documented here apply to both drawing-copy plans and `professionalAnnotations.geometricTolerances` in `DrawingSpec`, executed through the existing `solidworks_generate_drawing` MCP tool without adding new tools.
-Legacy single-frame fields and plain-letter datum lists remain backward-compatible. Numeric examples are for API regression only and must not be used directly as production tolerances. Whenever the user requests TCVN or Vietnamese mechanical standards, load `references/tcvn_mechanical.md` (from the root skill directory) and use the ISO symbol library (`symbolLibrary: "iso"`) under the ISO Independency Principle.
+Legacy single-frame fields and plain-letter datum lists remain backward-compatible. Numeric examples are for API regression only and must not be used directly as production tolerances. By default, always load `references/tcvn_mechanical.md` (from the root skill directory) and use the ISO symbol library (`symbolLibrary: "iso"`) under the TCVN/ISO Independency Principle; treat `gb` (`GB/T`) as reference only unless explicitly requested by the user.
 
 ## Common Datums and Datum Sub-Groups
 
@@ -46,7 +46,7 @@ Do not supply both `frames` and top-level single-frame `options`.
 | `maxTolerance` | `{"value":"0.5","diameter":true}`; maximum tolerance must not be smaller than the primary tolerance. |
 | `reciprocity` | Reciprocity requirement toggle; when enabled, the tolerance itself must also declare `materialCondition:"M"` or `"L"`. |
 | `freeState` / `statistical` | Free-state and statistical tolerance flags for the tolerance value itself, expressed separately from datum-member `freeState`. |
-| `symbolLibrary` | `iso` / `asme` / `gb`, mapping to `IGTOL` / `GTOL` / `GGTOL` respectively. Defaults to the legacy ISO library; composite frames cannot change symbol library. |
+| `symbolLibrary` | `iso` / `asme` / `gb`, mapping to `IGTOL` / `GTOL` / `GGTOL` respectively. Defaults to `iso` (TCVN/ISO baseline; `gb` is reference only unless explicitly requested); composite frames cannot change symbol library. |
 | `associatedFeature` | `Minimax` / `LeastSquares` / `MinimumCircumscribed` / `Tangent` / `MaximumInscribed`. |
 | `derivedFeature` | Toggle for derived feature of size. |
 | `associatedCharacteristic` | `C` / `CE` / `CI` / `G` / `GE` / `GI` / `X` / `N`. |

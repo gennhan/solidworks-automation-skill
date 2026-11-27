@@ -2,7 +2,7 @@
 
 `drilling_panel_gdt.py` detects hole-pattern arrays on a panel, computes a candidate coordinate table, and proposes a datum scheme. The output is a **candidate proposal** for design-engineer review and does not automatically deliver a released Engineering Drawing. It references community contribution [PR #36](https://github.com/wzyn20051216/solidworks-automation-skill/pull/36).
 
-By default, it does not guess hole functions or generate position tolerances, flatness, or material condition modifiers. When GD&T candidates are required, an engineer must explicitly supply a `--gdt-profile` JSON containing `positionToleranceMm`, `dowelPositionToleranceMm`, `flatnessMm`, `materialCondition`, and `datumRefs`. Computed results still require human review and cannot replace design inputs or standards-compliance sign-off.
+By default, it does not guess hole functions or generate position tolerances, flatness, or material condition modifiers. When GD&T candidates are required, an engineer must explicitly supply a `--gdt-profile` JSON containing `positionToleranceMm`, `dowelPositionToleranceMm`, `flatnessMm`, `materialCondition`, and `datumRefs`. Default strictly to TCVN/ISO (`ISO` drafting standard, `MMGS`, First-Angle Projection) and load `references/tcvn_mechanical.md` (from the root skill directory) before finalizing any GD&T or drawing specifications. Computed results still require human review and cannot replace design inputs or standards-compliance sign-off.
 
 The legacy helper `default_gdt_profile()` returns only an example tagged with `_exampleOnly`; it cannot be used directly for candidate generation—actual tolerances must come from engineering design inputs.
 

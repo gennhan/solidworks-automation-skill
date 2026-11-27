@@ -28,7 +28,7 @@ python scripts/sw_gdt_copy.py --source C:\work\plate.slddrw --plan C:\work\gdt-p
 
 The plan contains `schemaVersion="1.0"`, source SHA-256, actual `sheet`, `paperSize="A3"`, `datums`, and `geometricTolerances` arrays. Each entry requires a unique `id` and actual `view`.
 
-- Datum: `label`, `displayStyle="square"` or `"round_gb"`, `positionMm`, and an unambiguous edge `target`.
+- Datum: `label`, `displayStyle="square"` (default for TCVN/ISO) or `"round_gb"` (GB/T reference only when explicitly requested), `positionMm`, and an unambiguous edge `target`.
 - Tolerance: `characteristic`, positive decimal string `tolerance` (mm), boolean `diameter`, explicitly ordered `datums`, and `target`.
 - Optional `materialCondition`: `null`, `"M"`, `"L"`, or `"S"`; currently enabled only for cylindrical position and axis straightness tolerances.
 - Edge targets require `positionMm`; dimension targets are auto-anchored by SolidWorks and must not also specify a position.
@@ -42,7 +42,7 @@ Supports 1..8 stacked independent frames and composite frames. When using the `f
 The first layer must retain its characteristic symbol; subsequent composite layers share the same characteristic and tolerance-zone type with non-increasing tolerance values, may retain only a prefix of the previous layer's datums and modifiers in order, and may omit datums.
 Datum references accept both `"A"` and `{ "label": "A", "materialCondition": "M" }` (`M`/`L`/`S`/`null`), independent of the tolerance value's own `materialCondition`. Whether a modifier is valid for the referenced feature of size must still be confirmed by the designer.
 For common datums/datum sub-groups, projected tolerance zones, profile offsets, CZ/SZ, unit zones/maximum tolerances, reciprocity, and other frame modifiers, use the structured inputs in [gdt-extended-options.md](gdt-extended-options.md); arbitrary XML is rejected.
-Whenever the user requests TCVN or Vietnamese mechanical standards, also load `references/tcvn_mechanical.md` (from the root skill directory) for ISO-harmonized GD&T (`TCVN 5906`/`5907`), surface roughness, and welding symbol rules.
+By default, always load `references/tcvn_mechanical.md` (from the root skill directory) before configuring or checking GD&T (`TCVN 5906`/`5907` / ISO), surface roughness, or welding symbols; treat `GB/T` conventions as reference only unless explicitly requested by the user.
 
 ## Automated Drawing Generation from 3D Models
 

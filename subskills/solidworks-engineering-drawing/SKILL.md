@@ -11,15 +11,14 @@ This subskill focuses on 2D Engineering Drawings. It depends on the root `solidw
 ## When to Invoke
 
 - Generating Part Drawings or Assembly Drawings.
-- Requiring GB/T sheet formats, first-angle projection, dimension chains, hole tables, BOMs, or title blocks.
+- Requiring TCVN/ISO sheet formats (or GB/T as reference only when explicitly requested), first-angle projection, dimension chains, hole tables, BOMs, or title blocks.
 - Checking drawing view overlaps, dimension text, PDF text, title-block intrusion, or delivery evidence.
 - Reviewing flat-pattern evidence for sheet-metal tasks.
 
 ## Default Rules
 
-- `standard=GB_T` defaults to `projection=first_angle`.
-- GB/T combined with third-angle projection is blocked by `DrawingSpec` preflight validation.
-- Whenever the user requests TCVN or Vietnamese mechanical standards (drawings, limits/fits, GD&T, surface roughness, or welding), load `references/tcvn_mechanical.md` (from the root skill directory) and apply its ISO-harmonized, MMGS, First-Angle baseline.
+- Default strictly to **TCVN/ISO** (`ISO` drafting standard, `MMGS` units, `projection=first_angle`): always load `references/tcvn_mechanical.md` (from the root skill directory) before creating, configuring, or checking any 2D drawing, limit/fit, GD&T, surface roughness, or weldment. Never guess undocumented TCVN codes; fall back to the harmonized `ISO` equivalent and flag it for user verification.
+- Treat `GB/T` (`standard=GB_T`) conventions in this subskill as **reference only** unless explicitly requested by the user. When explicitly requested, `standard=GB_T` defaults to `projection=first_angle`, and GB/T combined with third-angle projection is blocked by `DrawingSpec` preflight validation.
 - Every hole, slot, and port must include specification, quantity, and locating information.
 - Drawing delivery must export a PDF and correlate every COM dimension location one-to-one with vector text bounding boxes in the final PDF; missing PDFs, missing parsers, incomplete correlation, or text collisions block release or trigger mandatory review.
 - This subskill does not implement reinforcement learning and never exposes arbitrary Python/VBA execution entry points.

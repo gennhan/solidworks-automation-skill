@@ -60,7 +60,7 @@ Acceptance gate: Parameter evidence matches measured B-Rep depths; flat-bottom h
 
 ## P4: Engineering Drawings, PMI & CAM Evidence
 
-- Automatically generate and read back GB/ISO-style threaded-hole callouts containing size, tolerance class, depth, quantity, and locating dimensions.
+- Automatically generate and read back TCVN/ISO-style threaded-hole callouts (with GB/T as reference only when explicitly requested; see `references/tcvn_mechanical.md` in the root skill directory) containing size, tolerance class, depth, quantity, and locating dimensions.
 - Integrate with `solidworks-engineering-drawing` hole tables / hole-slot schedules, ensuring three-way consistency across model properties, drawing text, and B-Rep evidence.
 - Perform separate capability probing for STEP AP242/PMI and CAM feature recognition; the presence of thread geometry in a plain STEP file does not imply CAM will automatically recognize tapping operations.
 

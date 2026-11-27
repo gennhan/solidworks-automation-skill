@@ -23,7 +23,7 @@ This case study demonstrates the end-to-end "code-driven SolidWorks → native D
 Described using `schemas/drawing_spec.schema.json`:
 
 - Source `.sldprt` / `.sldasm` / sheet-metal model
-- GB/T or ISO standard, sheet size, and projection method
+- TCVN/ISO drafting standard by default (see `references/tcvn_mechanical.md` in the root skill directory; `GB/T` is reference only unless explicitly requested), sheet size, and projection method (First-Angle by default)
 - Views, scale, section views, and detail views
 - Required dimensions and hole/slot specifications, quantities, and locations
 - Title block, technical notes, BOM, and delivery outputs
