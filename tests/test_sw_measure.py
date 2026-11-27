@@ -152,7 +152,7 @@ def test_bounding_box_short_array_reports_error():
     result = sw_measure.collect_bounding_box(FakeModel(box_m=[0.0, 0.0, 0.0]))
 
     assert result["size_mm"] is None
-    assert any("6 个坐标" in item for item in result["errors"])
+    assert any("6 coordinates" in item for item in result["errors"])
 
 
 # ------------------------------------------------------------ 质量属性
@@ -180,7 +180,7 @@ def test_mass_properties_warns_when_material_missing():
 
     assert result["material_assigned"] is False
     assert result["errors"] == []
-    assert any("未分配材料" in item for item in result["warnings"])
+    assert any("No material assigned" in item for item in result["warnings"])
 
 
 def test_missing_status_member_is_not_an_error():
@@ -239,7 +239,7 @@ def test_density_mismatch_is_flagged():
 
     result = sw_measure.collect_mass_properties(model, density_kg_m3=7850.0)
 
-    assert any("密度设置可能未生效" in item for item in result["errors"])
+    assert any("Density override may not have taken effect" in item for item in result["errors"])
 
 
 def test_mass_property_creation_failure_is_reported():
@@ -256,7 +256,7 @@ def test_mass_property_creation_failure_is_reported():
     result = sw_measure.collect_mass_properties(BrokenModel())
 
     assert result["mass_g"] is None
-    assert any("质量属性对象失败" in item for item in result["errors"])
+    assert any("create mass property object" in item for item in result["errors"])
 
 
 # ------------------------------------------------------------ 干涉检查

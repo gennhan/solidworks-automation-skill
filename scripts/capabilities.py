@@ -31,40 +31,40 @@ def load_capabilities(path: str | Path | None = None) -> dict[str, Any]:
     source = manifest_path(path)
     payload = json.loads(source.read_text(encoding="utf-8"))
     if not isinstance(payload, dict) or not isinstance(payload.get("capabilities"), list):
-        raise ValueError(f"能力清单格式无效: {source}")
+        raise ValueError(f"Invalid capability manifest format: {source}")
     for item in payload["capabilities"]:
         if not isinstance(item, dict) or not item.get("id") or item.get("level") not in VALID_LEVELS:
-            raise ValueError(f"能力清单条目无效: {item!r}")
+            raise ValueError(f"Invalid capability manifest entry: {item!r}")
     backends = payload.get("backend_catalog", {})
     routes = payload.get("operation_routes", [])
     if not isinstance(backends, dict) or not all(isinstance(item, dict) for item in backends.values()):
-        raise ValueError("backend_catalog 必须是对象映射")
+        raise ValueError("backend_catalog must be an object mapping")
     if not isinstance(routes, list):
-        raise ValueError("operation_routes 必须是数组")
+        raise ValueError("operation_routes must be a list")
     route_ids: set[str] = set()
     capability_ids = {str(item["id"]) for item in payload["capabilities"]}
     for route in routes:
         if not isinstance(route, dict) or not route.get("id") or route["id"] in route_ids:
-            raise ValueError(f"操作路由 ID 无效或重复: {route!r}")
+            raise ValueError(f"Invalid or duplicate operation route ID: {route!r}")
         route_ids.add(str(route["id"]))
         unknown_capabilities = set(route.get("capability_ids", [])) - capability_ids
         if unknown_capabilities:
-            raise ValueError(f"路由 {route['id']} 引用了未知能力: {sorted(unknown_capabilities)}")
+            raise ValueError(f"Route {route['id']} references unknown capabilities: {sorted(unknown_capabilities)}")
         candidates = route.get("candidates", [])
         if not isinstance(candidates, list):
-            raise ValueError(f"路由 {route['id']} 的 candidates 必须是数组")
+            raise ValueError(f"Route {route['id']} candidates must be a list")
         for candidate in candidates:
             backend_id = candidate.get("backend") if isinstance(candidate, dict) else None
             semantics = candidate.get("semantics") if isinstance(candidate, dict) else None
             if backend_id not in backends:
-                raise ValueError(f"路由 {route['id']} 引用了未知后端: {backend_id!r}")
+                raise ValueError(f"Route {route['id']} references unknown backend: {backend_id!r}")
             if semantics not in VALID_ROUTE_SEMANTICS:
-                raise ValueError(f"路由 {route['id']} 的语义类型无效: {semantics!r}")
+                raise ValueError(f"Route {route['id']} has invalid semantics type: {semantics!r}")
             if not isinstance(candidate.get("priority"), int):
-                raise ValueError(f"路由 {route['id']} 的优先级必须是整数")
+                raise ValueError(f"Route {route['id']} priority must be an integer")
         unknown_diagnostics = set(route.get("diagnostic_backends", [])) - set(backends)
         if unknown_diagnostics:
-            raise ValueError(f"路由 {route['id']} 引用了未知诊断后端: {sorted(unknown_diagnostics)}")
+            raise ValueError(f"Route {route['id']} references unknown diagnostic backends: {sorted(unknown_diagnostics)}")
     return payload
 
 
@@ -108,7 +108,7 @@ def resolve_operation_backend(
             "status": "blocked",
             "operation_id": operation_id,
             "error_code": "UNKNOWN_OPERATION_ROUTE",
-            "reason": "能力矩阵中不存在该原子操作路由",
+            "reason": "Operation route does not exist in capability matrix",
         }
 
     revision = str(solidworks_revision or "").strip()
@@ -133,7 +133,7 @@ def resolve_operation_backend(
             "status": "blocked",
             "operation_id": operation_id,
             "error_code": "MISSING_RUNTIME_REQUIREMENT",
-            "reason": "缺少与编程语言无关的运行条件，切换语言不能解除阻塞",
+            "reason": "Missing language-independent runtime prerequisites; switching languages cannot unblock this operation",
             "missing_requirements": missing_requirements,
             "review_required": True,
         }
@@ -144,7 +144,7 @@ def resolve_operation_backend(
             "status": "blocked",
             "operation_id": operation_id,
             "error_code": "NO_LANGUAGE_SUBSTITUTION",
-            "reason": str(route.get("blocked_reason") or "该操作没有可用执行后端"),
+            "reason": str(route.get("blocked_reason") or "No execution backend is available for this operation"),
             "review_required": bool(route.get("review_required", True)),
         }
 
@@ -157,14 +157,14 @@ def resolve_operation_backend(
             considered.append({
                 "backend": backend_id,
                 "accepted": False,
-                "reason": "调用者要求原始接口语义，不能使用 Automation 等价接口",
+                "reason": "Caller requires exact interface semantics; Automation-equivalent interface cannot be used",
             })
             continue
         if backend_id not in available:
-            considered.append({"backend": backend_id, "accepted": False, "reason": "运行时不可用"})
+            considered.append({"backend": backend_id, "accepted": False, "reason": "Runtime unavailable"})
             continue
         backend = backends[backend_id]
-        considered.append({"backend": backend_id, "accepted": True, "reason": "按优先级选中"})
+        considered.append({"backend": backend_id, "accepted": True, "reason": "Selected by priority"})
         return {
             "status": "ready",
             "operation_id": operation_id,
@@ -182,7 +182,7 @@ def resolve_operation_backend(
         "status": "unavailable",
         "operation_id": operation_id,
         "error_code": "NO_COMPATIBLE_BACKEND_AVAILABLE",
-        "reason": "已知后端均不可用或不满足请求的接口语义",
+        "reason": "No known backend is available or satisfies the requested interface semantics",
         "exact_api_requested": exact_api,
         "considered": considered,
         "diagnostic_backends": list(route.get("diagnostic_backends", [])),

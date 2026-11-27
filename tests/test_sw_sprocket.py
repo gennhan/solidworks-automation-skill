@@ -27,7 +27,7 @@ SPEC = sw_sprocket.SprocketSpec(12.7, 7.92, 17, 6, 10)
 
 def test_rejects_existing_solid_before_modifying_document():
     model = Model(existing=True)
-    with pytest.raises(ValueError, match="无实体"):
+    with pytest.raises(ValueError, match="no solid bodies"):
         sw_sprocket.create_approximate_sprocket(model, SPEC)
     assert model.SketchManager.AddToDB is False
 
@@ -63,6 +63,6 @@ def test_failed_line_restores_sketch_settings(monkeypatch):
         yield "profile"
     monkeypatch.setattr(sw_part, "sketch", sketch)
     monkeypatch.setattr(sw_part, "sketch_line", lambda *_: None)
-    with pytest.raises(RuntimeError, match="轮廓线段"):
+    with pytest.raises(RuntimeError, match="profile segment"):
         sw_sprocket.create_approximate_sprocket(model, SPEC)
     assert model.SketchManager.AddToDB is False and model.SketchManager.DisplayWhenAdded is True

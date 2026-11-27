@@ -88,18 +88,18 @@ def check_required_files():
     """检查必需文件是否存在。"""
     missing = [path for path in REQUIRED_FILES if not (ROOT / path).exists()]
     if missing:
-        raise AssertionError("缺少必需文件: " + ", ".join(missing))
+        raise AssertionError("Missing required files: " + ", ".join(missing))
 
 
 def check_skill_frontmatter():
     """检查 SKILL.md 的基础 frontmatter。"""
     text = (ROOT / "SKILL.md").read_text(encoding="utf-8")
     if not text.startswith("---\n"):
-        raise AssertionError("SKILL.md 必须以 YAML frontmatter 开头")
+        raise AssertionError("SKILL.md must start with YAML frontmatter")
     if "name: solidworks-automation" not in text:
-        raise AssertionError("SKILL.md 缺少正确的 name")
+        raise AssertionError("SKILL.md is missing the expected name")
     if "description:" not in text:
-        raise AssertionError("SKILL.md 缺少 description")
+        raise AssertionError("SKILL.md is missing description")
 
 
 def check_python_syntax():
@@ -139,17 +139,17 @@ def check_json_files():
     #        tests/evals/baseline.json 的 workflow_count，否则视为未同步的变更。
     entries = workflows.get("workflows", [])
     if not entries:
-        raise AssertionError("黄金工作流清单不能为空")
+        raise AssertionError("Golden workflows manifest cannot be empty")
     identifiers = [str(item.get("id") or "").strip() for item in entries]
     if any(not identifier for identifier in identifiers):
-        raise AssertionError("黄金工作流 id 必须非空")
+        raise AssertionError("Golden workflow id cannot be empty")
     if len(set(identifiers)) != len(identifiers):
-        raise AssertionError("黄金工作流 id 必须唯一")
+        raise AssertionError("Golden workflow ids must be unique")
     baseline = json.loads((ROOT / "tests/evals/baseline.json").read_text(encoding="utf-8"))
     declared = baseline.get("workflow_count")
     if declared != len(entries):
         raise AssertionError(
-            f"黄金工作流数量({len(entries)})与 tests/evals/baseline.json 的 workflow_count({declared})不一致"
+            f"Golden workflow count ({len(entries)}) does not match workflow_count ({declared}) in tests/evals/baseline.json"
         )
     return len(targets)
 

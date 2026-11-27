@@ -69,27 +69,27 @@ def _identifier(value: Any, field: str) -> str:
     """@brief 验证稳定且不会进入文件名注入的标识符。"""
     token = str(value or "")
     if not _ID.fullmatch(token):
-        raise ValueError(f"{field} 只能使用字母开头的 1-64 位字母、数字或下划线。")
+        raise ValueError(f"{field} must be 1-64 letters, digits, or underscores starting with a letter.")
     return token
 
 
 def _finite(value: Any, field: str, *, positive: bool = False, maximum: float | None = None) -> float:
     """@brief 校验有限数值、正数约束和可选上限。"""
     if isinstance(value, bool):
-        raise ValueError(f"{field} 必须是有限数值。")
+        raise ValueError(f"{field} must be a finite number.")
     try:
         number = float(value)
     except (TypeError, ValueError) as exc:
-        raise ValueError(f"{field} 必须是有限数值。") from exc
+        raise ValueError(f"{field} must be a finite number.") from exc
     if not math.isfinite(number) or (positive and number <= 0) or (maximum is not None and number > maximum):
-        raise ValueError(f"{field} 超出允许范围。")
+        raise ValueError(f"{field} is out of allowed range.")
     return number
 
 
 def _point2(value: Any, field: str) -> list[float]:
     """@brief 校验二维点。"""
     if not isinstance(value, list) or len(value) != 2:
-        raise ValueError(f"{field} 必须是两个有限数值。")
+        raise ValueError(f"{field} must be two finite numbers.")
     return [_finite(value[0], f"{field}[0]"), _finite(value[1], f"{field}[1]")]
 
 
@@ -122,10 +122,10 @@ def _validate_simple_polygon(points: list[list[float]], field: str) -> float:
                 continue
             c, d = points[second], points[(second + 1) % count]
             if _segments_intersect(a, b, c, d):
-                raise ValueError(f"{field} 包含自交或非相邻边接触。")
+                raise ValueError(f"{field} contains self-intersection or touching non-adjacent edges.")
     area2 = sum(points[i][0] * points[(i + 1) % len(points)][1] - points[(i + 1) % len(points)][0] * points[i][1] for i in range(len(points)))
     if abs(area2) <= 1e-9:
-        raise ValueError(f"{field} 形成退化多边形。")
+        raise ValueError(f"{field} forms a degenerate polygon.")
     return area2
 
 
@@ -135,12 +135,12 @@ def _load_request(value: str | Path | dict[str, Any]) -> dict[str, Any]:
         return dict(value)
     path = Path(value).expanduser().resolve()
     if path.suffix.lower() != ".json" or not path.is_file():
-        raise ValueError("OCP Loft 请求必须是存在的 JSON 文件。")
+        raise ValueError("OCP Loft request must be an existing JSON file.")
     if path.stat().st_size > 1024 * 1024:
-        raise ValueError("OCP Loft 请求超过 1 MiB 安全上限。")
+        raise ValueError("OCP Loft request exceeds 1 MiB safety limit.")
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
-        raise ValueError("OCP Loft 请求必须是 JSON object。")
+        raise ValueError("OCP Loft request must be a JSON object.")
     return payload
 
 
@@ -149,23 +149,23 @@ def validate_ocp_loft_request(value: str | Path | dict[str, Any]) -> dict[str, A
     request = _load_request(value)
     unknown = set(request) - _TOP_FIELDS
     if unknown:
-        raise ValueError(f"请求含未允许字段: {', '.join(sorted(unknown))}")
+        raise ValueError(f"Request contains disallowed fields: {', '.join(sorted(unknown))}")
     if request.get("schemaVersion") != "1.0" or request.get("units") != "mm" or request.get("operation") != "loft":
-        raise ValueError("schemaVersion/units/operation 必须分别为 1.0/mm/loft。")
+        raise ValueError("schemaVersion/units/operation must be 1.0/mm/loft respectively.")
     _identifier(request.get("modelId"), "modelId")
     if request.get("solid") is not True:
-        raise ValueError("黄金后端当前只允许 solid=true 的封闭实体 Loft。")
+        raise ValueError("Golden backend currently allows only closed solid Lofts with solid=true.")
     if request.get("ruled") is not True:
-        raise ValueError("黄金后端当前只允许 ruled=true；平滑 Loft 尚未通过鼓包和连续性验证。")
+        raise ValueError("Golden backend currently allows only ruled=true; smooth Loft has not passed bulge and continuity validation.")
     _finite(request.get("toleranceMm"), "toleranceMm", positive=True, maximum=0.1)
     outputs = request.get("outputs")
     if not isinstance(outputs, list) or not outputs or len(outputs) != len(set(outputs)) or any(item not in _OUTPUTS for item in outputs):
-        raise ValueError("outputs 必须是无重复的 step/brep/stl 白名单数组。")
+        raise ValueError("outputs must be a deduplicated whitelist array of step/brep/stl.")
     if not {"step", "brep"}.intersection(outputs):
-        raise ValueError("outputs 至少包含 step 或 brep，以便执行持久化 B-Rep 重开验收。")
+        raise ValueError("outputs must include at least step or brep for persistent B-Rep reopen verification.")
     sections = request.get("sections")
     if not isinstance(sections, list) or not 2 <= len(sections) <= 32:
-        raise ValueError("sections 数量必须为 2-32。")
+        raise ValueError("sections count must be 2-32.")
     ids: set[str] = set()
     previous_z: float | None = None
     section_family: str | None = None
@@ -173,22 +173,22 @@ def validate_ocp_loft_request(value: str | Path | dict[str, Any]) -> dict[str, A
     polygon_winding: int | None = None
     for index, section in enumerate(sections):
         if not isinstance(section, dict) or set(section) - _SECTION_FIELDS:
-            raise ValueError(f"sections[{index}] 结构无效或含未允许字段。")
+            raise ValueError(f"sections[{index}] has invalid structure or disallowed fields.")
         section_id = _identifier(section.get("id"), f"sections[{index}].id")
         if section_id in ids:
-            raise ValueError(f"截面 ID 重复: {section_id}")
+            raise ValueError(f"Duplicate section ID: {section_id}")
         ids.add(section_id)
         kind = section.get("type")
         if kind not in _SECTION_TYPES:
-            raise ValueError(f"sections[{index}].type 仅支持 circle/ellipse/polygon。")
+            raise ValueError(f"sections[{index}].type supports only circle/ellipse/polygon.")
         family = "polygon" if kind == "polygon" else "analytic"
         if section_family is None:
             section_family = family
         elif family != section_family:
-            raise ValueError("圆/椭圆截面不能与多边形截面混用；请使用同一拓扑家族。")
+            raise ValueError("Circle/ellipse sections cannot be mixed with polygon sections; use one topology family.")
         z_value = _finite(section.get("z"), f"sections[{index}].z")
         if previous_z is not None and z_value <= previous_z:
-            raise ValueError("截面 z 必须严格递增，避免退化或反向 Loft。")
+            raise ValueError("Section z must strictly increase to avoid degenerate or reversed Loft.")
         previous_z = z_value
         _point2(section.get("center", [0, 0]), f"sections[{index}].center")
         expected = {"id", "type", "z"}
@@ -200,28 +200,28 @@ def validate_ocp_loft_request(value: str | Path | dict[str, Any]) -> dict[str, A
             major = _finite(section.get("majorRadius"), f"sections[{index}].majorRadius", positive=True)
             minor = _finite(section.get("minorRadius"), f"sections[{index}].minorRadius", positive=True)
             if major < minor:
-                raise ValueError(f"sections[{index}].majorRadius 必须不小于 minorRadius。")
+                raise ValueError(f"sections[{index}].majorRadius must be greater than or equal to minorRadius.")
             if "rotationDeg" in section:
                 _finite(section["rotationDeg"], f"sections[{index}].rotationDeg")
             expected |= {"majorRadius", "minorRadius"} | optional_center | ({"rotationDeg"} if "rotationDeg" in section else set())
         else:
             points = section.get("points")
             if not isinstance(points, list) or not 3 <= len(points) <= 128:
-                raise ValueError(f"sections[{index}].points 数量必须为 3-128。")
+                raise ValueError(f"sections[{index}].points count must be 3-128.")
             normalized = [_point2(point, f"sections[{index}].points") for point in points]
             if len({tuple(point) for point in normalized}) != len(normalized):
-                raise ValueError(f"sections[{index}].points 不能包含重复点。")
+                raise ValueError(f"sections[{index}].points cannot contain duplicate points.")
             area2 = _validate_simple_polygon(normalized, f"sections[{index}].points")
             winding = 1 if area2 > 0 else -1
             if polygon_vertex_count is None:
                 polygon_vertex_count = len(normalized)
                 polygon_winding = winding
             elif len(normalized) != polygon_vertex_count or winding != polygon_winding:
-                raise ValueError("多边形 Loft 的各截面必须具有相同顶点数和相同绕向。")
+                raise ValueError("Polygon Loft sections must have the same vertex count and winding order.")
             expected |= {"points"} | optional_center
         unexpected_for_kind = set(section) - expected
         if unexpected_for_kind:
-            raise ValueError(f"sections[{index}] 包含不适用于 {kind} 的字段: {', '.join(sorted(unexpected_for_kind))}")
+            raise ValueError(f"sections[{index}] contains fields not applicable to {kind}: {', '.join(sorted(unexpected_for_kind))}")
     return request
 
 
@@ -249,14 +249,14 @@ def _make_wire(section: dict[str, Any]):
         for start in (0.0, math.pi / 2, math.pi, 3 * math.pi / 2):
             wire_builder.Add(BRepBuilderAPI_MakeEdge(curve, start, start + math.pi / 2).Edge())
         if not wire_builder.IsDone():
-            raise RuntimeError(f"解析截面构造失败: {section['id']}")
+            raise RuntimeError(f"Failed to construct analytic section: {section['id']}")
         return wire_builder.Wire()
     polygon = BRepBuilderAPI_MakePolygon()
     for point in section["points"]:
         polygon.Add(gp_Pnt(x + float(point[0]), y + float(point[1]), z))
     polygon.Close()
     if not polygon.IsDone():
-        raise RuntimeError(f"多边形截面构造失败: {section['id']}")
+        raise RuntimeError(f"Failed to construct polygon section: {section['id']}")
     return polygon.Wire()
 
 
@@ -264,7 +264,7 @@ def build_ocp_loft_shape(value: str | Path | dict[str, Any]):
     """@brief 构造真实 OCP 封闭 Loft 实体。"""
     request = validate_ocp_loft_request(value)
     if importlib.util.find_spec("OCP") is None:
-        raise ModuleNotFoundError("缺少 OCP 运行时。")
+        raise ModuleNotFoundError("Missing OCP runtime.")
     from OCP.BRepOffsetAPI import BRepOffsetAPI_ThruSections
 
     builder = BRepOffsetAPI_ThruSections(True, bool(request["ruled"]), float(request["toleranceMm"]))
@@ -273,10 +273,10 @@ def build_ocp_loft_shape(value: str | Path | dict[str, Any]):
         builder.AddWire(_make_wire(section))
     builder.Build()
     if not builder.IsDone():
-        raise RuntimeError("OCP Loft 构造失败。")
+        raise RuntimeError("OCP Loft construction failed.")
     shape = builder.Shape()
     if shape.IsNull():
-        raise RuntimeError("OCP Loft 返回空形状。")
+        raise RuntimeError("OCP Loft returned a null shape.")
     return request, shape
 
 
@@ -321,7 +321,7 @@ def _verify_section_envelope(request: dict[str, Any], evidence: dict[str, Any]) 
     deltas = [expected["min"][i] - actual["min"][i] for i in range(3)] + [actual["max"][i] - expected["max"][i] for i in range(3)]
     maximum_excess = max(deltas)
     if maximum_excess > tolerance:
-        raise RuntimeError(f"OCP Loft 超出截面理论包络 {maximum_excess:g} mm，疑似接缝错配或异常鼓包。")
+        raise RuntimeError(f"OCP Loft exceeds theoretical section envelope by {maximum_excess:g} mm; possible seam mismatch or abnormal bulge.")
     evidence["sectionEnvelopeCheck"] = {"expectedBoundsMm": expected, "maximumExcessMm": maximum_excess, "toleranceMm": tolerance, "pass": True}
 
 
@@ -358,9 +358,9 @@ def _shape_evidence(shape) -> dict[str, Any]:
         "topology": {"solids": count(TopAbs_SOLID), "faces": count(TopAbs_FACE), "edges": count(TopAbs_EDGE), "vertices": count(TopAbs_VERTEX)},
     }
     if not evidence["valid"] or evidence["topology"]["solids"] < 1 or evidence["volumeMm3"] <= 0 or evidence["surfaceAreaMm2"] <= 0:
-        raise RuntimeError("OCP Loft 未通过有效实体、拓扑、体积或面积门禁。")
+        raise RuntimeError("OCP Loft failed valid solid, topology, volume, or area gate.")
     if any(not math.isfinite(value) for value in evidence["boundsMm"]["min"] + evidence["boundsMm"]["max"]):
-        raise RuntimeError("OCP Loft 包围盒包含非有限数值。")
+        raise RuntimeError("OCP Loft bounding box contains non-finite values.")
     return evidence
 
 
@@ -373,8 +373,8 @@ def _verify_reopened_evidence(original: dict[str, Any], reopened: dict[str, Any]
     maximum_bound_delta = max(abs(float(left) - float(right)) for left, right in zip(original_bounds, reopened_bounds))
     if volume_delta > 1e-6 or maximum_bound_delta > 1e-5:
         raise RuntimeError(
-            f"{fmt.upper()} 重开后几何偏差超限: volumeRelativeDelta={volume_delta:g}, "
-            f"maximumBoundDeltaMm={maximum_bound_delta:g}。"
+            f"{fmt.upper()} geometry deviation after reopen exceeds tolerance: volumeRelativeDelta={volume_delta:g}, "
+            f"maximumBoundDeltaMm={maximum_bound_delta:g}."
         )
     reopened["comparisonToOriginal"] = {
         "volumeRelativeDelta": volume_delta,
@@ -414,12 +414,12 @@ def _write_shape(shape, target: Path, fmt: str) -> None:
             transfer_status = writer.Transfer(shape, STEPControl_AsIs)
             write_status = writer.Write(str(target)) if transfer_status == IFSelect_RetDone else None
         if transfer_status != IFSelect_RetDone or write_status != IFSelect_RetDone:
-            raise RuntimeError("STEP 写入失败。")
+            raise RuntimeError("STEP write failed.")
     elif fmt == "brep":
         from OCP.BRepTools import BRepTools
 
         if not BRepTools.Write_s(shape, str(target)):
-            raise RuntimeError("BREP 写入失败。")
+            raise RuntimeError("BREP write failed.")
     elif fmt == "stl":
         from OCP.BRepMesh import BRepMesh_IncrementalMesh
         from OCP.StlAPI import StlAPI_Writer
@@ -427,11 +427,11 @@ def _write_shape(shape, target: Path, fmt: str) -> None:
         mesher = BRepMesh_IncrementalMesh(shape, 0.2, False, 0.35, True)
         mesher.Perform()
         if not mesher.IsDone() or not StlAPI_Writer().Write(shape, str(target)):
-            raise RuntimeError("STL 网格化或写入失败。")
+            raise RuntimeError("STL meshing or write failed.")
     else:  # pragma: no cover - 调用前已验证
-        raise ValueError(f"不支持输出格式: {fmt}")
+        raise ValueError(f"Unsupported output format: {fmt}")
     if not target.is_file() or target.stat().st_size <= 0:
-        raise RuntimeError(f"{fmt.upper()} 产物为空。")
+        raise RuntimeError(f"{fmt.upper()} artifact is empty.")
 
 
 def _reopen_shape(path: Path, fmt: str):
@@ -445,7 +445,7 @@ def _reopen_shape(path: Path, fmt: str):
             read_status = reader.ReadFile(str(path))
             transferred_roots = reader.TransferRoots() if read_status == IFSelect_RetDone else 0
         if read_status != IFSelect_RetDone or transferred_roots <= 0:
-            raise RuntimeError("STEP 重开或实体转换失败。")
+            raise RuntimeError("STEP reopen or solid transfer failed.")
         shape = reader.OneShape()
     elif fmt == "brep":
         from OCP.BRep import BRep_Builder
@@ -454,11 +454,11 @@ def _reopen_shape(path: Path, fmt: str):
 
         shape = TopoDS_Shape()
         if not BRepTools.Read_s(shape, str(path), BRep_Builder()):
-            raise RuntimeError("BREP 重开失败。")
+            raise RuntimeError("BREP reopen failed.")
     else:
-        raise ValueError("只有 STEP/BREP 参与 B-Rep 重开验收。")
+        raise ValueError("Only STEP/BREP participate in B-Rep reopen verification.")
     if shape.IsNull():
-        raise RuntimeError(f"{fmt.upper()} 重开后为空形状。")
+        raise RuntimeError(f"{fmt.upper()} reopened as a null shape.")
     return shape
 
 

@@ -23,28 +23,28 @@ OPTION_FIELDS = {"symbolLibrary", "zoneShape", "unitZone", "maxTolerance", "prof
 
 def object_fields(value, allowed, required=()):
     if not isinstance(value, dict) or set(value) - set(allowed) or not set(required) <= set(value):
-        raise ValueError("GD&T 选项字段缺失、类型错误或包含未知字段")
+        raise ValueError("GD&T option fields are missing, mistyped, or contain unknown fields")
     return value
 
 
 def decimal_text(value, *, positive=False, signed=False):
     pattern = r"-?\d+(?:\.\d+)?" if signed else r"\d+(?:\.\d+)?"
     if not isinstance(value, str) or len(value) > 32 or not re.fullmatch(pattern, value):
-        raise ValueError("GD&T 数值必须是显式、有限、非指数十进制字符串")
+        raise ValueError("GD&T numeric value must be an explicit, finite, non-exponential decimal string")
     if positive and Decimal(value) <= 0:
-        raise ValueError("GD&T 数值必须大于零")
+        raise ValueError("GD&T numeric value must be greater than zero")
     return value
 
 
 def boolean(value):
     if not isinstance(value, bool):
-        raise ValueError("GD&T 开关必须为布尔值")
+        raise ValueError("GD&T flag must be a boolean")
     return "true" if value else "false"
 
 
 def enum(value, choices):
     if not isinstance(value, str) or value not in choices:
-        raise ValueError("GD&T 选项枚举无效")
+        raise ValueError("Invalid GD&T option enum value")
     return value
 
 
@@ -60,7 +60,7 @@ def normalize_constraints(value):
     for key, item in value.items():
         if key == "translation":
             if not isinstance(item, list) or len(item) != 3:
-                raise ValueError("基准平移必须提供 I/J/K 三个明确分量")
+                raise ValueError("Datum translation must provide three explicit I/J/K components")
             for entry in item:
                 decimal_text(entry, signed=True)
         else:
@@ -74,7 +74,7 @@ def normalize_detail(value, *, compartment=True):
     allowed = {"label", "materialCondition", "modifiers"} | ({"constraints"} if compartment else set())
     object_fields(value, allowed, {"label"})
     if not isinstance(value["label"], str) or not re.fullmatch(r"[A-Z]{1,2}", value["label"]):
-        raise ValueError("基准标识无效")
+        raise ValueError("Invalid datum label")
     condition = value.get("materialCondition")
     if condition is not None:
         enum(condition, MATERIAL_NAMES)
@@ -103,22 +103,22 @@ def normalize_detail(value, *, compartment=True):
 def datum_references(datums):
     """最多三个顺序基准格；组内字母分别确认，不把 A-B 当作一个基准标识。"""
     if not isinstance(datums, list) or len(datums) > 3:
-        raise ValueError("最多允许三个顺序基准")
+        raise ValueError("At most three ordered datum references are allowed")
     result, labels = [], []
     for value in datums:
         if isinstance(value, dict) and "common" in value:
             object_fields(value, {"common", "subDatums", "constraints"}, {"common"})
             members = value["common"]
             if not isinstance(members, list) or not 2 <= len(members) <= 8:
-                raise ValueError("公共基准格必须包含 2..8 个明确基准")
+                raise ValueError("Common datum compartment must contain 2..8 explicit datums")
             item = {"common": [normalize_detail(entry, compartment=False) for entry in members]}
             groups = value.get("subDatums", [])
             if not isinstance(groups, list) or len(groups) > 3:
-                raise ValueError("子基准组数量无效")
+                raise ValueError("Invalid sub-datum group count")
             subgroups = []
             for group in groups:
                 if not isinstance(group, list) or not 2 <= len(group) <= 8:
-                    raise ValueError("子基准组必须包含 2..8 个明确基准")
+                    raise ValueError("Sub-datum group must contain 2..8 explicit datums")
                 subgroups.append([normalize_detail(entry, compartment=False) for entry in group])
             if subgroups:
                 item["subDatums"] = subgroups
@@ -132,7 +132,7 @@ def datum_references(datums):
             labels.append(item["label"])
         result.append(item)
     if len(set(labels)) != len(labels):
-        raise ValueError("同一框中的基准标识不得重复")
+        raise ValueError("Datum labels cannot be duplicated within the same frame")
     return result
 
 
@@ -190,7 +190,7 @@ def _range_options(limits, options, tolerance, diameter):
     if shape is not None:
         enum(shape, set(RANGE_SYMBOLS) - {"angle"})
         if (shape in {"diameter", "sphericalDiameter"}) != diameter:
-            raise ValueError("zoneShape 与 diameter 公差带声明冲突")
+            raise ValueError("zoneShape conflicts with diameter tolerance zone declaration")
         limits.find("PrimaryRangeSymbol").text = RANGE_SYMBOLS[shape]
     if "unitZone" in options:
         unit = object_fields(options["unitZone"], {"separator", "value", "symbol", "limit"}, {"separator", "value"})
@@ -210,7 +210,7 @@ def _range_options(limits, options, tolerance, diameter):
         decimal_text(maximum["value"], positive=True)
         boolean(maximum["diameter"])
         if Decimal(maximum["value"]) < Decimal(tolerance):
-            raise ValueError("最大公差不能小于主公差")
+            raise ValueError("Maximum tolerance cannot be less than primary tolerance")
         ET.SubElement(limits, "ApplyMAXTolerance").text = "true"
         ET.SubElement(limits, "MaxToleranceSymbol").text = "phi" if maximum["diameter"] else ""
         ET.SubElement(limits, "MaxToleranceValue").text = maximum["value"]
@@ -219,20 +219,20 @@ def _range_options(limits, options, tolerance, diameter):
 def _profile_options(root, value, characteristic, tolerance):
     value = object_fields(value, {"unequalOutside", "offsets", "dynamic", "combination", "constraints"})
     if not value or {"unequalOutside", "offsets"} <= set(value):
-        raise ValueError("轮廓带选项不能为空，不等分布与偏置不能同时指定")
+        raise ValueError("Profile zone options cannot be empty, and unequalOutside and offsets cannot both be specified")
     if (set(value) & {"unequalOutside", "offsets"} or value.get("dynamic") is True) and characteristic not in {"line_profile", "surface_profile"}:
-        raise ValueError("不等分布、轮廓偏置和动态轮廓必须使用轮廓度")
+        raise ValueError("Unequal disposition, profile offsets, and dynamic profile require a profile characteristic")
     parent = ET.SubElement(root, "OffsetZoneInfo")
     if "unequalOutside" in value:
         decimal_text(value["unequalOutside"])
         if Decimal(value["unequalOutside"]) > Decimal(tolerance):
-            raise ValueError("轮廓外侧分配量不能超过整个公差带")
+            raise ValueError("Outside profile disposition cannot exceed total tolerance zone")
         profile = ET.SubElement(parent, "UnequallyDisposedProfile")
         ET.SubElement(profile, "OutsideDisposition").text = value["unequalOutside"]
     elif "offsets" in value:
         offsets = value["offsets"]
         if not isinstance(offsets, list) or not 1 <= len(offsets) <= 2:
-            raise ValueError("轮廓偏置必须包含一或两个明确方向和数值")
+            raise ValueError("Profile offsets must contain one or two explicit directions and values")
         profile = ET.SubElement(parent, "ToleranceZoneOffset")
         for prefix, offset in zip(("First", "Second"), offsets):
             object_fields(offset, {"direction", "value"}, {"direction", "value"})
@@ -249,7 +249,7 @@ def _profile_options(root, value, characteristic, tolerance):
         if (not isinstance(constraints, list) or not 1 <= len(constraints) <= 3
                 or any(not isinstance(item, str) or item not in PROFILE_CONSTRAINTS for item in constraints)
                 or len(set(constraints)) != len(constraints)):
-            raise ValueError("公差带约束必须为不重复的 1..3 项")
+            raise ValueError("Tolerance zone constraints must be 1..3 unique items")
         for item in constraints:
             ET.SubElement(parent, "Constraint").text = PROFILE_CONSTRAINTS[enum(item, PROFILE_CONSTRAINTS)]
     if not len(parent):
@@ -267,7 +267,7 @@ def _filter_xml(parent, value):
         append_flag(detail, "LongWavePassFilter", value["longWave"])
     separator = value.get("separator", "")
     if "second" in value and separator not in ("Space", "X"):
-        raise ValueError("双滤波段必须指定分隔方式")
+        raise ValueError("Dual filter stages must specify a separator")
     ET.SubElement(detail, "FilterIndicationSeparator").text = enum(separator, ("", "Space", "X"))
     if "second" in value:
         second = object_fields(value["second"], {"cutOff", "shortWave", "longWave"}, {"cutOff"})
@@ -297,7 +297,7 @@ def append_options_before_material(root, limits, options, *, characteristic, tol
         if "filters" in options:
             filters = options["filters"]
             if not isinstance(filters, list) or not 1 <= len(filters) <= 8:
-                raise ValueError("滤波信息必须为 1..8 项明确配置")
+                raise ValueError("Filter definitions must contain 1..8 explicit entries")
             parent = ET.SubElement(feature, "Filters")
             for value in filters:
                 _filter_xml(parent, value)
@@ -306,7 +306,7 @@ def append_options_before_material(root, limits, options, *, characteristic, tol
         if "projectedZone" in options:
             projection = object_fields(options["projectedZone"], {"projection", "range"}, {"projection"})
             if characteristic not in {"position", "parallelism", "perpendicularity", "angularity"} or not diameter:
-                raise ValueError("投影公差带当前要求圆柱位置度或轴线方向公差")
+                raise ValueError("Projected tolerance zone currently requires cylindrical position or axis orientation tolerance")
             ET.SubElement(feature, "ProjectedToleranceZone").text = "true"
             ET.SubElement(feature, "Projection").text = decimal_text(projection["projection"], positive=True)
             if "range" in projection:
@@ -322,7 +322,7 @@ def append_options_before_material(root, limits, options, *, characteristic, tol
     if "reciprocity" in options:
         boolean(options["reciprocity"])
         if options["reciprocity"] and material_condition not in {"M", "L"}:
-            raise ValueError("互易要求必须与 M 或 L 材料条件一起指定")
+            raise ValueError("Reciprocity requirement must be paired with M or L material condition")
     for key in ("freeState", "statistical"):
         if key in options:
             boolean(options[key])

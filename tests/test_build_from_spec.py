@@ -274,7 +274,7 @@ def test_hole_outside_plate_is_rejected_before_building(harness):
     result, record = run(spec, harness)
 
     assert result["status"] == "error"
-    assert any("超出了板料范围" in item for item in result["errors"])
+    assert any("exceeds plate bounds" in item for item in result["errors"])
     assert record["holes"] == []
 
 
@@ -287,7 +287,7 @@ def test_hole_touching_edge_is_rejected(harness):
     result, _ = run(spec, harness)
 
     assert result["status"] == "error"
-    assert any("超出了板料范围" in item for item in result["errors"])
+    assert any("exceeds plate bounds" in item for item in result["errors"])
 
 
 def test_valid_corner_holes_pass_bounds_check(harness):
@@ -312,7 +312,7 @@ def test_cylinder_hole_outside_radius_rejected(harness):
 
     result, _ = run(spec, harness)
 
-    assert any("超出圆柱半径" in item for item in result["errors"])
+    assert any("exceeds cylinder radius" in item for item in result["errors"])
 
 
 # ------------------------------------------------------------ 结果判定
@@ -329,7 +329,7 @@ def test_hole_feature_names_key_is_read_correctly(harness):
     result, _ = run(spec, harness)
 
     assert result["hole_count_created"] == 1
-    assert not any("未成功创建" in item for item in result["errors"])
+    assert not any("was not created" in item for item in result["errors"])
     step = next(item for item in result["steps"] if item["step"] == "hole")
     assert step["ok"] is True
     assert step["feature"] == "H1"
@@ -472,7 +472,7 @@ def test_fillet_skipped_when_no_edges_match(harness, monkeypatch):
 
     result, record = run(spec, harness, apply_fillets=True)
 
-    assert any("未选中任何边线" in item for item in result["warnings"])
+    assert any("no edges selected" in item for item in result["warnings"])
     assert not any(call[0] == "fillet" for call in record["part"])
 
 
@@ -486,7 +486,7 @@ def test_fillet_failure_is_warning_not_error(harness, monkeypatch):
 
     result, _ = run(spec, harness, apply_fillets=True)
 
-    assert any("圆角 0 失败" in item for item in result["warnings"])
+    assert any("Fillet 0 failed" in item for item in result["warnings"])
     assert result["status"] in ("ok", "warn")
 
 

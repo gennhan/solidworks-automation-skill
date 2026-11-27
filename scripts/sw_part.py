@@ -480,8 +480,8 @@ def _ensure_sketch_selected(model, sketch_name):
     if not selected_sketch:
         model.ClearSelection2(True)
         raise ValueError(
-            f"无法选择草图: {sketch_name}。已尝试活动草图对象、缓存草图对象、"
-            "FeatureByName 和 SelectByID2('SKETCH')。"
+            f"Unable to select sketch: {sketch_name}. Tried active sketch object, cached sketch object, "
+            "FeatureByName, and SelectByID2('SKETCH')."
         )
     return selected_sketch
 
@@ -505,7 +505,7 @@ def start_sketch(model, plane_name="Front Plane"):
         model.SketchManager.InsertSketch(True)
         return selected_plane
 
-    raise ValueError(f"无法选择基准面: {plane_name}")
+    raise ValueError(f"Unable to select reference plane: {plane_name}")
 
 
 def end_sketch(model):
@@ -901,8 +901,8 @@ def fillet(model, radius, edges=None):
                     continue
     if _get_selection_count(model) <= 0:
         raise ValueError(
-            "圆角需要先选择边线。请用 select_edges() 按几何条件选边，"
-            "或用 solidworks_list_edges 查看可用边线。"
+            "Fillet requires edges to be selected first. Use select_edges() to filter by geometry, "
+            "or call solidworks_list_edges to inspect available edges."
         )
     return model.FeatureManager.FeatureFillet(195, radius, 0, 0)
 
@@ -1020,5 +1020,5 @@ def rib(model, sketch_name, thickness, direction=True):
     )
     created = [feature for name, feature in rib_features().items() if name not in previous]
     if len(created) > 1:
-        raise RuntimeError("InsertRib 后新增多个筋特征，无法确定本次结果")
+        raise RuntimeError("InsertRib created multiple rib features; cannot uniquely identify the result")
     return created[0] if created else None

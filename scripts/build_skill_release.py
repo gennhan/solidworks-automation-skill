@@ -24,7 +24,7 @@ def release_version(root: Path) -> str:
     skill = json.loads((root / "package.json").read_text(encoding="utf-8"))["version"]
     desktop = json.loads((root / "apps/workbench-ui/src-tauri/tauri.conf.json").read_text(encoding="utf-8"))["version"]
     if skill != desktop or not re.fullmatch(r"\d+\.\d+\.\d+", skill):
-        raise ValueError("技能包与桌面程序版本不一致或无效")
+        raise ValueError("Skill package and desktop app versions do not match or are invalid")
     return skill
 
 
@@ -35,7 +35,7 @@ def _digest(data: bytes) -> str:
 def _entry_name(relative: str) -> str:
     path = PurePosixPath(relative)
     if path.is_absolute() or not path.parts or any(part.casefold() in {"..", ".git"} for part in path.parts) or ":" in relative or "\\" in relative:
-        raise ValueError(f"不安全的技能包路径: {relative}")
+        raise ValueError(f"Unsafe skill archive path: {relative}")
     return PREFIX + relative
 
 
@@ -45,14 +45,14 @@ def build_skill_archive(root: Path, output: Path, *, source_commit: str | None =
     if source_commit is None:
         source_commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
     if not re.fullmatch(r"[0-9a-f]{40}", source_commit):
-        raise ValueError("发布来源必须是完整 Git 提交 SHA")
+        raise ValueError("Release source must be a full Git commit SHA")
     files = collect_runtime_files(root)
     files.update({Path(name): root / name for name in EXTRA_FILES})
     payload = {}
     for relative, source in sorted(files.items()):
         _entry_name(relative.as_posix())
         if not source.resolve(strict=True).is_relative_to(root):
-            raise ValueError(f"技能包源文件越出仓库: {relative}")
+            raise ValueError(f"Skill source file escapes repository: {relative}")
         payload[relative.as_posix()] = source.read_bytes()
     manifest = {"schemaVersion": "1.0", "version": version, "sourceCommit": source_commit,
                 "files": {name: {"sha256": _digest(data), "sizeBytes": len(data)} for name, data in payload.items()}}
@@ -75,25 +75,25 @@ def verify_skill_archive(path: Path, *, expected_version: str | None = None, exp
     with zipfile.ZipFile(path) as archive:
         names = archive.namelist()
         if len(names) != len(set(names)):
-            raise ValueError("技能包包含重复文件")
+            raise ValueError("Skill archive contains duplicate files")
         manifest = json.loads(archive.read(PREFIX + MANIFEST))
         version, commit = manifest["version"], manifest["sourceCommit"]
         if manifest.get("schemaVersion") != "1.0" or not re.fullmatch(r"\d+\.\d+\.\d+", version) or not re.fullmatch(r"[0-9a-f]{40}", commit):
-            raise ValueError("技能包清单格式无效")
+            raise ValueError("Invalid skill archive manifest format")
         if expected_version is not None and version != expected_version:
-            raise ValueError("技能包版本不匹配")
+            raise ValueError("Skill archive version mismatch")
         if expected_commit is not None and commit != expected_commit:
-            raise ValueError("技能包来源提交不匹配")
+            raise ValueError("Skill archive source commit mismatch")
         expected_names = {_entry_name(name) for name in manifest["files"]} | {PREFIX + MANIFEST}
         if set(names) != expected_names:
-            raise ValueError("技能包文件清单不完整或包含额外文件")
+            raise ValueError("Skill archive file list is incomplete or contains extra files")
         for name, record in manifest["files"].items():
             data = archive.read(_entry_name(name))
             if _digest(data) != record["sha256"] or len(data) != record["sizeBytes"]:
-                raise ValueError(f"技能包文件校验失败: {name}")
+                raise ValueError(f"Skill archive file checksum verification failed: {name}")
         package = json.loads(archive.read(PREFIX + "package.json"))
         if package["version"] != version:
-            raise ValueError("技能包入口版本与清单不一致")
+            raise ValueError("Skill archive package version does not match manifest")
     return {"status": "pass", "version": version, "sourceCommit": commit, "files": len(manifest["files"])}
 
 
@@ -104,18 +104,18 @@ def verify_desktop_skill(skill_archive: Path, desktop_archive: Path, root: Path 
         files = [name for name in desktop.namelist() if not name.endswith(("/", "\\"))]
         paths = {name.replace("\\", "/"): name for name in files}
         if len(paths) != len(files):
-            raise ValueError("桌面包包含重复文件")
+            raise ValueError("Desktop archive contains duplicate files")
         for name in paths:
             _entry_name(name)
         embedded = {name for name in paths if name.startswith("skill/")}
         expected = {"skill/" + path.as_posix() for path in runtime}
         if embedded != expected:
-            raise ValueError("桌面内嵌技能文件集与发布源不一致")
+            raise ValueError("Desktop embedded skill file set does not match release source")
         for path, source in runtime.items():
             relative = path.as_posix()
             data = desktop.read(paths["skill/" + relative])
             if data != skill.read(PREFIX + relative) or data != source.read_bytes():
-                raise ValueError(f"桌面内嵌技能内容不一致: {relative}")
+                raise ValueError(f"Desktop embedded skill content mismatch: {relative}")
     return {"status": "pass", "desktopRuntimeFiles": len(runtime)}
 
 
@@ -125,14 +125,14 @@ def verify_installed_skill(skill_archive: Path, installed: Path, root: Path = RO
     installed = installed.resolve(strict=True)
     actual = {path.relative_to(installed).as_posix(): path for path in installed.rglob("*") if path.is_file()}
     if set(actual) != {path.as_posix() for path in runtime}:
-        raise ValueError("安装后的技能文件集不一致")
+        raise ValueError("Installed skill file set mismatch")
     with zipfile.ZipFile(skill_archive) as skill:
         for relative, source in runtime.items():
             path = actual[relative.as_posix()]
             if not path.resolve().is_relative_to(installed):
-                raise ValueError("安装后的技能文件越出目标目录")
+                raise ValueError("Installed skill file escapes target directory")
             if path.read_bytes() != skill.read(PREFIX + relative.as_posix()) or path.read_bytes() != source.read_bytes():
-                raise ValueError(f"安装后的技能内容不一致: {relative}")
+                raise ValueError(f"Installed skill content mismatch: {relative}")
     return {"status": "pass", "installedRuntimeFiles": len(runtime)}
 
 
@@ -154,7 +154,7 @@ def main():
     else:
         version = release_version(ROOT)
         if args.version is not None and args.version != version:
-            raise ValueError("请求版本与项目版本不一致")
+            raise ValueError("Requested version does not match project version")
         output = args.output or ROOT / "release-output" / f"SolidWorks-Automation-Skill-{version}.zip"
         result = build_skill_archive(ROOT, output)
     print(json.dumps(result, ensure_ascii=False, indent=2))

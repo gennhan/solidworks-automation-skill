@@ -41,7 +41,7 @@ def test_hand_computed_anchors():
 
 def test_decel_torque_is_negative_regeneration_and_peak_uses_abs():
     r = ds.compute_drive(_screw_spec())
-    decel = next(p for p in r["phases"] if p["name"].endswith("减速"))
+    decel = next(p for p in r["phases"] if p["name"].endswith("decel"))
     assert decel["torque_nm"] == pytest.approx(-0.245933, rel=1e-4)  # 回馈近似值
     assert r["t_peak_nm"] == pytest.approx(max(abs(p["torque_nm"]) for p in r["phases"]))
 
@@ -101,13 +101,13 @@ def test_friction_opposes_motion_in_both_directions():
 
 def test_dwell_without_brake_holds_gravity_only_on_inclined_axis():
     horiz = ds.compute_drive(_screw_spec(motion={"dwell_s": 1.0}))
-    dwell_h = next(p for p in horiz["phases"] if p["name"].endswith("驻留"))
+    dwell_h = next(p for p in horiz["phases"] if p["name"].endswith("dwell"))
     assert dwell_h["torque_nm"] == pytest.approx(0.0, abs=1e-12)
     vert = ds.compute_drive(_screw_spec(load={"incline_deg": 90}, motion={"dwell_s": 1.0}))
-    dwell_v = next(p for p in vert["phases"] if p["name"].endswith("驻留"))
+    dwell_v = next(p for p in vert["phases"] if p["name"].endswith("dwell"))
     assert dwell_v["torque_nm"] > 0
     braked = ds.compute_drive(_screw_spec(load={"incline_deg": 90}, motion={"dwell_s": 1.0}, motor={"has_brake": True}))
-    assert next(p for p in braked["phases"] if p["name"].endswith("驻留"))["torque_nm"] == 0.0
+    assert next(p for p in braked["phases"] if p["name"].endswith("dwell"))["torque_nm"] == 0.0
 
 
 def test_kgcm2_inertia_unit():

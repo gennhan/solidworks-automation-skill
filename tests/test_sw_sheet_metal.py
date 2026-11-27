@@ -60,10 +60,10 @@ def test_flat_pattern_export_requires_saved_model(tmp_path):
 @pytest.mark.parametrize(
     "spec,message",
     [
-        (BaseFlangeSpec(0, 0.001, 0.1), "厚度"),
-        (BaseFlangeSpec(0.002, -0.001, 0.1), "半径"),
-        (BaseFlangeSpec(0.002, 0.001, 0), "深度"),
-        (BaseFlangeSpec(0.002, 0.001, 0.1, k_factor=1.0), "K 因子"),
+        (BaseFlangeSpec(0, 0.001, 0.1), "thickness"),
+        (BaseFlangeSpec(0.002, -0.001, 0.1), "radius"),
+        (BaseFlangeSpec(0.002, 0.001, 0), "depth"),
+        (BaseFlangeSpec(0.002, 0.001, 0.1, k_factor=1.0), "K-factor"),
     ],
 )
 def test_base_flange_spec_rejects_invalid_manufacturing_values(spec, message):

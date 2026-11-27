@@ -40,5 +40,5 @@ def test_dxf_preview_scene_rejects_oversized_input_before_parse(tmp_path: Path, 
         return value
 
     monkeypatch.setattr(Path, "stat", fake_stat)
-    with pytest.raises(ValueError, match="安全上限"):
+    with pytest.raises(ValueError, match="safety limit"):
         dxf_to_preview_scene(source)

@@ -25,19 +25,19 @@ def validate_spring_spec(spec: OpenHelicalSpringSpec) -> dict[str, float]:
     for name in ("wire_diameter_mm", "mean_diameter_mm", "helix_height_mm", "turns"):
         raw = getattr(spec, name)
         if isinstance(raw, bool):
-            raise ValueError(f"{name} 必须为有限正数")
+            raise ValueError(f"{name} must be a finite positive number")
         value = float(raw)
         if not math.isfinite(value) or value <= 0:
-            raise ValueError(f"{name} 必须为有限正数")
+            raise ValueError(f"{name} must be a finite positive number")
         values.append(value)
     wire, mean, height, turns = values
     if not isinstance(spec.clockwise, bool):
-        raise ValueError("clockwise 必须为布尔值")
+        raise ValueError("clockwise must be a boolean")
     if not 1 <= turns <= 20 or mean < wire * 4 or not .1 <= wire <= 50 or mean > 500 or height > 2000:
-        raise ValueError("试点要求圈数 1..20、线径 0.1..50 mm、中径不超过 500 mm 且至少为线径 4 倍、高度不超过 2000 mm")
+        raise ValueError("Pilot requires turns in 1..20, wire diameter in 0.1..50 mm, mean diameter <= 500 mm and >= 4x wire diameter, and height <= 2000 mm")
     pitch = height / turns
     if pitch < wire * 1.25 or pitch > mean * 0.5:
-        raise ValueError("试点要求中心线螺距至少为线径 1.25 倍且不超过中径一半")
+        raise ValueError("Pilot requires centerline pitch >= 1.25x wire diameter and <= 0.5x mean diameter")
     centerline_length = math.hypot(math.pi * mean * turns, height)
     return {"pitch_mm": pitch, "centerline_length_mm": centerline_length,
             "ideal_volume_mm3": math.pi * (wire / 2) ** 2 * centerline_length}
@@ -58,10 +58,10 @@ def exact_body_bounds_mm(body) -> list[float]:
             vector[axis] = direction
             values = [VARIANT(pythoncom.VT_BYREF | pythoncom.VT_R8, 0.0) for _ in range(3)]
             if not dispatch.GetExtremePoint(*vector, *values):
-                raise RuntimeError("无法读取弹簧实体极值点")
+                raise RuntimeError("Unable to read spring body extreme point")
             coordinate = float(values[axis].value)
             if not math.isfinite(coordinate):
-                raise RuntimeError("弹簧实体极值点不是有限数值")
+                raise RuntimeError("Spring body extreme point is not a finite number")
             limits.append(coordinate * 1000)
         bounds.append(limits[1] - limits[0])
     return bounds
@@ -86,7 +86,7 @@ def verify_helix_definition(helix, spec: OpenHelicalSpringSpec, pitch: float) ->
     if direction not in (True, False) or bool(direction) != spec.clockwise or by != 1 or any(
             not math.isclose(actual, wanted, rel_tol=1e-8, abs_tol=1e-8)
             for actual, wanted in ((height, float(spec.helix_height_mm)), (actual_pitch, pitch), (turns, float(spec.turns)))):
-        raise RuntimeError("螺旋线旋向、定义方式或尺寸回读不符")
+        raise RuntimeError("Helix direction, definition mode, or dimensions readback mismatch")
     return {"clockwise": bool(direction), "defined_by": by, "height_mm": height, "pitch_mm": actual_pitch, "turns": turns}
 
 
@@ -95,9 +95,9 @@ def create_open_helical_spring(model, spec: OpenHelicalSpringSpec, plane_name: s
     calculated = validate_spring_spec(spec)
     kind = get_com_member(model, "GetType")
     if isinstance(kind, bool) or kind != 1:
-        raise ValueError("必须传入 SolidWorks 零件文档")
+        raise ValueError("A SolidWorks part document is required")
     if tuple(get_com_member(model, "GetBodies2", 0, False) or ()):
-        raise ValueError("弹簧只允许创建在无实体的零件中")
+        raise ValueError("Spring can only be created in an empty part with no solid bodies")
     try:
         from .sw_part import sketch, sketch_circle, _ensure_sketch_selected
         from .sw_review import collect_model_summary
@@ -112,7 +112,7 @@ def create_open_helical_spring(model, spec: OpenHelicalSpringSpec, plane_name: s
     before = {item.get("name") for item in collect_model_summary(model).get("features", [])}
     with sketch(model, plane_name) as ref:
         if sketch_circle(model, 0, 0, float(spec.mean_diameter_mm) / 2000) is None:
-            raise RuntimeError("无法创建螺旋线基圆")
+            raise RuntimeError("Failed to create helix base circle")
         sketch_quality = fully_define_sketch(model)
     _ensure_sketch_selected(model, ref)
     # swHelixDefinedByHeightAndRevolution=1。InsertHelix 返回 void，需回读特征树。
@@ -121,34 +121,34 @@ def create_open_helical_spring(model, spec: OpenHelicalSpringSpec, plane_name: s
     features = collect_model_summary(model).get("features", [])
     helixes = [item for item in features if item.get("type") == "Helix" and item.get("name") not in before]
     if len(helixes) != 1:
-        raise RuntimeError("无法唯一确认新建螺旋线")
+        raise RuntimeError("Unable to uniquely identify newly created helix")
     helix = get_com_member(model, "FeatureByName", helixes[0]["name"])
     helix_data = verify_helix_definition(helix, spec, calculated["pitch_mm"])
     model.ClearSelection2(True)
     if not get_com_member(helix, "Select2", False, 4):  # 4 = sweep path
-        raise RuntimeError("无法选择螺旋扫描路径")
+        raise RuntimeError("Unable to select helix sweep path")
     # SW2026 类型库确认 20 个输入参数；CircularProfile=True，直径为米。
     feature = model.FeatureManager.InsertProtrusionSwept4(
         False, False, 0, False, False, 0, 0, False, 0.0, 0.0, 0, 0,
         True, False, True, 0.0, False, True, float(spec.wire_diameter_mm) / 1000, 0)
     model.ClearSelection2(True)
     if feature is None:
-        raise RuntimeError("圆形截面扫描失败")
+        raise RuntimeError("Circular profile sweep failed")
     feature.Name = "OpenHelicalSpring"
     if not model.ForceRebuild3(False):
-        raise RuntimeError("弹簧重建失败")
+        raise RuntimeError("Spring rebuild failed")
     bodies = tuple(get_com_member(model, "GetBodies2", 0, False) or ())
     mass = collect_mass_properties(model)
     volume = mass.get("volume_mm3")
     if len(bodies) != 1 or mass.get("errors") or not isinstance(volume, (int, float)) or not math.isfinite(volume):
-        raise RuntimeError("无法确认单一实体及体积")
+        raise RuntimeError("Unable to confirm single solid body and volume")
     if not math.isclose(volume, calculated["ideal_volume_mm3"], rel_tol=0.005):
-        raise RuntimeError("实际扫描体积与非自交圆线螺旋理论体积不符")
+        raise RuntimeError("Actual swept volume does not match theoretical non-self-intersecting circular-wire helix volume")
     actual_bounds = exact_body_bounds_mm(bodies[0])
     expected_bounds = expected_body_bounds_mm(spec, calculated["pitch_mm"])
     if any(not math.isclose(actual, expected, rel_tol=.002, abs_tol=.03)
            for actual, expected in zip(sorted(actual_bounds), expected_bounds)):
-        raise RuntimeError("实际实体极值尺寸与给定螺旋线及截面不符")
+        raise RuntimeError("Actual body extreme bounds do not match specified helix and section")
     return feature, {"status": "review_required", "input": asdict(spec), "calculated": calculated,
                      "actual_volume_mm3": volume, "actual_extreme_bounds_mm": actual_bounds,
                      "helix_feature": helixes[0]["name"], "helix_readback": helix_data,

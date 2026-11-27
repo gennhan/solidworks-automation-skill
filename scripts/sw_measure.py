@@ -101,19 +101,19 @@ def collect_mass_properties(model, density_kg_m3=None):
     if not material:
         # 这是工程提醒而非执行错误：质量数值本身算得出来，只是密度是默认值。
         result["warnings"] = [
-            "文档未分配材料，SolidWorks 按默认密度（1000 kg/m³）计算；"
-            "质量结果不可直接用于工程判断，请分配材料或显式传入 density_kg_m3。"
+            "No material assigned to document; SolidWorks used the default density (1000 kg/m³). "
+            "Mass results cannot be used directly for engineering judgment; assign a material or pass density_kg_m3 explicitly."
         ]
 
     try:
         extension = get_com_member(model, "Extension")
         mass_property = get_com_member(extension, "CreateMassProperty")
     except Exception as exc:
-        result["errors"].append(f"创建质量属性对象失败: {exc}")
+        result["errors"].append(f"Failed to create mass property object: {exc}")
         return result
 
     if mass_property is None:
-        result["errors"].append("CreateMassProperty 返回空对象")
+        result["errors"].append("CreateMassProperty returned None")
         return result
 
     if density_kg_m3 is not None:
@@ -124,7 +124,7 @@ def collect_mass_properties(model, density_kg_m3=None):
             result["density_overridden"] = True
         except Exception as exc:
             result["density_overridden"] = False
-            result["errors"].append(f"设置密度失败，将使用文档当前密度: {exc}")
+            result["errors"].append(f"Failed to set density; using current document density: {exc}")
 
     def read(name, *args):
         """@brief 读取一个质量属性成员并记录失败原因。"""
@@ -132,7 +132,7 @@ def collect_mass_properties(model, density_kg_m3=None):
             member = getattr(mass_property, name)
             return member(*args) if args or callable(member) else member
         except Exception as exc:
-            result["errors"].append(f"{name} 读取失败: {exc}")
+            result["errors"].append(f"Failed to read {name}: {exc}")
             return None
 
     # IMassProperty.Status 在部分版本（实测 SW2024 SP5）不可用。它只是诊断字段，
@@ -167,8 +167,8 @@ def collect_mass_properties(model, density_kg_m3=None):
     if density_kg_m3 is not None and implied_density is not None:
         if abs(implied_density - float(density_kg_m3)) > max(1.0, float(density_kg_m3) * 0.01):
             result["errors"].append(
-                f"密度设置可能未生效：请求 {density_kg_m3} kg/m³，"
-                f"但质量/体积反算出 {implied_density} kg/m³。"
+                f"Density override may not have taken effect: requested {density_kg_m3} kg/m³, "
+                f"but mass/volume implies {implied_density} kg/m³."
             )
 
     # CenterOfMass 在 makepy 强类型代理下是方法，在动态代理下是属性；
@@ -176,7 +176,7 @@ def collect_mass_properties(model, density_kg_m3=None):
     try:
         center = list(get_com_member(mass_property, "CenterOfMass") or [])
     except Exception as exc:
-        result["errors"].append(f"CenterOfMass 读取失败: {exc}")
+        result["errors"].append(f"Failed to read CenterOfMass: {exc}")
         center = []
     if len(center) >= 3:
         result["center_of_mass_mm"] = [_round(value * _MM_PER_M, 6) for value in center[:3]]
@@ -184,7 +184,7 @@ def collect_mass_properties(model, density_kg_m3=None):
     try:
         inertia = list(get_com_member(mass_property, "GetMomentOfInertia", 0) or [])
     except Exception as exc:
-        result["errors"].append(f"GetMomentOfInertia 读取失败: {exc}")
+        result["errors"].append(f"Failed to read GetMomentOfInertia: {exc}")
         inertia = []
     if len(inertia) >= 9:
         # 返回 3x3 对称张量；SI 单位 kg*m^2 转 kg*mm^2。
@@ -227,12 +227,12 @@ def collect_bounding_box(model):
         try:
             box = model.GetBox(0)
         except Exception as exc:
-            result["errors"].append(f"包围盒读取失败: {exc}")
+            result["errors"].append(f"Failed to read bounding box: {exc}")
             return result
 
     values = list(box or [])
     if len(values) < 6:
-        result["errors"].append("包围盒未返回 6 个坐标值")
+        result["errors"].append("Bounding box did not return 6 coordinates")
         return result
 
     scaled = [float(value) * _MM_PER_M for value in values[:6]]
@@ -282,11 +282,11 @@ def inspect_interference(asm_model, treat_subassemblies_as_components=False,
         asm_model.ClearSelection2(True)
         interference = get_com_member(asm_model, "InterferenceDetectionManager")
     except Exception as exc:
-        result["errors"].append(f"无法获取干涉检查对象: {exc}")
+        result["errors"].append(f"Unable to obtain interference detection manager: {exc}")
         return result
 
     if interference is None:
-        result["errors"].append("InterferenceDetectionManager 返回空对象；请确认活动文档是装配体。")
+        result["errors"].append("InterferenceDetectionManager returned None; verify active document is an assembly.")
         return result
 
     try:
@@ -303,14 +303,14 @@ def inspect_interference(asm_model, treat_subassemblies_as_components=False,
         detected = list(raw_items) if raw_items is not None else []
         count = int(get_com_member(interference, "GetInterferenceCount"))
         if count < 0 or count != len(detected):
-            raise RuntimeError(f"干涉数量与数组不一致: {count} != {len(detected)}")
+            raise RuntimeError(f"Interference count mismatch with array length: {count} != {len(detected)}")
         items = []
         for index, item in enumerate(detected):
             entry = {"index": index, "name": None}
             if include_volume:
                 volume_m3 = float(get_com_member(item, "Volume"))
                 if not math.isfinite(volume_m3) or volume_m3 < 0:
-                    raise RuntimeError(f"无效干涉体积: {volume_m3}")
+                    raise RuntimeError(f"Invalid interference volume: {volume_m3}")
                 entry["volume_mm3"] = _round(volume_m3 * (_MM_PER_M**3), 6)
             components = get_com_member(item, "Components")
             entry["components"] = [
@@ -320,13 +320,13 @@ def inspect_interference(asm_model, treat_subassemblies_as_components=False,
             ]
             items.append(entry)
     except Exception as exc:
-        result["errors"].append(f"配置、计算或读取干涉失败: {exc}")
+        result["errors"].append(f"Failed to configure, compute, or read interferences: {exc}")
         return result
     finally:
         try:
             interference.Done()
         except Exception as exc:
-            result["errors"].append(f"结束干涉检查失败: {exc}")
+            result["errors"].append(f"Failed to finish interference detection: {exc}")
 
     if result["errors"]:
         return result
@@ -372,13 +372,13 @@ def check_tolerance_fit(shaft_mm, hole_mm, nominal_mm=None, fit="clearance"):
 
     if fit == "clearance":
         expected = clearance > 0
-        verdict = "间隙配合" if expected else "不是间隙配合：孔不大于轴"
+        verdict = "Clearance fit" if expected else "Not a clearance fit: hole is not larger than shaft"
     elif fit == "interference":
         expected = clearance < 0
-        verdict = "过盈配合" if expected else "不是过盈配合：孔不小于轴"
+        verdict = "Interference fit" if expected else "Not an interference fit: hole is not smaller than shaft"
     else:
         expected = True
-        verdict = "过渡配合"
+        verdict = "Transition fit"
 
     return {
         "nominal_mm": _round(nominal, 6),
@@ -388,5 +388,5 @@ def check_tolerance_fit(shaft_mm, hole_mm, nominal_mm=None, fit="clearance"):
         "fit_requested": fit,
         "fit_satisfied": bool(expected),
         "verdict": verdict,
-        "caveat": "名义尺寸不含公差，真实配合必须按 GB/T 1800 或 ISO 286 查表并做公差链计算。",
+        "caveat": "Nominal dimensions exclude tolerances; real fits must follow GB/T 1800 or ISO 286 tables and tolerance stack-up analysis.",
     }

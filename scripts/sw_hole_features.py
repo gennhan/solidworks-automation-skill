@@ -23,7 +23,7 @@ class HoleFeatureCreationError(RuntimeError):
 
     def __init__(self, feature_name, diagnostics):
         self.diagnostics = diagnostics
-        super().__init__(f"SolidWorks 未创建特征: {feature_name}; "
+        super().__init__(f"SolidWorks did not create feature: {feature_name}; "
                          f"diagnostics={json.dumps(diagnostics, ensure_ascii=False)}")
 
 
@@ -77,24 +77,24 @@ def _positive(name: str, value: float) -> float:
     """@brief 校验正有限长度。"""
     number = float(value)
     if not math.isfinite(number) or number <= 0.0:
-        raise ValueError(f"{name} 必须是正有限值，单位为米")
+        raise ValueError(f"{name} must be a positive finite value in meters")
     return number
 
 
 def _center(center: Sequence[float]) -> tuple[float, float]:
     """@brief 校验二维孔中心坐标。"""
     if len(center) != 2:
-        raise ValueError("center 必须包含两个草图平面坐标，单位为米")
+        raise ValueError("center must contain two sketch-plane coordinates in meters")
     values = (float(center[0]), float(center[1]))
     if not all(math.isfinite(value) for value in values):
-        raise ValueError("center 必须是有限值")
+        raise ValueError("center must contain finite values")
     return values
 
 
 def _feature_name(feature, fallback: str) -> str:
     """@brief 设置并回读特征名称；COM 不允许改名时返回当前名称或兜底名。"""
     if feature is None:
-        raise RuntimeError(f"SolidWorks 未创建特征: {fallback}")
+        raise RuntimeError(f"SolidWorks did not create feature: {fallback}")
     try:
         feature.Name = fallback
     except Exception:
@@ -110,7 +110,7 @@ def _circle_cut(model, plane_name: str, center: tuple[float, float], diameter: f
     with sketch(model, plane_name) as sketch_name:
         segment = sketch_circle(model, center[0], center[1], diameter / 2.0)
         if segment is None:
-            raise RuntimeError(f"创建圆草图失败: {feature_name}")
+            raise RuntimeError(f"Failed to create circle sketch: {feature_name}")
     feature = extrude_cut(model, sketch_name, depth)
     if feature is None:
         raise HoleFeatureCreationError(feature_name,
@@ -147,10 +147,10 @@ def _find_hole_entry_edge(model, plane_name: str, center: tuple[float, float], r
                 except Exception:
                     continue
     if not candidates:
-        raise RuntimeError("无法按圆心和半径找到沉头孔入口圆边")
+        raise RuntimeError("Unable to find countersink entry circular edge by center and radius")
     candidates.sort(key=lambda item: item[0])
     if candidates[0][0] > max(tolerance * 10.0, 1e-5):
-        raise RuntimeError(f"找到的圆边偏离沉头入口位置: {candidates[0][0] * 1000.0:.3f} mm")
+        raise RuntimeError(f"Found circular edge deviates from countersink entry position: {candidates[0][0] * 1000.0:.3f} mm")
     return candidates[0][1]
 
 
@@ -159,7 +159,7 @@ def _chamfer_hole_entry(model, plane_name, center, hole_diameter, countersink_di
     edge = _find_hole_entry_edge(model, plane_name, center, hole_diameter / 2.0)
     model.ClearSelection2(True)
     if not _select_com_object(edge, append=False, mark=0):
-        raise RuntimeError(f"选择沉头孔入口圆边失败: {feature_name}")
+        raise RuntimeError(f"Failed to select countersink entry circular edge: {feature_name}")
     radial_distance = (countersink_diameter - hole_diameter) / 2.0
     feature = model.FeatureManager.InsertFeatureChamfer(
         4, 1, radial_distance, half_angle_rad, 0.0, 0.0, 0.0, 0.0
@@ -168,7 +168,7 @@ def _chamfer_hole_entry(model, plane_name, center, hole_diameter, countersink_di
     return _feature_name(feature, feature_name)
 
 
-def create_blind_hole(model, center, diameter, depth, plane_name="Front Plane", name="盲孔") -> dict:
+def create_blind_hole(model, center, diameter, depth, plane_name="Front Plane", name="BlindHole") -> dict:
     """@brief 创建定深盲孔，并返回创建参数证据。"""
     center = _center(center)
     diameter = _positive("diameter", diameter)
@@ -177,7 +177,7 @@ def create_blind_hole(model, center, diameter, depth, plane_name="Front Plane", 
     return HoleFeatureEvidence("blind", center, diameter, depth, False, plane_name, (feature_name,)).to_dict()
 
 
-def create_through_hole(model, center, diameter, plane_name="Front Plane", name="通孔") -> dict:
+def create_through_hole(model, center, diameter, plane_name="Front Plane", name="ThroughHole") -> dict:
     """@brief 创建完全贯穿圆孔，并返回创建参数证据。"""
     center = _center(center)
     diameter = _positive("diameter", diameter)
@@ -192,7 +192,7 @@ def create_counterbore_hole(
     counterbore_diameter,
     counterbore_depth,
     plane_name="Front Plane",
-    name="沉孔",
+    name="Counterbore",
 ) -> dict:
     """@brief 创建通孔加同轴圆柱沉孔的两级复合孔。"""
     center = _center(center)
@@ -200,9 +200,9 @@ def create_counterbore_hole(
     counterbore_diameter = _positive("counterbore_diameter", counterbore_diameter)
     counterbore_depth = _positive("counterbore_depth", counterbore_depth)
     if counterbore_diameter <= hole_diameter:
-        raise ValueError("counterbore_diameter 必须大于 hole_diameter")
-    through_name = _circle_cut(model, plane_name, center, hole_diameter, 0.0, f"{name}_通孔")
-    recess_name = _circle_cut(model, plane_name, center, counterbore_diameter, counterbore_depth, f"{name}_沉孔")
+        raise ValueError("counterbore_diameter must be greater than hole_diameter")
+    through_name = _circle_cut(model, plane_name, center, hole_diameter, 0.0, f"{name}_Through")
+    recess_name = _circle_cut(model, plane_name, center, counterbore_diameter, counterbore_depth, f"{name}_Counterbore")
     return HoleFeatureEvidence(
         "counterbore", center, hole_diameter, None, True, plane_name, (through_name, recess_name),
         counterbore_diameter_m=counterbore_diameter,
@@ -217,7 +217,7 @@ def create_countersink_hole(
     countersink_diameter,
     included_angle_deg=90.0,
     plane_name="Front Plane",
-    name="沉头孔",
+    name="Countersink",
 ) -> dict:
     """@brief 创建通孔加锥形沉头；角度为沉头包含角。"""
     center = _center(center)
@@ -225,13 +225,13 @@ def create_countersink_hole(
     countersink_diameter = _positive("countersink_diameter", countersink_diameter)
     angle = float(included_angle_deg)
     if countersink_diameter <= hole_diameter:
-        raise ValueError("countersink_diameter 必须大于 hole_diameter")
+        raise ValueError("countersink_diameter must be greater than hole_diameter")
     if not math.isfinite(angle) or not 10.0 <= angle < 170.0:
-        raise ValueError("included_angle_deg 必须在 [10, 170) 范围内")
+        raise ValueError("included_angle_deg must be within [10, 170)")
     half_angle = math.radians(angle / 2.0)
-    through_name = _circle_cut(model, plane_name, center, hole_diameter, 0.0, f"{name}_通孔")
+    through_name = _circle_cut(model, plane_name, center, hole_diameter, 0.0, f"{name}_Through")
     sink_name = _chamfer_hole_entry(
-        model, plane_name, center, hole_diameter, countersink_diameter, half_angle, f"{name}_锥面"
+        model, plane_name, center, hole_diameter, countersink_diameter, half_angle, f"{name}_Cone"
     )
     return HoleFeatureEvidence(
         "countersink", center, hole_diameter, None, True, plane_name, (through_name, sink_name),
@@ -247,7 +247,7 @@ def create_semicircular_slot(
     width,
     depth=0.0,
     plane_name="Front Plane",
-    name="半圆端槽",
+    name="SemicircularSlot",
 ) -> dict:
     """@brief 创建两端为半圆的直槽；depth=0 表示贯穿。"""
     start = _center(start)
@@ -255,11 +255,11 @@ def create_semicircular_slot(
     width = _positive("width", width)
     depth = 0.0 if float(depth) == 0.0 else _positive("depth", depth)
     if math.dist(start, end) <= 1e-12:
-        raise ValueError("槽起点和终点不能重合")
+        raise ValueError("Slot start and end points cannot coincide")
     with sketch(model, plane_name) as sketch_name:
         segments = sketch_slot(model, start[0], start[1], end[0], end[1], width / 2.0)
         if segments is None:
-            raise RuntimeError(f"创建半圆端槽草图失败: {name}")
+            raise RuntimeError(f"Failed to create semicircular slot sketch: {name}")
     feature_name = _feature_name(extrude_cut(model, sketch_name, depth), name)
     return {
         "feature_kind": "semicircular_slot",
@@ -282,8 +282,8 @@ def create_hole_pattern(model, positions: Iterable[Sequence[float]], creator, **
     evidence = []
     for index, position in enumerate(positions, start=1):
         item_kwargs = dict(kwargs)
-        base_name = str(item_kwargs.pop("name", "孔"))
+        base_name = str(item_kwargs.pop("name", "Hole"))
         evidence.append(creator(model, position, name=f"{base_name}_{index}", **item_kwargs))
     if not evidence:
-        raise ValueError("positions 至少包含一个孔位")
+        raise ValueError("positions must contain at least one hole location")
     return evidence

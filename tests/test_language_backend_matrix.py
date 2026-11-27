@@ -108,7 +108,7 @@ def test_router_does_not_assume_catalog_backends_are_installed() -> None:
 
     assert result["status"] == "unavailable"
     assert result["error_code"] == "NO_COMPATIBLE_BACKEND_AVAILABLE"
-    assert all(item["reason"] == "运行时不可用" for item in result["considered"])
+    assert all(item["reason"] == "Runtime unavailable" for item in result["considered"])
 
 
 def test_invalid_backend_reference_is_rejected(tmp_path: Path) -> None:
@@ -118,5 +118,5 @@ def test_invalid_backend_reference_is_rejected(tmp_path: Path) -> None:
     manifest = tmp_path / "capabilities.yaml"
     manifest.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
 
-    with pytest.raises(ValueError, match="未知后端"):
+    with pytest.raises(ValueError, match="unknown backend"):
         load_capabilities(manifest)

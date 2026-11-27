@@ -22,13 +22,13 @@ def _now_iso() -> str:
 def _finite_positive(value: Any, field: str, *, maximum: float | None = None) -> float:
     """@brief 校验有限正数和可选上限。"""
     if isinstance(value, bool):
-        raise ValueError(f"{field} 必须是有限正数。")
+        raise ValueError(f"{field} must be a finite positive number.")
     try:
         number = float(value)
     except (TypeError, ValueError) as exc:
-        raise ValueError(f"{field} 必须是有限正数。") from exc
+        raise ValueError(f"{field} must be a finite positive number.") from exc
     if not math.isfinite(number) or number <= 0 or (maximum is not None and number > maximum):
-        raise ValueError(f"{field} 超出允许范围。")
+        raise ValueError(f"{field} is out of allowed range.")
     return number
 
 
@@ -36,7 +36,7 @@ def _identifier(value: Any, field: str) -> str:
     """@brief 校验不会进入路径或求解器关键字的标识符。"""
     token = str(value or "")
     if not token or len(token) > 64 or not token[0].isalpha() or not all(char.isalnum() or char == "_" for char in token):
-        raise ValueError(f"{field} 只能使用字母开头的 1-64 位字母、数字或下划线。")
+        raise ValueError(f"{field} must be 1-64 letters, digits, or underscores starting with a letter.")
     return token
 
 
@@ -46,12 +46,12 @@ def _load_request(value: str | Path | dict[str, Any]) -> dict[str, Any]:
         return dict(value)
     path = Path(value).expanduser().resolve()
     if path.suffix.lower() != ".json" or not path.is_file():
-        raise ValueError("网格收敛请求必须是存在的 JSON 文件。")
+        raise ValueError("Mesh convergence request must be an existing JSON file.")
     if path.stat().st_size > 128 * 1024 * 1024:
-        raise ValueError("网格收敛请求超过 128 MiB 安全上限。")
+        raise ValueError("Mesh convergence request exceeds 128 MiB safety limit.")
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
-        raise ValueError("网格收敛请求必须是 JSON object。")
+        raise ValueError("Mesh convergence request must be a JSON object.")
     return payload
 
 
@@ -73,14 +73,14 @@ def validate_convergence_request(value: str | Path | dict[str, Any]) -> dict[str
     request = _load_request(value)
     allowed = {"schemaVersion", "studyId", "tolerancePercent", "cases"}
     if set(request) - allowed:
-        raise ValueError(f"收敛请求含未允许字段: {', '.join(sorted(set(request) - allowed))}")
+        raise ValueError(f"Convergence request contains disallowed fields: {', '.join(sorted(set(request) - allowed))}")
     if request.get("schemaVersion") != "1.0":
-        raise ValueError("schemaVersion 必须为 1.0。")
+        raise ValueError("schemaVersion must be 1.0.")
     _identifier(request.get("studyId"), "studyId")
     _finite_positive(request.get("tolerancePercent"), "tolerancePercent", maximum=25.0)
     cases = request.get("cases")
     if not isinstance(cases, list) or not 3 <= len(cases) <= 8:
-        raise ValueError("cases 必须包含 3-8 档网格。")
+        raise ValueError("cases must contain 3-8 mesh levels.")
     case_ids: set[str] = set()
     previous_size = math.inf
     previous_nodes = 0
@@ -88,29 +88,29 @@ def validate_convergence_request(value: str | Path | dict[str, Any]) -> dict[str
     fingerprint = None
     for index, case in enumerate(cases):
         if not isinstance(case, dict) or set(case) != {"id", "characteristicSizeMm", "analysis"}:
-            raise ValueError(f"cases[{index}] 结构无效。")
+            raise ValueError(f"cases[{index}] has invalid structure.")
         case_id = _identifier(case.get("id"), f"cases[{index}].id")
         if case_id in case_ids:
-            raise ValueError(f"收敛 case ID 重复: {case_id}")
+            raise ValueError(f"Duplicate convergence case ID: {case_id}")
         case_ids.add(case_id)
         size = _finite_positive(case.get("characteristicSizeMm"), f"cases[{index}].characteristicSizeMm")
         if size >= previous_size:
-            raise ValueError("characteristicSizeMm 必须按粗到细严格递减。")
+            raise ValueError("characteristicSizeMm must strictly decrease from coarse to fine.")
         previous_size = size
         analysis = validate_analysis(case.get("analysis"))
         if analysis["analysisType"] not in {"static_linear", "static_nonlinear"} or analysis["solver"] not in {"auto", "calculix"}:
-            raise ValueError("网格收敛当前只允许 CalculiX static_linear/static_nonlinear。")
+            raise ValueError("Mesh convergence currently allows only CalculiX static_linear/static_nonlinear.")
         node_count = len(analysis["mesh"]["nodes"])
         element_count = len(analysis["mesh"]["elements"])
         if node_count <= previous_nodes or element_count <= previous_elements:
-            raise ValueError("网格细化时节点数和单元数必须严格增加。")
+            raise ValueError("Node and element counts must strictly increase during mesh refinement.")
         previous_nodes = node_count
         previous_elements = element_count
         current_fingerprint = _physics_fingerprint(analysis)
         if fingerprint is None:
             fingerprint = current_fingerprint
         elif current_fingerprint != fingerprint:
-            raise ValueError("所有收敛 case 的材料、载荷和约束必须完全一致。")
+            raise ValueError("Material, loads, and constraints must be identical across all convergence cases.")
     return request
 
 

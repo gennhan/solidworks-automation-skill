@@ -69,7 +69,7 @@ def _edge_curve(edge):
     try:
         curve = get_com_member(edge, "GetCurve")
         if curve is None:
-            raise ValueError("IEdge.GetCurve 返回空曲线")
+            raise ValueError("IEdge.GetCurve returned null curve")
         getattr(curve, "IsLine")  # 排除 pywin32 返回的未调用方法包装。
         return curve
     except Exception as error:
@@ -91,30 +91,30 @@ def _edge_curve(edge):
                 if info.GetNames(member_id)[0] == "GetCurve":
                     matches.append(member_id)
             if not matches:
-                raise ValueError("类型信息中没有 GetCurve")
+                raise ValueError("GetCurve not found in type info")
             dispid = matches[0]
         curve = dynamic.Dispatch(ole.Invoke(dispid, 0, pythoncom.DISPATCH_METHOD, True))
         getattr(curve, "IsLine")
         return curve
     except Exception as error:
-        raise RuntimeError(f"GetCurve 绑定及兼容调用均失败: {original_error}; {error}") from error
+        raise RuntimeError(f"GetCurve binding and fallback invocation both failed: {original_error}; {error}") from error
 
 
 def _curve_span(curve_params):
     """@brief 严格读取官方 11-double 布局；反向边按 SenseFlag 恢复曲线参数。"""
     if curve_params is None or len(curve_params) != 11:
-        raise ValueError("GetCurveParams2 必须返回 11 个 double，不能猜测未知布局")
+        raise ValueError("GetCurveParams2 must return 11 doubles; unknown layouts cannot be assumed")
     values = [float(value) for value in curve_params[:8]]
     if not all(math.isfinite(value) for value in values):
-        raise ValueError("曲线参数包含非有限值")
+        raise ValueError("Curve parameters contain non-finite values")
     start, end = values[6:8]
     sense = struct.unpack("<ii", struct.pack("<d", float(curve_params[10])))[1]
     if sense not in (0, 1):
-        raise ValueError("曲线方向标记无效")
+        raise ValueError("Invalid curve sense flag")
     if not sense:
         start, end = -end, -start
     if start >= end:
-        raise ValueError("曲线参数区间为空或顺序无效")
+        raise ValueError("Curve parameter interval is empty or out of order")
     return start, end
 
 
@@ -122,7 +122,7 @@ def _positive_mm(value):
     """@brief 拒绝无效/非有限几何量，避免 NaN 在筛选比较中穿透。"""
     result = float(value) * _MM_PER_M
     if not math.isfinite(result) or result <= 0:
-        raise ValueError("几何长度必须为有限正数")
+        raise ValueError("Geometric length must be a finite positive number")
     return round(result, 6)
 
 
@@ -157,28 +157,28 @@ def describe_edge(edge, index=0):
     try:
         curve = _edge_curve(edge)
     except Exception as exc:
-        descriptor["errors"].append(f"读取曲线失败: {exc}")
+        descriptor["errors"].append(f"Failed to read curve: {exc}")
     if curve is not None:
         try:
             curve_params = list(get_com_member(edge, "GetCurveParams2") or [])
             span = _curve_span(curve_params)
         except Exception as exc:
-            descriptor["errors"].append(f"读取曲线参数失败: {exc}")
+            descriptor["errors"].append(f"Failed to read curve parameters: {exc}")
     try:
         if curve is not None:
             is_line, is_circle = get_com_member(curve, "IsLine"), get_com_member(curve, "IsCircle")
             if is_line is None or is_circle is None:
-                raise ValueError("曲线类型返回空值")
+                raise ValueError("Curve type returned None")
             descriptor["is_line"], descriptor["is_circle"] = bool(is_line), bool(is_circle)
     except Exception as exc:
-        descriptor["errors"].append(f"读取曲线类型失败: {exc}")
+        descriptor["errors"].append(f"Failed to read curve type: {exc}")
 
     # 边长：IEdge 没有 GetLength，长度在 ICurve::GetLength3(起参, 止参) 上。
     try:
         if curve is not None and span is not None:
             descriptor["length_mm"] = _positive_mm(get_com_member(curve, "GetLength3", *span))
     except Exception as exc:
-        descriptor["errors"].append(f"读取边长失败: {exc}")
+        descriptor["errors"].append(f"Failed to read edge length: {exc}")
 
     # 中点优先用边的起止顶点（IEdge::GetStartVertex/GetEndVertex），
     # 这是不受曲线参数排列差异影响的方式。
@@ -188,7 +188,7 @@ def describe_edge(edge, index=0):
         start_mm = _to_mm(list(get_com_member(get_com_member(edge, "GetStartVertex"), "GetPoint") or []))
         end_mm = _to_mm(list(get_com_member(get_com_member(edge, "GetEndVertex"), "GetPoint") or []))
         if len(start_mm) != 3 or len(end_mm) != 3 or not all(math.isfinite(v) for v in start_mm + end_mm):
-            raise ValueError("端点必须包含三个有限坐标")
+            raise ValueError("Endpoints must contain three finite coordinates")
     except Exception as exc:
         endpoint_error = exc
         start_mm = end_mm = None
@@ -196,7 +196,7 @@ def describe_edge(edge, index=0):
     if span is not None and (not start_mm or not end_mm):
         start_mm, end_mm = _to_mm(curve_params[:3]), _to_mm(curve_params[3:6])
     if endpoint_error is not None and (not start_mm or not end_mm):
-        descriptor["errors"].append(f"读取端点失败: {endpoint_error}")
+        descriptor["errors"].append(f"Failed to read endpoints: {endpoint_error}")
     if start_mm and end_mm and len(start_mm) >= 3 and len(end_mm) >= 3 and all(math.isfinite(v) for v in start_mm + end_mm):
         descriptor["mid_point_mm"] = [
             round((start_mm[axis] + end_mm[axis]) / 2.0, 6) for axis in range(3)
@@ -212,20 +212,20 @@ def describe_edge(edge, index=0):
         try:
             circle = list(get_com_member(curve, "CircleParams") or [])
             if len(circle) != 7 or not all(math.isfinite(float(value)) for value in circle):
-                raise ValueError("CircleParams 必须返回七个有限数值")
+                raise ValueError("CircleParams must return seven finite numeric values")
             descriptor["diameter_mm"] = _positive_mm(float(circle[6]) * 2.0)
         except Exception as exc:
-            descriptor["errors"].append(f"读取直径失败: {exc}")
+            descriptor["errors"].append(f"Failed to read diameter: {exc}")
     elif descriptor["is_line"] is True and descriptor["direction"] is None and curve is not None:
         try:
             line = [float(value) for value in get_com_member(curve, "LineParams")]
             if len(line) != 6 or not all(math.isfinite(value) for value in line):
-                raise ValueError("LineParams 必须返回六个有限数值")
+                raise ValueError("LineParams must return six finite numeric values")
             descriptor["direction"] = _normalize(line[3:6])
             if descriptor["direction"] is None:
-                raise ValueError("直线方向为零向量")
+                raise ValueError("Line direction is a zero vector")
         except Exception as exc:
-            descriptor["errors"].append(f"读取直线方向失败: {exc}")
+            descriptor["errors"].append(f"Failed to read line direction: {exc}")
 
     return descriptor
 
@@ -282,7 +282,7 @@ def iter_model_edges(model, body_index=None):
     try:
         bodies = list(get_com_member(model, "GetBodies2", 0, False) or [])
     except Exception as exc:
-        return descriptors, [f"读取实体列表失败: {exc}"]
+        return descriptors, [f"Failed to read solid bodies: {exc}"]
 
     for index, body in enumerate(bodies):
         if body_index is not None and index != body_index:
@@ -290,14 +290,14 @@ def iter_model_edges(model, body_index=None):
         try:
             edges = list(get_com_member(body, "GetEdges") or [])
         except Exception as exc:
-            errors.append(f"实体 {index} 读取边线失败: {exc}")
+            errors.append(f"Body {index} failed to read edges: {exc}")
             continue
         for edge_index, edge in enumerate(edges):
             descriptor = describe_edge(edge, index=len(descriptors))
             descriptor["body_index"] = index
             descriptor["edge_index"] = edge_index
             descriptors.append(descriptor)
-            errors.extend(f"实体 {index} 边 {edge_index}: {error}" for error in descriptor["errors"])
+            errors.extend(f"Body {index} edge {edge_index}: {error}" for error in descriptor["errors"])
 
     return descriptors, errors
 
@@ -328,13 +328,13 @@ def filter_edges(descriptors, axis="all", min_length_mm=None, max_length_mm=None
                         ("diameter_mm", diameter_mm), ("diameter_tolerance_mm", diameter_tolerance_mm),
                         ("position_tolerance_mm", position_tolerance_mm), ("angle_tolerance_deg", angle_tolerance_deg)):
         if value is not None and (isinstance(value, bool) or not math.isfinite(value) or value < 0):
-            raise ValueError(f"{name} 必须是有限非负数")
+            raise ValueError(f"{name} must be a finite non-negative number")
     if min_length_mm is not None and max_length_mm is not None and min_length_mm > max_length_mm:
-        raise ValueError("最小长度不能大于最大长度")
+        raise ValueError("min_length_mm cannot exceed max_length_mm")
     if axis not in {"all", "vertical", *_AXIS_VECTORS}:
-        raise ValueError("未知选边方向")
+        raise ValueError("Unknown edge selection axis")
     if position_mm is not None and (len(position_mm) != 3 or not all(math.isfinite(value) for value in position_mm)):
-        raise ValueError("选边位置必须包含三个有限坐标")
+        raise ValueError("Edge selection position must contain three finite coordinates")
 
     normalized_axis = "z" if axis == "vertical" else axis
     target_vector = _AXIS_VECTORS.get(normalized_axis)
@@ -343,42 +343,42 @@ def filter_edges(descriptors, axis="all", min_length_mm=None, max_length_mm=None
         reasons = []
 
         if descriptor.get("is_line") is None and descriptor.get("is_circle") is None:
-            reasons.append("曲线类型未知")
+            reasons.append("Curve type unknown")
 
         if min_length_mm is not None:
             length = descriptor.get("length_mm")
             if length is None or not math.isfinite(length) or length < min_length_mm:
-                reasons.append(f"长度 {length} < {min_length_mm}")
+                reasons.append(f"length {length} < {min_length_mm}")
 
         if max_length_mm is not None:
             length = descriptor.get("length_mm")
             if length is None or not math.isfinite(length) or length > max_length_mm:
-                reasons.append(f"长度 {length} > {max_length_mm}")
+                reasons.append(f"length {length} > {max_length_mm}")
 
         if circular is not None and (descriptor.get("is_circle") is None or bool(descriptor.get("is_circle")) != bool(circular)):
-            reasons.append(f"圆边判定不符（要求 circular={circular}）")
+            reasons.append(f"circularity mismatch (required circular={circular})")
 
         if diameter_mm is not None:
             actual = descriptor.get("diameter_mm")
             if actual is None or not math.isfinite(actual) or actual <= 0:
-                reasons.append("直径未知")
+                reasons.append("diameter unknown")
             elif abs(actual - diameter_mm) > diameter_tolerance_mm:
-                reasons.append(f"直径 {actual} 偏离 {diameter_mm}±{diameter_tolerance_mm}")
+                reasons.append(f"diameter {actual} deviates from {diameter_mm}±{diameter_tolerance_mm}")
 
         if position_mm is not None:
             midpoint = descriptor.get("mid_point_mm")
             if midpoint is None or len(midpoint) != 3 or not all(math.isfinite(value) for value in midpoint):
-                reasons.append("中点未知")
+                reasons.append("midpoint unknown")
             else:
                 distance = max(abs(midpoint[axis] - position_mm[axis]) for axis in range(3))
                 if distance > position_tolerance_mm:
-                    reasons.append(f"中点偏离 {distance:.3f}mm > {position_tolerance_mm}mm")
+                    reasons.append(f"midpoint offset {distance:.3f}mm > {position_tolerance_mm}mm")
 
         if target_vector is not None:
             if descriptor.get("is_circle"):
-                reasons.append("圆边无轴向概念")
+                reasons.append("circular edge has no axial direction")
             elif not _is_parallel(descriptor.get("direction"), target_vector, angle_tolerance_deg):
-                reasons.append(f"方向不平行于 {normalized_axis} 轴")
+                reasons.append(f"direction not parallel to {normalized_axis} axis")
 
         if convex_only or concave_only:
             convexity = descriptor.get("convexity")
@@ -387,9 +387,9 @@ def filter_edges(descriptors, axis="all", min_length_mm=None, max_length_mm=None
                 descriptor["convexity"] = convexity
             if convexity is not None:
                 if convex_only and convexity != "convex":
-                    reasons.append(f"非凸边（{convexity}）")
+                    reasons.append(f"not convex ({convexity})")
                 if concave_only and convexity != "concave":
-                    reasons.append(f"非凹边（{convexity}）")
+                    reasons.append(f"not concave ({convexity})")
 
         if reasons:
             rejected.append({"index": descriptor.get("index"), "reasons": reasons})
@@ -430,7 +430,7 @@ def select_edges(model, edge_spec, clear_first=True, mark=0):
             "selected_count": 0,
             "selected": [],
             "rejected": [],
-            "errors": errors + ["模型中未找到任何边线；请确认活动文档是零件且已创建实体。"],
+            "errors": errors + ["No edges found in model; verify active document is a part with solid bodies."],
         }
 
     selected, rejected = filter_edges(descriptors, **(edge_spec or {}))
@@ -442,8 +442,8 @@ def select_edges(model, edge_spec, clear_first=True, mark=0):
             "rejected_count": len(rejected),
             "rejected_sample": rejected[:50],
             "errors": errors + [
-                f"没有边线满足条件 {edge_spec}。已检查 {len(descriptors)} 条边，"
-                "请放宽筛选条件或先用 solidworks_list_edges 查看可用边线。"
+                f"No edges matched filter {edge_spec}. Inspected {len(descriptors)} edges; "
+                "relax filter criteria or call solidworks_list_edges to inspect available edges."
             ],
         }
 
@@ -456,7 +456,7 @@ def select_edges(model, edge_spec, clear_first=True, mark=0):
         if _select_edge(edge, append=True, mark=mark):
             applied.append(descriptor)
         else:
-            selection_failures.append(f"边 {descriptor['index']}: Select 返回 False")
+            selection_failures.append(f"Edge {descriptor['index']}: Select returned False")
 
     if not applied:
         return {
@@ -464,7 +464,7 @@ def select_edges(model, edge_spec, clear_first=True, mark=0):
             "selected_count": 0,
             "selected": [],
             "rejected": rejected[:50],
-            "errors": errors + selection_failures + ["所有候选边线均选择失败。"],
+            "errors": errors + selection_failures + ["All candidate edge selections failed."],
         }
 
     return {

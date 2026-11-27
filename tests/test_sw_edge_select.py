@@ -370,7 +370,7 @@ def test_select_edges_errors_on_empty_model():
     result = sw_edge_select.select_edges(FakeModel([]), {"axis": "z"})
 
     assert result["status"] == "error"
-    assert any("未找到任何边线" in item for item in result["errors"])
+    assert any("No edges found" in item for item in result["errors"])
 
 
 def test_select_edges_reports_partial_failures():
@@ -420,7 +420,7 @@ def test_invalid_curve_length_is_reported(value):
     edge = FakeEdge((0, 0, 0), (.01, 0, 0), length_m=value)
     descriptor = sw_edge_select.describe_edge(edge)
     assert descriptor["length_mm"] is None
-    assert any("边长" in error for error in descriptor["errors"])
+    assert any("edge length" in error for error in descriptor["errors"])
 
 
 @pytest.mark.parametrize("value", [float("nan"), float("inf"), -1, 0])
@@ -428,7 +428,7 @@ def test_invalid_circle_radius_is_reported(value):
     edge = FakeEdge((0, 0, 0), (.01, 0, 0), is_circle=True, diameter_m=value)
     descriptor = sw_edge_select.describe_edge(edge)
     assert descriptor["diameter_mm"] is None
-    assert any("直径" in error for error in descriptor["errors"])
+    assert any("diameter" in error for error in descriptor["errors"])
 
 
 def test_curve_none_is_not_silent_success():
@@ -443,7 +443,7 @@ def test_curve_failure_propagates_and_cannot_be_selected_as_non_circle():
     edge = FakeEdge((0, 0, 0), (.01, 0, 0))
     edge.GetCurve = lambda: None
     descriptors, errors = sw_edge_select.iter_model_edges(FakeModel([edge]))
-    assert errors and "读取曲线失败" in errors[0]
+    assert errors and "Failed to read curve" in errors[0]
     selected, rejected = sw_edge_select.filter_edges(descriptors, circular=False)
     assert not selected and rejected
     result = sw_edge_select.select_edges(FakeModel([edge]), {"axis": "all"})

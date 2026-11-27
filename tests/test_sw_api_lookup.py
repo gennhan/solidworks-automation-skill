@@ -100,7 +100,7 @@ def test_changed_running_process_discards_type_library_evidence(monkeypatch, tmp
     monkeypatch.setattr(api, "_process_executable", lambda pid: tmp_path / "different" / "SLDWORKS.exe")
     result = api.lookup_api("ISketchManager", "CreateCircleByRadius", 2026, online=False)
     assert result["status"] == "unknown" and result["typelib"] is None
-    assert any("目标进程已变化" in warning for warning in result["warnings"])
+    assert any("Target process changed" in warning for warning in result["warnings"])
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows installation discovery")
@@ -116,7 +116,7 @@ def test_installed_target_checks_executable_version_and_rejects_ambiguity(monkey
     monkeypatch.setattr(api, "_executable_year", lambda path: int(path.parent.name))
     assert api._installed_target(2024)["year"] == 2024
     assert api._installed_target(2026)["year"] == 2026
-    with pytest.raises(RuntimeError, match="多个匹配安装"):
+    with pytest.raises(RuntimeError, match="Multiple matching installations"):
         api._installed_target(None)
     monkeypatch.setattr(api, "_executable_year", lambda path: 2026)
     assert api._installed_target(2024) is None
@@ -130,13 +130,13 @@ def test_running_target_requires_matching_pid_and_version(monkeypatch, tmp_path)
     monkeypatch.setattr(api, "_executable_year", lambda path: 2026)
     result = api._running_target(2026, 123)
     assert result["year"] == 2026 and result["revision"] is None and result["process_id"] == 123
-    with pytest.raises(RuntimeError, match="进程不存在"):
+    with pytest.raises(RuntimeError, match="process not found"):
         api._running_target(2026, 124)
     monkeypatch.setattr(api, "_executable_year", lambda path: 2024)
-    with pytest.raises(RuntimeError, match="版本与进程枚举不一致"):
+    with pytest.raises(RuntimeError, match="file version does not match process enumeration"):
         api._running_target(2026, 123)
     monkeypatch.setattr(api, "solidworks_processes", lambda: {123: 2026, 456: 2026})
-    with pytest.raises(RuntimeError, match="多个"):
+    with pytest.raises(RuntimeError, match="Multiple"):
         api._running_target(2026, None)
 
 
@@ -177,12 +177,12 @@ def test_official_fetch_rejects_mismatched_version_and_redirect(monkeypatch):
     class Opener:
         def open(self, request, timeout): return _Response(_official_html(version="2026"), request.full_url)
     monkeypatch.setattr(api.urllib.request, "build_opener", lambda handler: Opener())
-    with pytest.raises(RuntimeError, match="版本或产品"):
+    with pytest.raises(RuntimeError, match="version or product"):
         api.retrieve_official_document(2024, "ISketchManager", "CreateCircleByRadius")
     class Redirected:
         def open(self, request, timeout): return _Response(_official_html(), "https://example.test/")
     monkeypatch.setattr(api.urllib.request, "build_opener", lambda handler: Redirected())
-    with pytest.raises(RuntimeError, match="地址发生变化"):
+    with pytest.raises(RuntimeError, match="URL changed"):
         api.retrieve_official_document(2024, "ISketchManager", "CreateCircleByRadius")
 
 
@@ -227,7 +227,7 @@ def test_multiple_matching_type_libraries_do_not_crash_online_lookup(monkeypatch
     monkeypatch.setattr(api, "retrieve_official_document", lambda *a, **k: {"status": "found"})
     result = api.lookup_api("ISketchManager", "CreateCircleByRadius", 2026)
     assert result["status"] == "conflict" and result["official"]["status"] == "found"
-    assert any("多个类型库" in warning for warning in result["warnings"])
+    assert any("Multiple type libraries" in warning for warning in result["warnings"])
 
 
 def test_cancel_stops_before_network(monkeypatch):
@@ -309,7 +309,7 @@ def test_task_cli_rejects_conflicting_versions_without_lookup(monkeypatch, capsy
     monkeypatch.setattr(api, "lookup_api", lambda *a, **k: pytest.fail("must not query"))
     monkeypatch.setattr(sys, "argv", ["sw_api_lookup.py", "--task", "2024版和2026版的拉伸"])
     assert api.main() == 2
-    assert "版本" in json.loads(capsys.readouterr().err)["message"]
+    assert "version" in json.loads(capsys.readouterr().err)["message"].lower()
 
 
 def test_task_context_labels_parallel_and_cached_sources(monkeypatch):

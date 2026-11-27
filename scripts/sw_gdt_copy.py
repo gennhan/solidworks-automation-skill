@@ -25,12 +25,12 @@ def inspect_targets(source):
     """只读列出计划可用的真实目标及源哈希，供自然语言任务构建明确计划。"""
     source = Path(source).expanduser().resolve(strict=True)
     if source.suffix.casefold() != ".slddrw":
-        raise ValueError("必须提供 SLDDRW")
+        raise ValueError("Source must be an SLDDRW file")
     digest = _sha256(source)
     with SolidWorksReadGuard(), SolidWorksSession(version=2026, visible=True) as session:
         drawing = _open_checked(session, source)
         if get_com_member(drawing, "GetSaveFlag") not in (False, 0):
-            raise ValueError("图纸存在未保存修改")
+            raise ValueError("Drawing has unsaved changes")
         sheet = get_com_member(drawing, "GetCurrentSheet")
         result = {"sourceSha256": digest, "sheet": get_com_member(sheet, "GetName"), "views": []}
         for view in get_com_member(sheet, "GetViews") or ():
@@ -38,7 +38,7 @@ def inspect_targets(source):
             if not components:
                 continue
             if len(components) != 1:
-                raise ValueError("只支持单零件视图")
+                raise ValueError("Only single-part views are supported")
             row = {"view": str(get_com_member(view, "Name")), "targets": []}
             for dimension in get_com_member(view, "GetDisplayDimensions") or ():
                 row["targets"].append({"kind": "dimension", "name": str(get_com_member(dimension, "GetNameForSelection")),
@@ -54,10 +54,10 @@ def inspect_targets(source):
                     values = get_com_member(curve, "CircleParams")
                     row["targets"].append({"kind": "circle", "centerMm": [1000 * value for value in values[:3]], "radiusMm": 1000 * values[6]})
             if len(row["targets"]) > 500:
-                raise ValueError("单个视图超过 500 个目标，请使用专项脚本")
+                raise ValueError("View exceeds 500 targets; use a dedicated script")
             result["views"].append(row)
         if _sha256(source) != digest:
-            raise RuntimeError("只读检查期间源文件变化")
+            raise RuntimeError("Source file changed during read-only inspection")
         return result
 
 
@@ -69,17 +69,17 @@ def validate_plan(plan):
     json.dumps(plan, allow_nan=False)
     rows = [*plan["datums"], *plan["geometricTolerances"]]
     if not rows or len({row["id"] for row in rows}) != len(rows):
-        raise ValueError("计划不能为空，且标注 ID 不得重复")
+        raise ValueError("Plan cannot be empty and annotation IDs must be unique")
     labels = [row["label"] for row in plan["datums"]]
     if len(set(labels)) != len(labels):
-        raise ValueError("计划中的基准标识重复")
+        raise ValueError("Duplicate datum labels in plan")
     for row in plan["datums"]:
         if row["target"]["kind"] == "dimension":
-            raise ValueError("基准当前只支持明确的边线目标")
+            raise ValueError("Datums currently support only explicit edge targets")
     for row in plan["geometricTolerances"]:
         build_gtol_xmls(row)
         if (row["target"]["kind"] == "dimension") == ("positionMm" in row):
-            raise ValueError("尺寸关联公差自动定位；边线关联公差必须指定位置")
+            raise ValueError("Dimension-attached tolerances auto-position; edge-attached tolerances must specify positionMm")
     return plan
 
 
@@ -101,7 +101,7 @@ def resolve_target(view, target):
     else:
         components = get_com_member(view, "GetVisibleComponents") or ()
         if len(components) != 1:
-            raise ValueError("只支持单个零件的视图，不能猜测组件")
+            raise ValueError("Only single-part views are supported; cannot guess component")
         for edge in get_com_member(view, "GetVisibleEntities2", components[0], 1) or ():
             curve = get_com_member(edge, "GetCurve")
             if kind == "line" and get_com_member(curve, "IsLine"):
@@ -111,7 +111,7 @@ def resolve_target(view, target):
                 a, b = get_com_member(start_vertex, "GetPoint"), get_com_member(end_vertex, "GetPoint")
                 start, end = [v / 1000 for v in target["startMm"]], [v / 1000 for v in target["endMm"]]
                 if _near(start, end):
-                    raise ValueError("线段端点不能重合")
+                    raise ValueError("Line endpoints cannot coincide")
                 if (_near(a, start) and _near(b, end)) or (_near(a, end) and _near(b, start)):
                     candidates.append(edge)
             elif kind == "circle" and get_com_member(curve, "IsCircle"):
@@ -119,14 +119,14 @@ def resolve_target(view, target):
                 if _near(values[:3], [v / 1000 for v in target["centerMm"]]) and _near([values[6]], [target["radiusMm"] / 1000]):
                     candidates.append(edge)
     if len(candidates) != 1:
-        raise ValueError(f"目标不能唯一确认：{kind}，候选数 {len(candidates)}")
+        raise ValueError(f"Target could not be uniquely resolved: {kind}, candidates={len(candidates)}")
     return candidates[0]
 
 
 def _persistent_id(extension, entity):
     value = get_com_member(extension, "GetPersistReference3", entity)
     if not isinstance(value, (bytes, memoryview, list, tuple)) or not value:
-        raise ValueError("对象不支持可靠的持久引用")
+        raise ValueError("Entity does not support reliable persistent references")
     return bytes(value)
 
 
@@ -139,20 +139,20 @@ def _same_id(extension, before, after):
 def _resolve_plan(drawing, plan, *, expected_sheet_size=(.420, .297), dimensions=None):
     sheet = get_com_member(drawing, "GetCurrentSheet")
     if str(get_com_member(sheet, "GetName")) != plan["sheet"]:
-        raise ValueError("计划的图纸页与当前页不一致")
+        raise ValueError("Plan sheet name does not match active sheet")
     properties = get_com_member(sheet, "GetProperties2")
     if not isinstance(properties, (list, tuple)) or len(properties) != 8 or not _near(properties[5:7], expected_sheet_size):
-        raise ValueError("实际图幅与计划不一致")
+        raise ValueError("Actual sheet size does not match plan")
     units = get_com_member(drawing, "GetUnits")
     if not isinstance(units, (list, tuple)) or not units or units[0] != 0:  # swMM
-        raise ValueError("此入口要求图纸使用毫米单位")
+        raise ValueError("Drawing must use millimeter units for this entrypoint")
     views = get_com_member(sheet, "GetViews") or ()
     labels = []
     for view in views:
         labels.extend(str(get_com_member(tag, "GetLabel")) for tag in get_com_member(view, "GetDatumTags") or ())
     requested_labels = [row["label"] for row in plan["datums"]]
     if len(labels) != len(set(labels)) or set(labels) & set(requested_labels):
-        raise ValueError("图纸或计划包含重名基准，无法确认引用")
+        raise ValueError("Drawing or plan contains duplicate datum labels; references cannot be confirmed")
     available = set(labels) | set(requested_labels)
     resolved = []
     extension = get_com_member(drawing, "Extension")
@@ -160,14 +160,14 @@ def _resolve_plan(drawing, plan, *, expected_sheet_size=(.420, .297), dimensions
         for row in rows:
             matching = [view for view in views if str(get_com_member(view, "Name") or "") == row["view"]]
             if len(matching) != 1:
-                raise ValueError("视图名称不唯一或不存在：" + row["view"])
+                raise ValueError("View name is not unique or not found: " + row["view"])
             if kind == "gtol" and not referenced_datums(row) <= available:
-                raise ValueError("公差引用了不存在的基准")
+                raise ValueError("Tolerance references a nonexistent datum")
             target_spec = row["target"]
             if target_spec.get("kind") == "dimension" and "dimensionId" in target_spec:
                 bound = (dimensions or {}).get(target_spec["dimensionId"])
                 if not bound or bound["view"] != row["view"]:
-                    raise ValueError("公差目标尺寸不存在或属于其他视图")
+                    raise ValueError("Tolerance target dimension not found or belongs to another view")
                 target = bound["object"]
             else:
                 target = resolve_target(matching[0], target_spec)
@@ -198,10 +198,10 @@ def create_annotations(drawing, resolved, app, *, name_ids=False):
         if name_ids:
             name = "CAD_ANN__" + row["id"]
             if not get_com_member(ann, "SetName", name) or get_com_member(ann, "GetName") != name:
-                raise RuntimeError("无法持久绑定标注 ID")
+                raise RuntimeError("Unable to persistently bind annotation ID")
         annotation_id = _persistent_id(extension, ann)
         if any(_same_id(extension, previous, annotation_id) for previous in annotation_ids):
-            raise RuntimeError("写入复用了已有标注身份，副本不保存")
+            raise RuntimeError("Write reused an existing annotation identity; copy was not saved")
         annotation_ids.append(annotation_id)
         records.append({"kind": kind, "request": row, "object": obj, "annotation_id": annotation_id,
                         "target_id": target_id, "position": get_com_member(ann, "GetPosition")})
@@ -221,22 +221,22 @@ def _verify_reopened(drawing, records):
                     if _same_id(extension, record["annotation_id"], _persistent_id(extension, ann)):
                         candidates.append(obj)
         if len(candidates) != 1:
-            raise RuntimeError("重开后标注身份不一致：" + row["id"])
+            raise RuntimeError("Annotation identity mismatch after reopen: " + row["id"])
         obj = candidates[0]
         ann = get_com_member(obj, "GetAnnotation")
         attached = get_com_member(ann, "GetAttachedEntities3")
         if (get_com_member(ann, "GetAttachedEntityCount3") != 1 or not isinstance(attached, (tuple, list))
                 or len(attached) != 1 or attached[0] is None
                 or not _same_id(extension, record["target_id"], _persistent_id(extension, attached[0]))):
-            raise RuntimeError("重开后目标关联不一致：" + row["id"])
+            raise RuntimeError("Target attachment mismatch after reopen: " + row["id"])
         if kind == "datum":
             if get_com_member(obj, "GetLabel") != row["label"] or get_com_member(obj, "GetDisplayStyle") != (1 if row["displayStyle"] == "square" else 2):
-                raise RuntimeError("重开后基准内容不一致")
+                raise RuntimeError("Datum content mismatch after reopen")
         else:
             verify_gtol_frames(obj, build_gtol_xmls(row))
         position = get_com_member(ann, "GetPosition")
         if not _near(position[:2], record["position"][:2]):
-            raise RuntimeError(f"重开后标注位置不一致：{row['id']}，预期 {record['position'][:2]}，实际 {position[:2]}")
+            raise RuntimeError(f"Annotation position mismatch after reopen: {row['id']}, expected {record['position'][:2]}, actual {position[:2]}")
 
 
 def _capture_saved_positions(records):
@@ -244,10 +244,10 @@ def _capture_saved_positions(records):
     for record in records:
         position = get_com_member(get_com_member(record["object"], "GetAnnotation"), "GetPosition")
         if not isinstance(position, (list, tuple)) or len(position) < 2 or not _near(position[:2], position[:2]):
-            raise RuntimeError("保存后标注位置无效")
+            raise RuntimeError("Invalid annotation position after save")
         requested = record["request"].get("positionMm")
         if requested is not None and not all(math.isclose(actual, intended / 1000, rel_tol=0, abs_tol=1e-6) for actual, intended in zip(position[:2], requested)):
-            raise RuntimeError("保存后标注偏离显式请求位置")
+            raise RuntimeError("Saved annotation deviated from explicitly requested position")
         record["position"] = position
 
 
@@ -257,11 +257,11 @@ def annotate_copy(source, plan, output_dir):
     source = Path(source).expanduser().absolute()
     output = Path(output_dir).expanduser().absolute()
     if source.is_symlink() or not source.is_file() or source.suffix.casefold() != ".slddrw":
-        raise ValueError("源文件必须是现有的非链接 SLDDRW")
+        raise ValueError("Source file must be an existing non-symlink SLDDRW")
     if _sha256(source) != plan["sourceSha256"]:
-        raise ValueError("源图纸已经变化，必须重新生成计划")
+        raise ValueError("Source drawing has changed; plan must be regenerated")
     if output.exists() or output.is_symlink() or not output.parent.is_dir():
-        raise ValueError("输出目录必须不存在，且父目录必须存在")
+        raise ValueError("Output directory must not exist and its parent directory must exist")
     report = {"status": "blocked", "reviewRequired": True, "source": str(source), "outputs": [], "error": None,
               "limitations": ["Supports SW2026 single-sheet, single-part A3 drawing copies only.", "Does not derive design tolerances or certify manufacturing/standard compliance.", "Dimensions must already exist; use the DrawingSpec drawing package entry point to create dimensions automatically."]}
     created_dir = False
@@ -269,21 +269,21 @@ def annotate_copy(source, plan, output_dir):
         with SolidWorksReadGuard(), SolidWorksSession(version=2026, visible=True) as session:
             original = _open_checked(session, source)
             if get_com_member(original, "GetType") != 3 or get_com_member(original, "GetSaveFlag") not in (False, 0):
-                raise ValueError("源图纸存在未保存修改或类型无效")
+                raise ValueError("Source drawing has unsaved changes or invalid document type")
             if len(get_com_member(original, "GetSheetNames") or ()) != 1:
-                raise ValueError("当前入口只支持单页工程图")
+                raise ValueError("This entrypoint currently supports single-sheet drawings only")
             dependencies = get_com_member(original, "GetDependencies2", True, True, False)
             if not isinstance(dependencies, (list, tuple)) or len(dependencies) % 2 or not dependencies:
-                raise ValueError("无法确认图纸模型依赖")
+                raise ValueError("Unable to confirm drawing model dependencies")
             refs = {Path(str(dependencies[index])).resolve(strict=True) for index in range(1, len(dependencies), 2)}
             if len(refs) != 1 or any(path.suffix.casefold() != ".sldprt" for path in refs):
-                raise ValueError("只支持引用一个零件的图纸")
+                raise ValueError("Only drawings referencing a single part are supported")
             source_hashes = {path: _sha256(path) for path in {source.resolve(), *refs}}
             for view in get_com_member(get_com_member(original, "GetCurrentSheet"), "GetViews") or ():
                 model = get_com_member(view, "ReferencedDocument", default=None)
                 if model is not None and (get_com_member(model, "GetSaveFlag") not in (False, 0)
                         or Path(str(get_com_member(model, "GetPathName") or "")).resolve() not in refs):
-                    raise ValueError("模型未保存或模型引用身份不一致")
+                    raise ValueError("Model has unsaved changes or model reference identity mismatch")
             _resolve_plan(original, plan)  # 全量预解析，任何歧义在创建目录前阻断。
             if any(item is original for item in session._owned_documents):
                 session.close(model=original)
@@ -295,14 +295,14 @@ def annotate_copy(source, plan, output_dir):
                 writer.flush()
                 os.fsync(writer.fileno())
             if _sha256(copy) != plan["sourceSha256"]:
-                raise RuntimeError("副本字节与计划不一致")
+                raise RuntimeError("Copy bytes do not match plan checksum")
             drawing = _open_checked(session, copy, read_only=False)
             resolved = _resolve_plan(drawing, plan)
             records = create_annotations(drawing, resolved, session.sw)
             if not get_com_member(drawing, "ForceRebuild3", False):
-                raise RuntimeError("工程图重建失败")
+                raise RuntimeError("Drawing rebuild failed")
             if not session.save(drawing, str(copy)):
-                raise RuntimeError("副本保存失败")
+                raise RuntimeError("Failed to save drawing copy")
             _capture_saved_positions(records)
             session.close(model=drawing)
             drawing = _open_checked(session, copy)
@@ -313,19 +313,19 @@ def annotate_copy(source, plan, output_dir):
             from scripts.sw_review import review_drawing_layout, save_review_previews, inspect_bmp_preview
             pdf = output / "drawing.pdf"
             if not export_sheet_to_pdf(drawing, str(pdf), sw_app=session.sw):
-                raise RuntimeError("PDF 导出失败")
+                raise RuntimeError("PDF export failed")
             previews = save_review_previews(drawing, output / "previews", basename="drawing", views=("front",))
             structure = inspect_drawing_structure(drawing, paper_size_hint="A3")
             rendering = inspect_pdf_dimension_rendering(pdf, structure)
             if rendering.get("status") != "pass":
-                raise RuntimeError("PDF 尺寸文字核验失败")
+                raise RuntimeError("PDF dimension text verification failed")
             rendered = sw_drawing_review._MODULE._with_rendered_dimension_boxes(structure, rendering)
             layout = review_drawing_layout(rendered, preview_evidence=[inspect_bmp_preview(path) for path in previews])
             report["layout"] = layout
             if layout.get("status") != "pass":
-                raise RuntimeError("图纸布局核验失败")
+                raise RuntimeError("Drawing layout verification failed")
             if any(_sha256(path) != digest for path, digest in source_hashes.items()):
-                raise RuntimeError("源图纸或模型文件发生变化")
+                raise RuntimeError("Source drawing or model file changed")
             report.update(status="review_required", nativeValidation="pass", annotationCount=len(records),
                           outputs=[str(copy), str(pdf), *map(str, previews)], sourceHashes={str(path): value for path, value in source_hashes.items()})
     except Exception as error:
@@ -346,14 +346,14 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if args.inspect:
         if args.plan or args.output_dir:
-            parser.error("--inspect 不接受写入计划或输出目录")
+            parser.error("--inspect does not accept --plan or --output-dir")
         print(json.dumps(inspect_targets(args.source), ensure_ascii=True, indent=2, allow_nan=False))
         return 0
     if not args.plan or not args.output_dir:
-        parser.error("写入时必须提供 --plan 和 --output-dir")
+        parser.error("--plan and --output-dir are required when writing")
     plan_path = Path(args.plan)
     if plan_path.stat().st_size > 1024 * 1024:
-        parser.error("计划不得超过 1 MiB")
+        parser.error("Plan file must not exceed 1 MiB")
     plan = json.loads(plan_path.read_text(encoding="utf-8-sig"))
     result = annotate_copy(args.source, plan, args.output_dir)
     print(json.dumps(result, ensure_ascii=True, indent=2))

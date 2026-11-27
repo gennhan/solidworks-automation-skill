@@ -75,7 +75,7 @@ def test_archive_verification_rejects_invalid_delivery(tmp_path, fault):
 def test_release_rejects_mixed_skill_and_desktop_versions(tmp_path):
     source_tree(tmp_path)
     (tmp_path / "package.json").write_text('{"version":"2.0.0"}', encoding="utf-8")
-    with pytest.raises(ValueError, match="版本"):
+    with pytest.raises(ValueError, match="version"):
         build_skill_archive(tmp_path, tmp_path / "mismatch.zip", source_commit="a"*40)
 
 
@@ -85,7 +85,7 @@ def test_archive_does_not_follow_sources_outside_repository(tmp_path, monkeypatc
     outside = tmp_path / "private.py"
     outside.write_text("private fixture", encoding="utf-8")
     monkeypatch.setattr("scripts.build_skill_release.collect_runtime_files", lambda _: {Path("scripts/private.py"): outside})
-    with pytest.raises(ValueError, match="越出仓库"):
+    with pytest.raises(ValueError, match="escapes repository"):
         build_skill_archive(root, tmp_path / "outside.zip", source_commit="a"*40)
 
 
@@ -106,7 +106,7 @@ def test_desktop_package_must_embed_the_same_complete_runtime(tmp_path, fault):
     if fault is None:
         assert verify_desktop_skill(skill, desktop, root)["status"] == "pass"
     else:
-        with pytest.raises(ValueError, match="不一致"):
+        with pytest.raises(ValueError, match="mismatch|does not match"):
             verify_desktop_skill(skill, desktop, root)
 
 
@@ -122,5 +122,5 @@ def test_actual_installed_files_are_verified(tmp_path):
         shutil.copy2(source, target)
     assert verify_installed_skill(skill, installed, root)["status"] == "pass"
     (installed / "scripts/sw_edge_select.py").write_text("old version", encoding="utf-8")
-    with pytest.raises(ValueError, match="内容不一致"):
+    with pytest.raises(ValueError, match="content mismatch"):
         verify_installed_skill(skill, installed, root)

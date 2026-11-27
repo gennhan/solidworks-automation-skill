@@ -29,7 +29,7 @@ def test_rejects_distinct_source_paths_with_same_name(tmp_path):
     duplicate = alternate / "PART.SLDPRT"
     duplicate.write_bytes(b"different part")
     plan.append({"source": str(duplicate), "new_name": "other.sldprt", "status": "planned"})
-    with pytest.raises(ValueError, match="源文件名称重复"):
+    with pytest.raises(ValueError, match="Duplicate source filename"):
         prepare_assembly_plan(root, plan)
 
 
@@ -92,11 +92,11 @@ def test_component_snapshot_requires_matching_transform_and_mate_health(tmp_path
     identity = lambda path, before, after: before == after
     _compare_assembly(before, after, {old.casefold(): new}, identity_comparator=identity)
     after["components"][0]["transform"] = [0.1] + [0.0] * 15
-    with pytest.raises(ValueError, match="变换"):
+    with pytest.raises(ValueError, match="transform"):
         _compare_assembly(before, after, {old.casefold(): new}, identity_comparator=identity)
     after["components"][0]["transform"] = [0.0] * 16
     after["mates"] = []
-    with pytest.raises(ValueError, match="配合"):
+    with pytest.raises(ValueError, match="(?i)mate"):
         _compare_assembly(before, after, {old.casefold(): new})
 
 
@@ -121,7 +121,7 @@ def test_healthy_mate_does_not_hide_changed_reference(tmp_path, change):
     before = {"components": [], "mates": [mate]}
     after = {"components": [], "mates": [{**mate, "entities": [] if change == "missing" else [copied]}]}
     compare = lambda path, before, after: 2 if change == "unknown_identity" else before == after
-    with pytest.raises(ValueError, match="配合"):
+    with pytest.raises(ValueError, match="(?i)mate"):
         _compare_assembly(before, after, {old.casefold(): new}, identity_comparator=compare)
 
 
@@ -147,7 +147,7 @@ def test_assembly_external_reference_is_blocked():
         def ListAuxiliaryExternalFileReferencesCount(self):
             return 0
 
-    with pytest.raises(ValueError, match="外部文件引用"):
+    with pytest.raises(ValueError, match="external file references"):
         _assembly_snapshot(Assembly())
 
 
@@ -186,7 +186,7 @@ def test_copy_stops_before_copy_when_graph_has_unplanned_dependency(tmp_path, mo
     monkeypatch.setattr(implementation, "_assembly_snapshot", lambda model: {})
     result = implementation.copy_assembly(root, plan, tmp_path / "output")
     assert result["status"] == "blocked"
-    assert "引用不在计划中" in result["error"]
+    assert "Reference not in plan" in result["error"]
     assert result["outputs"] == []
     assert list((tmp_path / "output").glob("*.sld*")) == []
     assert root.read_bytes() == b"test"

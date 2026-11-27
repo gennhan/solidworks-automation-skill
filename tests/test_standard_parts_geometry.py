@@ -59,8 +59,8 @@ def test_compression_spring_metrics_and_rate():
     assert s.solid_length_mm == pytest.approx(24.0)
     assert s.outer_diameter_mm == pytest.approx(27.0)
     assert s.pitch_mm == pytest.approx(60.0 / 8.0)
-    assert any("中心线轴向行程" in item for item in s.limitations)
-    assert any("不生成" in item for item in s.limitations)
+    assert any("centerline axial travel" in item for item in s.limitations)
+    assert any("does not generate" in item for item in s.limitations)
     expected_rate = 79300.0 * 3.0**4 / (8.0 * 24.0**3 * 6.0)
     assert s.spring_rate_n_per_mm == pytest.approx(expected_rate)
     # 螺旋线沿 +Z 单调递增且首点在 z=0，末点在自由长度。
@@ -140,7 +140,7 @@ def test_bore_must_fit_actual_profile_not_only_nominal_root():
     geometry = geo.roller_sprocket_profile(12.7, 7.92, 17)
     assert geometry.profile_min_diameter_mm < geometry.root_diameter_mm
     assert geometry.profile_min_diameter_mm == pytest.approx(geometry.pitch_diameter_mm - 2 * geometry.seating_radius_mm)
-    with pytest.raises(ValueError, match="实际最小直径"):
+    with pytest.raises(ValueError, match="actual minimum diameter"):
         geo.roller_sprocket_profile(12.7, 7.92, 17, bore_diameter_mm=(geometry.profile_min_diameter_mm + geometry.root_diameter_mm) / 2)
 
 

@@ -236,42 +236,42 @@ def review_drawing_layout(structure, *, padding_m=0.001, preview_evidence=None) 
         for item in previews
     )
     checks = [
-        {"id": "drawing-view-count", "status": "pass" if len(views) >= 3 else "fail", "message": f"读取到 {len(views)} 个工程图视图"},
-        {"id": "drawing-view-boxes", "status": "pass" if view_boxes_complete else "warning", "message": "视图边界完整" if view_boxes_complete else "视图边界证据不完整"},
+        {"id": "drawing-view-count", "status": "pass" if len(views) >= 3 else "fail", "message": f"Read {len(views)} drawing views"},
+        {"id": "drawing-view-boxes", "status": "pass" if view_boxes_complete else "warning", "message": "View bounding boxes complete" if view_boxes_complete else "View bounding box evidence incomplete"},
         {
             "id": "drawing-dimension-boxes",
             "status": "pass" if dimension_boxes_complete and not estimated_dimensions else "warning",
             "message": (
-                "没有读取到尺寸实体"
+                "No dimension entities read"
                 if not dimensions
-                else "尺寸文字边界完整（SolidWorks 原生或最终 PDF 矢量文字）"
+                else "Dimension text bounding boxes complete (SolidWorks native or final PDF vector text)"
                 if dimension_boxes_complete and not estimated_dimensions
-                else f"SolidWorks 原生边界 {len(native_dimensions)}/{len(dimensions)}，PDF 最终文字边界 {len(rendered_dimensions)}/{len(dimensions)}，保守估算 {len(estimated_dimensions)}/{len(dimensions)}"
+                else f"SolidWorks native boxes {len(native_dimensions)}/{len(dimensions)}, final PDF text boxes {len(rendered_dimensions)}/{len(dimensions)}, conservative estimates {len(estimated_dimensions)}/{len(dimensions)}"
             ),
         },
         {
             "id": "drawing-dimension-estimate-provenance",
             "status": "warning" if estimated_dimensions else "pass",
-            "message": "估算边界仅用于风险筛查，不作为 SolidWorks 原生包围盒" if estimated_dimensions else "没有使用估算尺寸边界",
+            "message": "Estimated boxes are for risk screening only, not SolidWorks native bounding boxes" if estimated_dimensions else "No estimated dimension bounding boxes used",
         },
-        {"id": "drawing-title-block-box", "status": "pass" if title_box else "warning", "message": "标题栏区域可用于碰撞检查" if title_box else "缺少标题栏区域证据"},
+        {"id": "drawing-title-block-box", "status": "pass" if title_box else "warning", "message": "Title block region available for collision checks" if title_box else "Missing title block region evidence"},
         {
             "id": "drawing-note-boxes",
             "status": "pass" if note_boxes_complete else "warning",
-            "message": f"注释边界完整（PDF 回填 {len(rendered_notes)} 项）" if note_boxes_complete else "部分注释缺少边界，无法完整检查注释碰撞",
+            "message": f"Note bounding boxes complete (PDF backfilled {len(rendered_notes)} items)" if note_boxes_complete else "Some notes lack bounding boxes; note collision check incomplete",
         },
         {
             "id": "drawing-layout-collisions",
             "status": "fail" if confirmed_findings else "warning" if estimated_risk_findings else "pass",
             "message": (
-                f"确认碰撞 {len(confirmed_findings)} 项，估算风险 {len(estimated_risk_findings)} 项"
-                if findings else "未发现结构化布局碰撞风险"
+                f"Confirmed collisions: {len(confirmed_findings)}, estimated risks: {len(estimated_risk_findings)}"
+                if findings else "No structured layout collision risks found"
             ),
         },
         {
             "id": "drawing-pixel-preview",
             "status": "pass" if pixel_preview_available else "warning",
-            "message": "BMP 预览存在且非空，可辅助目视确认" if pixel_preview_available else "未提供可用 BMP 像素证据；无法辅助确认估算边界",
+            "message": "BMP preview exists and is non-blank for visual confirmation" if pixel_preview_available else "No usable BMP pixel evidence provided; cannot visually confirm estimated boxes",
         },
     ]
     if len(views) < 3:
@@ -373,14 +373,14 @@ def inspect_pdf_text_layout(path, *, maximum_spans=20000, minimum_overlap_area_p
         ],
     }
     if source.suffix.lower() != ".pdf" or not source.is_file() or not 0 < source.stat().st_size <= 256 * 1024 * 1024:
-        base.update({"error_code": "DRAWING_PDF_INVALID", "message": "PDF 不存在、为空或超过 256 MiB。"})
+        base.update({"error_code": "DRAWING_PDF_INVALID", "message": "PDF does not exist, is empty, or exceeds 256 MiB."})
         return base
     try:
         fitz = _import_pdf_parser()
     except ImportError:
         base.update({
             "error_code": "DRAWING_PDF_TEXT_PARSER_MISSING",
-            "message": "缺少 PyMuPDF；安装 requirements-pdf.txt 后可读取 PDF 真实文字边界。",
+            "message": "Missing PyMuPDF; install requirements-pdf.txt to read actual PDF text bounding boxes.",
         })
         return base
 
@@ -408,7 +408,7 @@ def inspect_pdf_text_layout(path, *, maximum_spans=20000, minimum_overlap_area_p
                             page_spans.append(record)
                             spans.append(record)
                             if len(spans) > maximum_spans:
-                                raise ValueError(f"PDF 文字 span 超过安全上限 {maximum_spans}。")
+                                raise ValueError(f"PDF text spans exceed safety limit {maximum_spans}.")
                 base["pages"].append({
                     "page": page_index + 1,
                     "widthPt": float(page.rect.width),
@@ -450,7 +450,7 @@ def inspect_pdf_text_layout(path, *, maximum_spans=20000, minimum_overlap_area_p
         "numeric_text_span_count": sum(1 for item in spans if item["dimensionCandidate"]),
         "overlaps": overlaps,
         "error_code": "DRAWING_PDF_TEXT_OVERLAP_RISK" if overlaps else None,
-        "message": "PDF 中未提取到矢量文字。" if not spans else "PDF 矢量文字边界已读取。",
+        "message": "No vector text extracted from PDF." if not spans else "PDF vector text bounding boxes read.",
     })
     if not spans:
         base["error_code"] = "DRAWING_PDF_VECTOR_TEXT_MISSING"
@@ -606,7 +606,7 @@ def save_preview(model, output_path, view_name="isometric", width=1600, height=1
     clear_selection_for_preview(model)
     ok = model.SaveBMP(str(output_path), int(width), int(height))
     if not ok or not output_path.exists():
-        raise RuntimeError(f"预览图导出失败: {output_path}")
+        raise RuntimeError(f"Preview image export failed: {output_path}")
     return str(output_path)
 
 
@@ -835,9 +835,9 @@ def collect_geometry_measurements(model):
                 "axis_order": "model_xyz",
             }
         else:
-            measurements["errors"].append("GetPartBox(True) 未返回 6 个坐标值")
+            measurements["errors"].append("GetPartBox(True) did not return 6 coordinates")
     except Exception as exc:
-        measurements["errors"].append(f"包围盒读取失败: {exc}")
+        measurements["errors"].append(f"Failed to read bounding box: {exc}")
 
     try:
         bodies = get_com_member(model, "GetBodies2", 0, False) or []
@@ -883,9 +883,9 @@ def collect_geometry_measurements(model):
                             evidence["classification_reason"] = "internal cylinder has more than two boundary edges"
                             measurements["slot_arc_candidates"].append(evidence)
                 except Exception as exc:
-                    measurements["errors"].append(f"圆柱面读取失败 body={body_index} face={face_index}: {exc}")
+                    measurements["errors"].append(f"Failed to read cylindrical face body={body_index} face={face_index}: {exc}")
     except Exception as exc:
-        measurements["errors"].append(f"实体拓扑读取失败: {exc}")
+        measurements["errors"].append(f"Failed to read solid topology: {exc}")
     measurements["hole_count"] = len(measurements["holes"])
     measurements["hole_groups"] = group_coaxial_hole_segments(measurements["holes"])
     measurements["compound_holes"] = [
@@ -1006,12 +1006,12 @@ def evaluate_review_report(report):
             hard_fail = True
 
     if checks.get("rebuild_succeeded") is False:
-        add_issue("rebuild_failed", "fail", "模型重建失败，无法确认交付状态。", "修复特征错误后重新重建与审查。", 40)
+        add_issue("rebuild_failed", "fail", "Model rebuild failed; delivery state cannot be confirmed.", "Fix feature errors, then rebuild and re-review.", 40)
     summary = report.get("model") or {}
     if summary.get("faulty_features"):
-        add_issue("feature_errors_present", "fail", "特征树包含已确认的错误特征。", "修复报告列出的特征后重建。", 35)
+        add_issue("feature_errors_present", "fail", "Feature tree contains confirmed faulty features.", "Fix the features listed in the report and rebuild.", 35)
     if summary.get("warning_features") or summary.get("unknown_feature_health"):
-        add_issue("feature_health_review_required", "warn", "特征存在警告或无法取得完整错误证据。", "复核特征错误/警告明细。", 8)
+        add_issue("feature_health_review_required", "warn", "Features have warnings or complete error evidence could not be obtained.", "Review feature error/warning details.", 8)
     envelope = (report.get("cad_spec") or {}).get("envelope_mm")
     if summary.get("type") == 1 and envelope:
         try:
@@ -1021,32 +1021,32 @@ def evaluate_review_report(report):
         except (KeyError, TypeError, ValueError):
             valid = False
         if not valid:
-            add_issue("degenerate_envelope", "fail", "零件包络退化或不是有限尺寸。", "确认真实实体存在。", 35)
+            add_issue("degenerate_envelope", "fail", "Part envelope is degenerate or non-finite.", "Verify that a real solid body exists.", 35)
     interference = report.get("interference")
     if interference:
         if interference.get("status") == "blocked":
-            add_issue("interference_check_blocked", "warn", "装配体干涉证据读取失败。", "检查完整加载与 CAD 状态。", 8)
+            add_issue("interference_check_blocked", "warn", "Failed to read assembly interference evidence.", "Verify full component resolution and CAD state.", 8)
         elif interference.get("interference_count"):
-            add_issue("interference_detected", "warn", "装配体存在干涉，体积与组件详见明细。", "确认是否为有意过盈，否则修复配合。", 20)
+            add_issue("interference_detected", "warn", "Assembly interference detected; see details for volume and components.", "Confirm whether interference is an intentional press fit; otherwise fix mates.", 20)
     structure = report.get("drawing_structure")
     if structure is not None:
         if structure.get("error_code") == "DRAWING_VIEWS_MISSING" or (structure.get("status") in {"pass", "ok"} and not structure.get("views")):
-            add_issue("drawing_views_missing", "fail", "工程图没有可用视图。", "创建并复核工程图视图。", 35)
+            add_issue("drawing_views_missing", "fail", "Drawing has no usable views.", "Create and review drawing views.", 35)
         elif structure.get("status") == "blocked":
-            add_issue("drawing_structure_blocked", "warn", "工程图结构证据无法读取。", "复核工程图结构。", 8)
+            add_issue("drawing_structure_blocked", "warn", "Unable to read drawing structure evidence.", "Review drawing structure.", 8)
     layout = report.get("drawing_layout")
     if layout and layout.get("status") not in {"pass", "ok"}:
-        add_issue("drawing_layout_review_required", "warn", "工程图布局仍需复核。", "检查布局明细与最终 PDF。", 8)
+        add_issue("drawing_layout_review_required", "warn", "Drawing layout still requires review.", "Inspect layout details and the final PDF.", 8)
     quality = report.get("sketch_quality")
     if quality and quality.get("status") != "pass":
-        add_issue("sketch_quality_review_required", "warn", "建模草图的约束或驱动尺寸未通过回读。", "检查草图约束、Fix 与设计参数后重新验收。", 10)
+        add_issue("sketch_quality_review_required", "warn", "Modeling sketch constraints or driving dimensions failed readback.", "Check sketch constraints, Fix relations, and design parameters, then re-verify.", 10)
 
     if not checks.get("model_available"):
         add_issue(
             "model_missing",
             "fail",
-            "没有可审查的 SolidWorks 模型对象。",
-            "先确认连接成功并打开或新建了有效文档。",
+            "No SolidWorks model object available for review.",
+            "Confirm connection succeeded and a valid document is open or created.",
             40,
         )
 
@@ -1054,8 +1054,8 @@ def evaluate_review_report(report):
         add_issue(
             "previews_missing",
             "fail",
-            "预览图未成功生成。",
-            "检查 SaveBMP、输出目录权限、模型视图是否可见。",
+            "Preview images were not generated successfully.",
+            "Check SaveBMP, output directory permissions, and model view visibility.",
             35,
         )
 
@@ -1063,8 +1063,8 @@ def evaluate_review_report(report):
         add_issue(
             "previews_blank",
             "fail",
-            "至少一张预览图疑似空白。",
-            "检查模型是否为空、是否缩放到合适窗口、是否只停留在草图状态。",
+            "At least one preview image appears blank.",
+            "Check whether the model is empty, zoomed to fit, or stuck in sketch edit mode.",
             35,
         )
 
@@ -1072,8 +1072,8 @@ def evaluate_review_report(report):
         add_issue(
             "expected_outputs_missing",
             "fail",
-            "期望输出文件不存在或大小为 0。",
-            "重新检查保存/导出路径和 SolidWorks SaveAs 错误码。",
+            "Expected output file is missing or has zero size.",
+            "Recheck save/export paths and SolidWorks SaveAs error codes.",
             30,
         )
 
@@ -1081,8 +1081,8 @@ def evaluate_review_report(report):
         add_issue(
             "expected_outputs_not_declared",
             "warn",
-            "未声明期望输出文件，无法验证交付物是否完整。",
-            "调用 run_review() 时传入 expected_outputs。",
+            "Expected output files were not declared; deliverable completeness cannot be verified.",
+            "Pass expected_outputs when calling run_review().",
             8,
         )
 
@@ -1090,8 +1090,8 @@ def evaluate_review_report(report):
         add_issue(
             "feature_summary_unavailable",
             "warn",
-            "无法读取特征树摘要。",
-            "若几何预览正常可继续；若需调试特征树，检查 COM 成员兼容性。",
+            "Unable to read feature tree summary.",
+            "Continue if geometry previews look valid; check COM member compatibility to debug the feature tree.",
             8,
         )
 
@@ -1099,8 +1099,8 @@ def evaluate_review_report(report):
         add_issue(
             "too_few_previews",
             "warn",
-            "预览视角过少，难以判断三维几何。",
-            "至少导出 isometric/front/top/right 四个视角。",
+            "Too few preview angles to evaluate 3D geometry.",
+            "Export at least four views: isometric, front, top, and right.",
             8,
         )
 
@@ -1109,8 +1109,8 @@ def evaluate_review_report(report):
             add_issue(
                 "preview_file_too_small",
                 "warn",
-                f"预览图文件过小: {preview.get('path')}",
-                "确认 BMP 是否完整导出，必要时重新导出预览图。",
+                f"Preview image file is too small: {preview.get('path')}",
+                "Confirm BMP exported completely and re-export previews if needed.",
                 5,
             )
         if preview.get("width") and preview.get("height"):
@@ -1118,8 +1118,8 @@ def evaluate_review_report(report):
                 add_issue(
                     "preview_resolution_low",
                     "warn",
-                    f"预览图分辨率偏低: {preview.get('path')}",
-                    "使用默认 1600x1000 或更高分辨率导出。",
+                    f"Preview image resolution is too low: {preview.get('path')}",
+                    "Export at the default 1600x1000 resolution or higher.",
                     4,
                 )
 
@@ -1128,8 +1128,8 @@ def evaluate_review_report(report):
             add_issue(
                 "output_file_too_small",
                 "warn",
-                f"输出文件过小: {output.get('path')}",
-                "检查文件是否只是空壳或导出失败残留。",
+                f"Output file is too small: {output.get('path')}",
+                "Check whether the file is an empty stub or failed export artifact.",
                 6,
             )
 
@@ -1147,7 +1147,7 @@ def evaluate_review_report(report):
         "issues": issues,
         "recommendations": list(dict.fromkeys(recommendations)),
         "manual_review_required": True,
-        "manual_review_reason": "规则评分只能发现明显失败，最终几何是否符合用户意图仍需查看预览图或截图。",
+        "manual_review_reason": "Rule-based scoring only catches obvious failures; inspect preview images or screenshots to verify geometry matches user intent.",
     }
 
 
@@ -1257,7 +1257,7 @@ def main():
     if args.file:
         model = open_document(sw, args.file, silent=args.silent_open, raise_on_error=True)
     if model is None:
-        raise RuntimeError("没有可审查的活动 SolidWorks 文档")
+        raise RuntimeError("No active SolidWorks document available for review")
 
     views = [item.strip() for item in args.views.split(",") if item.strip()]
     report, report_path = run_review(

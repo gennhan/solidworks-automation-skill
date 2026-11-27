@@ -91,7 +91,7 @@ def test_hole_without_id_gets_generated_id_and_warning():
 
     assert result["status"] == "ok"
     assert result["normalized"]["holes"][0]["id"] == "H1"
-    assert any("未提供 id" in warning for warning in result["warnings"])
+    assert any("does not provide an id" in warning for warning in result["warnings"])
 
 
 def test_blind_hole_requires_depth():
@@ -118,7 +118,7 @@ def test_oversized_fillet_radius_warns():
     result = validate_design_spec(spec)
 
     assert result["status"] == "ok"
-    assert any("板厚" in warning for warning in result["warnings"])
+    assert any("plate thickness" in warning for warning in result["warnings"])
 
 
 def test_conflicting_fillet_flags_rejected():

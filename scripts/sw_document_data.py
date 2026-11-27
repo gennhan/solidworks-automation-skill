@@ -50,7 +50,7 @@ def _resolve_configuration_name(names: Sequence[str], requested: str) -> str | N
     """@brief 按 SolidWorks 配置名不区分大小写语义返回实际名称。"""
     matches = [str(name) for name in names if str(name).casefold() == requested.casefold()]
     if len(matches) > 1:
-        raise RuntimeError(f"配置名大小写匹配不唯一: {requested}")
+        raise RuntimeError(f"Case-insensitive configuration match is not unique: {requested}")
     return matches[0] if matches else None
 
 
@@ -87,11 +87,11 @@ def activate_configuration(
     """@brief 激活现有配置并通过活动配置名回读验证。"""
     requested_name = str(configuration_name).strip()
     if not requested_name:
-        raise ValueError("configuration_name 不能为空")
+        raise ValueError("configuration_name cannot be empty")
     names = _configuration_names(model)
     name = _resolve_configuration_name(names, requested_name)
     if name is None:
-        raise LookupError(f"找不到配置: {requested_name}")
+        raise LookupError(f"Configuration not found: {requested_name}")
 
     before = _active_configuration_name(model)
     api_called = before != name
@@ -138,18 +138,18 @@ def create_configuration(
     """
     requested_name = str(configuration_name).strip()
     if not requested_name:
-        raise ValueError("configuration_name 不能为空")
+        raise ValueError("configuration_name cannot be empty")
     if if_exists not in {"reuse", "error"}:
-        raise ValueError("if_exists 只支持 reuse 或 error")
+        raise ValueError("if_exists only supports 'reuse' or 'error'")
     if int(options) < 0:
-        raise ValueError("options 不能为负数")
+        raise ValueError("options cannot be negative")
 
     before_names = _configuration_names(model)
     existing_name = _resolve_configuration_name(before_names, requested_name)
     existed = existing_name is not None
     name = existing_name or requested_name
     if existed and if_exists == "error":
-        raise FileExistsError(f"配置已存在: {name}")
+        raise FileExistsError(f"Configuration already exists: {name}")
 
     created = None if existed else get_com_member(
         model,
@@ -160,7 +160,7 @@ def create_configuration(
         int(options),
     )
     if not existed and created is None:
-        raise RuntimeError(f"AddConfiguration3 未返回配置对象: {name}")
+        raise RuntimeError(f"AddConfiguration3 did not return a configuration object: {name}")
 
     after_names = _configuration_names(model)
     listed_name = _resolve_configuration_name(after_names, name)
@@ -220,19 +220,19 @@ def update_dimension_mm(
     必须提供配置名。SolidWorks API 内部单位为米。
     """
     if not dimension_name.strip():
-        raise ValueError("dimension_name 不能为空")
+        raise ValueError("dimension_name cannot be empty")
     if value_mm <= 0:
-        raise ValueError("value_mm 必须大于 0")
+        raise ValueError("value_mm must be greater than 0")
     if configuration_mode not in SET_VALUE_MODES:
-        raise ValueError(f"不支持的配置范围: {configuration_mode}")
+        raise ValueError(f"Unsupported configuration scope: {configuration_mode}")
 
     dimension = model.Parameter(dimension_name)
     if dimension is None:
-        raise LookupError(f"找不到尺寸: {dimension_name}")
+        raise LookupError(f"Dimension not found: {dimension_name}")
 
     requested_names = [str(name).strip() for name in (configuration_names or []) if str(name).strip()]
     if configuration_mode == "specific" and not requested_names:
-        raise ValueError("specific 模式必须提供 configuration_names")
+        raise ValueError("specific mode requires configuration_names")
     if configuration_mode == "all":
         evidence_names = _configuration_names(model)
     elif configuration_mode == "specific":
@@ -288,8 +288,8 @@ def update_dimension_mm(
 def _property_manager(model, configuration_name: str = ""):
     manager = model.Extension.CustomPropertyManager(configuration_name)
     if manager is None:
-        scope = configuration_name or "文件级"
-        raise RuntimeError(f"无法取得 {scope} 自定义属性管理器")
+        scope = configuration_name or "file-level"
+        raise RuntimeError(f"Unable to obtain {scope} CustomPropertyManager")
     return manager
 
 
@@ -323,15 +323,15 @@ def set_custom_properties(
 ) -> dict[str, Any]:
     """写入文件级或配置级属性，并逐项回读验证。"""
     if not properties:
-        raise ValueError("properties 不能为空")
+        raise ValueError("properties cannot be empty")
     if property_type not in PROPERTY_TYPES:
-        raise ValueError(f"不支持的属性类型: {property_type}")
+        raise ValueError(f"Unsupported property type: {property_type}")
     manager = _property_manager(model, configuration_name)
     results = []
     for raw_name, raw_value in properties.items():
         name = str(raw_name).strip()
         if not name:
-            raise ValueError("属性名不能为空")
+            raise ValueError("Property name cannot be empty")
         value = str(raw_value)
         add_status = int(manager.Add3(name, PROPERTY_TYPES[property_type], value, 2))
         readback = read_custom_property(model, name, configuration_name=configuration_name)

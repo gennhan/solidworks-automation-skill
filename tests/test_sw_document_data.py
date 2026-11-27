@@ -150,14 +150,14 @@ def test_rejects_missing_dimension_and_invalid_value():
     try:
         document_data.update_dimension_mm(model, "missing", 10)
     except LookupError as error:
-        assert "找不到尺寸" in str(error)
+        assert "Dimension not found" in str(error)
     else:
         raise AssertionError("missing dimension should fail")
 
     try:
         document_data.update_dimension_mm(model, "D1@Boss-Extrude1", 0)
     except ValueError as error:
-        assert "大于 0" in str(error)
+        assert "greater than 0" in str(error)
     else:
         raise AssertionError("non-positive dimension should fail")
 
@@ -220,7 +220,7 @@ def test_configuration_create_is_idempotent_or_strict_on_request():
     try:
         document_data.create_configuration(model, "加工", if_exists="error")
     except FileExistsError as error:
-        assert "配置已存在" in str(error)
+        assert "Configuration already exists" in str(error)
     else:
         raise AssertionError("strict duplicate configuration should fail")
 
@@ -232,7 +232,7 @@ def test_activate_configuration_rejects_unknown_name_before_com_call():
     try:
         document_data.activate_configuration(model, "不存在")
     except LookupError as error:
-        assert "找不到配置" in str(error)
+        assert "Configuration not found" in str(error)
     else:
         raise AssertionError("unknown configuration should fail")
 

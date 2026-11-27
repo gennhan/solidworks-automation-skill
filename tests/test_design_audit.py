@@ -140,7 +140,7 @@ def test_regression_gate_rejects_higher_risk():
     r = audit.assert_no_regression(baseline, candidate)
     assert r["passed"] is False
     assert r["delta"] == pytest.approx(5.0)
-    assert any("风险分" in reason for reason in r["reasons"])
+    assert any("Risk score" in reason for reason in r["reasons"])
 
 
 def test_regression_gate_rejects_new_critical_even_if_score_drops():

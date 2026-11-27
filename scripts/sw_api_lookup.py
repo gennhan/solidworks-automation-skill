@@ -48,7 +48,7 @@ class LookupCancelled(Exception):
 
 def _identifier(value: str, label: str) -> str:
     if not isinstance(value, str) or not _IDENTIFIER.fullmatch(value):
-        raise ValueError(f"{label} 必须是 1 至 128 位 ASCII 接口/成员标识符")
+        raise ValueError(f"{label} must be a 1-128 character ASCII interface/member identifier")
     return value
 
 
@@ -56,7 +56,7 @@ def official_api_url(version: int, interface: str, member: str) -> str:
     """为指定版本构造候选官方页面；URL 不是接口存在的证据。"""
     interface, member = _identifier(interface, "interface"), _identifier(member, "member")
     if isinstance(version, bool) or not isinstance(version, int) or not 2010 <= version <= 2035:
-        raise ValueError("version 必须是 2010 至 2035 的年份")
+        raise ValueError("version must be a year between 2010 and 2035")
     if interface.casefold().startswith("sw") and not interface.startswith("I"):
         return (f"https://help.solidworks.com/{version}/english/api/swconst/"
                 f"SolidWorks.Interop.swconst~SolidWorks.Interop.swconst.{interface}.html?format=P&value=")
@@ -76,7 +76,7 @@ def _process_executable(pid: int) -> Path:
     finally:
         win32api.CloseHandle(handle)
     if path.name.casefold() != "sldworks.exe":
-        raise RuntimeError("目标进程不是 SLDWORKS.exe")
+        raise RuntimeError("Target process is not SLDWORKS.exe")
     return path
 
 
@@ -103,14 +103,14 @@ def _running_target(version: int | None, process_id: int | None) -> dict[str, An
         return None
     processes = solidworks_processes()
     if processes is None:
-        raise RuntimeError("无法枚举 SolidWorks 进程，不能确定目标版本")
+        raise RuntimeError("Unable to enumerate SolidWorks processes to determine target version")
     if not processes:
         return None
     if process_id is not None and process_id not in processes:
-        raise RuntimeError("指定的 SolidWorks 进程不存在")
+        raise RuntimeError("Specified SolidWorks process not found")
     candidates = [pid for pid, year in processes.items() if version is None or year in (None, version)]
     if process_id is None and len(candidates) > 1:
-        raise RuntimeError("发现多个可能的 SolidWorks 实例，请明确指定进程 ID 和版本")
+        raise RuntimeError("Multiple candidate SolidWorks instances found; specify process ID and version explicitly")
     if not candidates and process_id is None:
         return None
     try:
@@ -118,15 +118,15 @@ def _running_target(version: int | None, process_id: int | None) -> dict[str, An
         executable = _process_executable(pid)
         year = _executable_year(executable)
         if year is None or (processes[pid] is not None and processes[pid] != year):
-            raise RuntimeError("SolidWorks 进程文件版本与进程枚举不一致或无法确认")
+            raise RuntimeError("SolidWorks process file version does not match process enumeration or cannot be confirmed")
         if version is not None and year != version:
-            raise RuntimeError(f"指定版本为 {version}，目标进程版本为 {year}")
+            raise RuntimeError(f"Requested version is {version}, but target process version is {year}")
         return {"year": year, "revision": None, "file_version": _executable_version(executable)[1], "process_id": pid,
                 "executable": executable, "source": "running_process"}
     except RuntimeError:
         raise
     except Exception as exc:
-        raise RuntimeError(f"运行中的 SolidWorks 无法可靠识别: {type(exc).__name__}") from exc
+        raise RuntimeError(f"Unable to reliably identify running SolidWorks instance: {type(exc).__name__}") from exc
 
 
 def _installed_target(version: int | None) -> dict[str, Any] | None:
@@ -149,7 +149,7 @@ def _installed_target(version: int | None) -> dict[str, Any] | None:
         matches.append({"year": year, "revision": None, "file_version": _executable_version(path)[1], "process_id": None,
                         "executable": path, "source": "installed_version"})
     if len(matches) > 1:
-        raise RuntimeError("发现多个匹配安装，请先连接目标 SolidWorks 实例")
+        raise RuntimeError("Multiple matching installations found; connect to the target SolidWorks instance first")
     return matches[0] if matches else None
 
 
@@ -302,27 +302,27 @@ def retrieve_official_document(version: int, interface: str, member: str, *,
     """明确授权后只访问固定官方域名；不发送任务描述、路径或凭据。"""
     url = official_api_url(version, interface, member)
     if cancelled and cancelled():
-        raise LookupCancelled("用户已取消 API 查证")
+        raise LookupCancelled("API lookup cancelled by user")
     request = urllib.request.Request(url, headers={"User-Agent": "SolidWorks-API-Lookup/1.0", "Accept": "text/html"})
     try:
         deadline = time.monotonic() + timeout
         opener = urllib.request.build_opener(_NoRedirect())
         with opener.open(request, timeout=timeout) as response:
             if response.geturl() != url:
-                raise RuntimeError("官方文档地址发生变化，已停止读取")
+                raise RuntimeError("Official documentation URL changed; read stopped")
             chunks, size = [], 0
             while True:
                 if cancelled and cancelled():
-                    raise LookupCancelled("用户已取消 API 查证")
+                    raise LookupCancelled("API lookup cancelled by user")
                 if time.monotonic() > deadline:
-                    raise TimeoutError("官方文档读取超时")
+                    raise TimeoutError("Official documentation read timeout")
                 chunk = response.read(min(65536, _MAX_RESPONSE + 1 - size))
                 if not chunk:
                     break
                 chunks.append(chunk)
                 size += len(chunk)
                 if size > _MAX_RESPONSE:
-                    raise RuntimeError("官方文档响应超过大小限制")
+                    raise RuntimeError("Official documentation response exceeded size limit")
         html = b"".join(chunks).decode("utf-8")
         parser = _NextDataParser()
         parser.feed(html)
@@ -335,7 +335,7 @@ def retrieve_official_document(version: int, interface: str, member: str, *,
         help_data = None
         if isinstance(props, dict):
             if str(props.get("version")) != str(version) or props.get("product") != "api":
-                raise RuntimeError("官方页面版本或产品与请求不一致")
+                raise RuntimeError("Official page version or product does not match request")
             help_data = props.get("helpContentData")
         if isinstance(help_data, dict) and isinstance(help_data.get("helpText"), str):
             title = str(help_data.get("title") or "")[:200]
@@ -346,16 +346,16 @@ def retrieve_official_document(version: int, interface: str, member: str, *,
             semantic = _SemanticPage()
             semantic.feed(html)
             if semantic.meta.get("solidworks-version") != str(version) or semantic.meta.get("solidworks-product") != "api":
-                raise RuntimeError("官方页面版本或产品与请求不一致")
+                raise RuntimeError("Official page version or product does not match request")
             title = "".join(semantic.title).strip()[:200]
             body = "".join(semantic.body)
         enum_page = interface.casefold().startswith("sw") and not interface.startswith("I")
         if interface.casefold() not in title.casefold() or (not enum_page and member.casefold() not in title.casefold()):
-            raise RuntimeError("官方页面标题与请求的接口不一致")
+            raise RuntimeError("Official page title does not match requested interface")
         text = re.sub(r"\n{3,}", "\n\n", body).strip()
         match_at = text.casefold().find(member.casefold())
         if match_at < 0:
-            raise RuntimeError("官方页面正文缺少请求的方法")
+            raise RuntimeError("Official page body is missing the requested method")
         if match_at > 5000:
             text = text[max(0, match_at - 800):]
         text = text[:6000]
@@ -366,16 +366,16 @@ def retrieve_official_document(version: int, interface: str, member: str, *,
     except LookupCancelled:
         raise
     except urllib.error.HTTPError as exc:
-        raise RuntimeError(f"官方文档读取失败: HTTP {exc.code}") from exc
+        raise RuntimeError(f"Failed to read official documentation: HTTP {exc.code}") from exc
     except (urllib.error.URLError, TimeoutError, OSError, UnicodeError, ValueError, RecursionError) as exc:
-        raise RuntimeError(f"官方文档读取失败: {type(exc).__name__}") from exc
+        raise RuntimeError(f"Failed to read official documentation: {type(exc).__name__}") from exc
 
 
 def _cached_official_document(version: int, interface: str, member: str, *,
                               cancelled: Callable[[], bool] | None = None) -> dict[str, Any]:
     """仅缓存公开官方片段；进程内有界缓存不包含任务内容或会话标识。"""
     if cancelled and cancelled():
-        raise LookupCancelled("用户已取消 API 查证")
+        raise LookupCancelled("API lookup cancelled by user")
     key = (version, interface.casefold(), member.casefold())
     now = time.monotonic()
     with _CACHE_LOCK:
@@ -402,9 +402,9 @@ def lookup_api(interface: str, member: str, version: int | None = None, *,
     if version is not None:
         official_api_url(version, interface, member)
     if process_id is not None and (isinstance(process_id, bool) or not isinstance(process_id, int) or process_id <= 0):
-        raise ValueError("process_id 必须是正整数")
+        raise ValueError("process_id must be a positive integer")
     if cancelled and cancelled():
-        raise LookupCancelled("用户已取消 API 查证")
+        raise LookupCancelled("API lookup cancelled by user")
     result: dict[str, Any] = {"interface": interface, "member": member, "status": "unknown",
                               "target": None, "typelib": None, "local_help": None, "official": None, "warnings": [],
                               "runtime_verified": False}
@@ -416,15 +416,15 @@ def lookup_api(interface: str, member: str, version: int | None = None, *,
         if setup_warning:
             result["warnings"].append(setup_warning)
         if cancelled and cancelled():
-            raise LookupCancelled("用户已取消 API 查证")
+            raise LookupCancelled("API lookup cancelled by user")
     try:
         target = _running_target(version, process_id)
         if target is None and process_id is not None:
-            raise RuntimeError("指定的 SolidWorks 进程未运行或无法附着")
+            raise RuntimeError("Specified SolidWorks process is not running or cannot be attached")
         if target is None:
             target = _installed_target(version)
         if target is None:
-            result["warnings"].append("未找到可确认版本的 SolidWorks 安装；没有启动软件。")
+            result["warnings"].append("No SolidWorks installation with a confirmed version was found; software was not launched.")
         else:
             result["target"] = {key: target.get(key) for key in ("year", "revision", "file_version", "process_id", "source")}
             version = int(target["year"])
@@ -433,18 +433,18 @@ def lookup_api(interface: str, member: str, version: int | None = None, *,
                                                     allow_install=setup_allowed, warnings=result["warnings"],
                                                     cancelled=cancelled)
             if cancelled and cancelled():
-                raise LookupCancelled("用户已取消 API 查证")
+                raise LookupCancelled("API lookup cancelled by user")
             if result["local_help"]:
                 if result["local_help"].get("version_evidence") == "signed_installer_product_and_file_hash":
-                    result["warnings"].append("本地 API Help 已按签名安装包、产品版本和文件哈希恢复；不代表运行时验证。")
+                    result["warnings"].append("Local API Help was restored using signed installer, product version, and file hash; this does not represent runtime verification.")
                 else:
-                    result["warnings"].append("本机 API Help 来自目标安装目录，文件内部版本尚未独立确认。")
+                    result["warnings"].append("Local API Help comes from the target installation directory; internal file version has not been independently verified.")
             library_names = ("swconst.tlb",) if interface.lower().startswith("sw") and not interface.startswith("I") else (
                 "sldworks.tlb", "swmotionstudy.tlb", "SWRoutingLib.tlb", "cmotionswapi.tlb")
             libraries = []
             for library_name in library_names:
                 if cancelled and cancelled():
-                    raise LookupCancelled("用户已取消 API 查证")
+                    raise LookupCancelled("API lookup cancelled by user")
                 path = target["executable"].parent / library_name
                 if not path.is_file():
                     continue
@@ -453,14 +453,14 @@ def lookup_api(interface: str, member: str, version: int | None = None, *,
                     libraries.append({"file": library_name, "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
                                       **declaration})
                 except Exception as exc:
-                    result["warnings"].append(f"无法读取 {library_name}: {type(exc).__name__}")
+                    result["warnings"].append(f"Unable to read {library_name}: {type(exc).__name__}")
             matching = [item for item in libraries if item["interface_found"]]
             if target.get("process_id") and (_process_executable(target["process_id"]) != target["executable"] or
                                               _executable_year(target["executable"]) != version):
-                raise RuntimeError("查证过程中目标进程已变化，类型库结果未采用")
+                raise RuntimeError("Target process changed during lookup; type library results discarded")
             if len(matching) > 1:
                 result["status"] = "conflict"
-                result["warnings"].append("多个类型库包含同名接口，无法确定应使用哪一个。")
+                result["warnings"].append("Multiple type libraries define the same interface name; unable to determine which to use.")
             elif matching:
                 result["typelib"] = matching[0]
                 result["status"] = "found" if matching[0]["member_found"] else "not_found"
@@ -470,7 +470,7 @@ def lookup_api(interface: str, member: str, version: int | None = None, *,
                                      "searched_libraries": [item["file"] for item in libraries]}
                 result["status"] = "not_found"
             else:
-                result["warnings"].append("目标版本没有可读取的对应类型库。")
+                result["warnings"].append("No readable matching type library found for target version.")
     except LookupCancelled:
         raise
     except (ImportError, OSError, RuntimeError, ValueError) as exc:
@@ -482,7 +482,7 @@ def lookup_api(interface: str, member: str, version: int | None = None, *,
             result["status"] = "documented"
         elif result["typelib"] is not None and result["typelib"]["member_found"] is False:
             result["status"] = "conflict"
-            result["warnings"].append("本机 API Help 与类型库不一致，请核对安装和文档版本。")
+            result["warnings"].append("Local API Help conflicts with type library; verify installation and documentation versions.")
     if version is not None:
         result["official_url"] = official_api_url(version, interface, member)
         if network_enabled:
@@ -492,18 +492,18 @@ def lookup_api(interface: str, member: str, version: int | None = None, *,
                 result["warnings"].append(str(exc))
                 result["official"] = load_document(version, interface, member)
                 if result["official"]:
-                    result["warnings"].append("官方网页不可用，使用上次获取的本地缓存；不保证是最新内容。")
+                    result["warnings"].append("Official web page unavailable; using last fetched local cache (may not be up to date).")
                 elif parallel_fallback and os.environ.get("SW_API_LOOKUP_PARALLEL", "on").strip().lower() not in {"off", "false", "0"}:
                     try:
                         setup_warning = ensure_python_packages(("mcp>=1.27,<2", "httpx>=0.27.1,<1"), ("mcp", "httpx"),
                                                                allow_network=setup_allowed, cancelled=cancelled)
                         if cancelled and cancelled():
-                            raise LookupCancelled("用户已取消 API 查证")
+                            raise LookupCancelled("API lookup cancelled by user")
                         if setup_warning:
                             raise RuntimeError(setup_warning)
                         result["official"] = retrieve_parallel_document(version, interface, member,
                                                                           result["official_url"], cancelled=cancelled)
-                        result["warnings"].append("官方网页直读失败，已使用匿名 Parallel 提取官方页面；版本仅依据链接和标题，需进一步核对。")
+                        result["warnings"].append("Direct official web read failed; extracted official page via anonymous Parallel fallback (version inferred only from URL and title; verify further).")
                     except ParallelLookupCancelled as cancel:
                         raise LookupCancelled(str(cancel)) from cancel
                     except RuntimeError as fallback_error:
@@ -515,19 +515,19 @@ def lookup_api(interface: str, member: str, version: int | None = None, *,
                     result["status"] = "documented"
                 elif result["typelib"] is not None and result["typelib"]["member_found"] is False:
                     result["status"] = "conflict"
-                    result["warnings"].append("官方页面与本机类型库结果不一致，不能据此宣称运行时可用。")
+                    result["warnings"].append("Official page conflicts with local type library; cannot claim runtime availability.")
         else:
             result["official"] = load_document(version, interface, member)
             if result["official"]:
-                result["warnings"].append("离线使用上次获取的本地缓存；不保证是最新内容。")
+                result["warnings"].append("Using last fetched local cache offline (may not be up to date).")
                 if result["typelib"] is None and result["status"] != "conflict": result["status"] = "documented"
                 elif result["typelib"] is not None and result["typelib"]["member_found"] is False:
                     result["status"] = "conflict"
-                    result["warnings"].append("缓存文档与本机类型库不一致，不能据此宣称运行时可用。")
+                    result["warnings"].append("Cached documentation conflicts with local type library; cannot claim runtime availability.")
             if online:
-                result["warnings"].append("环境配置已关闭本工具的官方文档联网查询。")
+                result["warnings"].append("Environment configuration disables online official documentation lookup for this tool.")
     elif online:
-        result["warnings"].append("版本未知，未访问官方网页。")
+        result["warnings"].append("Version unknown; official web page was not queried.")
     return result
 
 
@@ -536,11 +536,11 @@ def lookup_task(task: str, version: int | None = None, *, process_id: int | None
                 cancelled: Callable[[], bool] | None = None) -> dict[str, Any]:
     """本地识别自然语言候选；只向外部发送候选 API 标识。"""
     if not isinstance(task, str) or not task.strip() or len(task) > 10000:
-        raise ValueError("task 必须是 1 至 10000 字符的任务描述")
+        raise ValueError("task must be a description of 1 to 10000 characters")
     if version is not None and (isinstance(version, bool) or not isinstance(version, int) or not 2010 <= version <= 2035):
-        raise ValueError("version 必须是 2010 至 2035 的年份")
+        raise ValueError("version must be a year between 2010 and 2035")
     if process_id is not None and (isinstance(process_id, bool) or not isinstance(process_id, int) or process_id <= 0):
-        raise ValueError("process_id 必须是正整数")
+        raise ValueError("process_id must be a positive integer")
     try:
         from .api_intent import task_candidates, task_years
     except ImportError:
@@ -548,13 +548,13 @@ def lookup_task(task: str, version: int | None = None, *, process_id: int | None
     candidates, _ = task_candidates(task)
     years = task_years(task)
     if len(years) > 1 or (version is not None and years and version not in years):
-        raise ValueError("任务包含多个或不一致的 SolidWorks 版本，请明确目标版本")
+        raise ValueError("Task references multiple or conflicting SolidWorks versions; specify target version explicitly")
     year = version if version is not None else next(iter(years), None)
     results = [lookup_api(interface, member, year, process_id=process_id, online=online,
                           parallel_fallback=parallel_fallback, auto_install=auto_install, cancelled=cancelled)
                for interface, member in candidates]
     return {"status": "candidates" if results else "no_candidate", "results": results,
-            "warning": "候选仅供查证，实际方法须由任务规划与目标版本证据确认。"}
+            "warning": "Candidates are for lookup only; actual methods must be confirmed by task planning and target-version evidence."}
 
 
 def main() -> int:
@@ -573,12 +573,12 @@ def main() -> int:
     try:
         if args.task:
             if args.interface or args.member:
-                raise ValueError("--task 与接口/成员位置参数不能同时使用")
+                raise ValueError("--task cannot be used together with positional interface/member arguments")
             output = lookup_task(args.task, args.version, process_id=args.process_id, online=not args.offline,
                                  parallel_fallback=not args.no_parallel, auto_install=not args.no_auto_install)
         else:
             if not args.interface or not args.member:
-                raise ValueError("请提供接口和成员，或使用 --task 输入自然语言任务")
+                raise ValueError("Provide interface and member, or use --task for a natural-language task")
             output = lookup_api(args.interface, args.member, args.version, process_id=args.process_id,
                                 online=not args.offline, parallel_fallback=not args.no_parallel,
                                 auto_install=not args.no_auto_install)

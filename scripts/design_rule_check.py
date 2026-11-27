@@ -103,16 +103,16 @@ def _load_document(source: str | Path | Mapping[str, Any]) -> dict[str, Any]:
     else:
         path = Path(source)
         if path.stat().st_size > 4 * 1024 * 1024:
-            raise ValueError("中性文档超过 4 MiB 上限")
+            raise ValueError("Neutral document exceeds 4 MiB limit")
         document = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(document, dict):
-        raise ValueError("NeutralCadDocument 必须是 JSON 对象")
+        raise ValueError("NeutralCadDocument must be a JSON object")
     if not str(document.get("documentId") or "").strip():
-        raise ValueError("NeutralCadDocument 缺少 documentId")
+        raise ValueError("NeutralCadDocument is missing documentId")
     if not isinstance(document.get("features", []), list):
-        raise ValueError("features 必须是数组")
+        raise ValueError("features must be a list")
     if len(document.get("features", [])) > 1000:
-        raise ValueError("features 超过 1000 项上限，请拆分检查")
+        raise ValueError("features exceeds 1000-item limit; split checks")
     return document
 
 
@@ -121,7 +121,7 @@ def _extract_context(document: Mapping[str, Any]) -> dict[str, Any]:
     units = str(document.get("units") or "mm").strip().lower()
     factor = UNIT_TO_MM.get(units)
     if factor is None:
-        raise ValueError(f"DRC 不支持单位 {units}")
+        raise ValueError(f"Unsupported DRC units: {units}")
     metadata = document.get("metadata") if isinstance(document.get("metadata"), Mapping) else {}
     design = metadata.get("design") if isinstance(metadata.get("design"), Mapping) else {}
     manufacturing = metadata.get("manufacturing") if isinstance(metadata.get("manufacturing"), Mapping) else {}
@@ -218,17 +218,17 @@ def rule_geometry(ctx: Mapping[str, Any], th: Mapping[str, float]) -> list[dict[
     min_wall = ctx.get("min_wall_mm")
     limit = th["minWallThicknessMm"]
     if min_wall is None:
-        checks.append(_check("DRC-GEO-001", "geometry", "info", "info", "未提供最小壁厚，跳过壁厚检查", threshold_mm=limit))
+        checks.append(_check("DRC-GEO-001", "geometry", "info", "info", "Minimum wall thickness not provided; skipping wall thickness check", threshold_mm=limit))
     elif min_wall < limit:
         checks.append(
-            _check("DRC-GEO-001", "geometry", "fail", "major", f"最小壁厚 {min_wall:g}mm 小于阈值 {limit:g}mm", value_mm=min_wall, threshold_mm=limit)
+            _check("DRC-GEO-001", "geometry", "fail", "major", f"Minimum wall thickness {min_wall:g}mm is below threshold {limit:g}mm", value_mm=min_wall, threshold_mm=limit)
         )
     elif min_wall < limit * 1.5:
         checks.append(
-            _check("DRC-GEO-001", "geometry", "warning", "minor", f"最小壁厚 {min_wall:g}mm 接近阈值 {limit:g}mm", value_mm=min_wall, threshold_mm=limit)
+            _check("DRC-GEO-001", "geometry", "warning", "minor", f"Minimum wall thickness {min_wall:g}mm is close to threshold {limit:g}mm", value_mm=min_wall, threshold_mm=limit)
         )
     else:
-        checks.append(_check("DRC-GEO-001", "geometry", "pass", "info", f"最小壁厚 {min_wall:g}mm 合格", value_mm=min_wall, threshold_mm=limit))
+        checks.append(_check("DRC-GEO-001", "geometry", "pass", "info", f"Minimum wall thickness {min_wall:g}mm is acceptable", value_mm=min_wall, threshold_mm=limit))
     return checks
 
 
@@ -236,12 +236,12 @@ def rule_holes(ctx: Mapping[str, Any], th: Mapping[str, float]) -> list[dict[str
     checks: list[dict[str, Any]] = []
     holes = ctx.get("holes", [])
     if not holes:
-        return [_check("DRC-HOLE-000", "holes", "info", "info", "文档无孔特征，跳过孔规则")]
+        return [_check("DRC-HOLE-000", "holes", "info", "info", "Document has no hole features; skipping hole rules")]
     for hole in holes:
         hid = hole.get("id") or "hole"
         diameter = hole.get("diameter_mm")
         if diameter is not None and diameter <= 0:
-            checks.append(_check("DRC-HOLE-004", "holes", "fail", "critical", f"孔 {hid} 直径非正", target=hid))
+            checks.append(_check("DRC-HOLE-004", "holes", "fail", "critical", f"Hole {hid} diameter is non-positive", target=hid))
             continue
         # 孔边距
         edge = hole.get("edge_distance_mm")
@@ -249,7 +249,7 @@ def rule_holes(ctx: Mapping[str, Any], th: Mapping[str, float]) -> list[dict[str
             required = max(th["holeEdgeDistanceMinMm"], th["holeEdgeDistanceRatio"] * diameter)
             if edge < required:
                 checks.append(
-                    _check("DRC-HOLE-001", "holes", "fail", "major", f"孔 {hid} 边距 {edge:g}mm 小于要求 {required:g}mm", target=hid, value_mm=edge, required_mm=required)
+                    _check("DRC-HOLE-001", "holes", "fail", "major", f"Hole {hid} edge distance {edge:g}mm is below required {required:g}mm", target=hid, value_mm=edge, required_mm=required)
                 )
         # 螺纹啮合深度
         engagement = hole.get("engagement_mm")
@@ -258,7 +258,7 @@ def rule_holes(ctx: Mapping[str, Any], th: Mapping[str, float]) -> list[dict[str
             required = th["threadEngagementRatio"] * nominal
             if engagement < required:
                 checks.append(
-                    _check("DRC-HOLE-003", "holes", "warning", "warning", f"孔 {hid} 螺纹啮合 {engagement:g}mm 小于建议 {required:g}mm", target=hid, value_mm=engagement, required_mm=required)
+                    _check("DRC-HOLE-003", "holes", "warning", "warning", f"Hole {hid} thread engagement {engagement:g}mm is below recommended {required:g}mm", target=hid, value_mm=engagement, required_mm=required)
                 )
     # 孔间距
     positioned = [h for h in holes if h.get("x_mm") is not None and h.get("y_mm") is not None and h.get("diameter_mm")]
@@ -269,15 +269,15 @@ def rule_holes(ctx: Mapping[str, Any], th: Mapping[str, float]) -> list[dict[str
             required = th["holeSpacingRatio"] * max(a["diameter_mm"], b["diameter_mm"]) / 2.0
             if distance < required:
                 checks.append(
-                    _check("DRC-HOLE-002", "holes", "warning", "warning", f"孔 {a['id']} 与 {b['id']} 中心距 {distance:g}mm 小于建议 {required:g}mm", value_mm=distance, required_mm=required)
+                    _check("DRC-HOLE-002", "holes", "warning", "warning", f"Hole {a['id']} to {b['id']} center distance {distance:g}mm is below recommended {required:g}mm", value_mm=distance, required_mm=required)
                 )
     incomplete = any(h.get("diameter_mm") is None or h.get("edge_distance_mm") is None or
                      (h.get("thread") and (h.get("engagement_mm") is None or h.get("thread_nominal_mm") is None))
                      for h in holes) or (len(holes) > 1 and len(positioned) != len(holes))
     if incomplete:
-        checks.append(_check("DRC-HOLE-EVIDENCE", "holes", "info", "info", "孔径、边距、孔位或螺纹啮合证据不完整，不能判定全部孔已通过"))
+        checks.append(_check("DRC-HOLE-EVIDENCE", "holes", "info", "info", "Hole diameter, edge distance, position, or thread engagement evidence is incomplete; cannot confirm all holes pass"))
     elif not checks:
-        checks.append(_check("DRC-HOLE-OK", "holes", "pass", "info", f"{len(holes)} 个孔的已提供数据未触发孔规则"))
+        checks.append(_check("DRC-HOLE-OK", "holes", "pass", "info", f"Provided data for {len(holes)} hole(s) triggered no hole rules"))
     return checks
 
 
@@ -306,13 +306,13 @@ def rule_standard_parts(ctx: Mapping[str, Any], th: Mapping[str, float]) -> list
     checks: list[dict[str, Any]] = []
     parts = ctx.get("standard_parts", [])
     if not parts:
-        return [_check("DRC-STD-000", "standard_parts", "info", "info", "文档无标准件，跳过标准件规则")]
+        return [_check("DRC-STD-000", "standard_parts", "info", "info", "Document has no standard parts; skipping standard-part rules")]
     for part in parts:
         ptype = str(part.get("type") or "").lower()
         pid = str(part.get("id") or ptype or "part")
         if ptype in {"spur_gear", "gear"}:
             if part.get("is_pointed") is True:
-                checks.append(_check("DRC-STD-001", "standard_parts", "fail", "major", f"齿轮 {pid} 齿顶尖化（顶隙为 0）", target=pid))
+                checks.append(_check("DRC-STD-001", "standard_parts", "fail", "major", f"Gear {pid} has pointed teeth (zero tip width)", target=pid))
             teeth = _num(part.get("teeth"))
             shift = _num(part.get("profile_shift_coeff")) or 0.0
             z_min = gear_min_teeth_without_undercut(
@@ -325,8 +325,8 @@ def rule_standard_parts(ctx: Mapping[str, Any], th: Mapping[str, float]) -> list
                 checks.append(
                     _check(
                         "DRC-STD-002", "standard_parts", "warning", "warning",
-                        f"齿轮 {pid} 齿数 {teeth:g} 低于无根切下限 {z_min}"
-                        f"（压力角 {_num(part.get('pressure_angle_deg')) or 20.0:g}°、变位 x={shift:g}），存在根切风险",
+                        f"Gear {pid} tooth count {teeth:g} is below non-undercut minimum {z_min} "
+                        f"(pressure angle {_num(part.get('pressure_angle_deg')) or 20.0:g}°, shift x={shift:g}); undercut risk",
                         target=pid, required=z_min,
                     )
                 )
@@ -334,57 +334,57 @@ def rule_standard_parts(ctx: Mapping[str, Any], th: Mapping[str, float]) -> list
             index = _num(part.get("spring_index"))
             if index is not None:
                 if index < th["springIndexHardMin"] or index > th["springIndexHardMax"]:
-                    checks.append(_check("DRC-STD-003", "standard_parts", "fail", "major", f"弹簧 {pid} 指数 C={index:g} 超出可制造范围 [{th['springIndexHardMin']:g}, {th['springIndexHardMax']:g}]", target=pid))
+                    checks.append(_check("DRC-STD-003", "standard_parts", "fail", "major", f"Spring {pid} index C={index:g} is outside manufacturable range [{th['springIndexHardMin']:g}, {th['springIndexHardMax']:g}]", target=pid))
                 elif index < th["springIndexMin"] or index > th["springIndexMax"]:
-                    checks.append(_check("DRC-STD-003", "standard_parts", "warning", "warning", f"弹簧 {pid} 指数 C={index:g} 超出推荐范围 [{th['springIndexMin']:g}, {th['springIndexMax']:g}]", target=pid))
+                    checks.append(_check("DRC-STD-003", "standard_parts", "warning", "warning", f"Spring {pid} index C={index:g} is outside recommended range [{th['springIndexMin']:g}, {th['springIndexMax']:g}]", target=pid))
             solid = _num(part.get("solid_length_mm"))
             free = _num(part.get("free_length_mm"))
             if solid is not None and free is not None and solid >= free:
-                checks.append(_check("DRC-STD-004", "standard_parts", "fail", "critical", f"弹簧 {pid} 实体长度 {solid:g}mm 不小于自由长度 {free:g}mm", target=pid))
+                checks.append(_check("DRC-STD-004", "standard_parts", "fail", "critical", f"Spring {pid} solid length {solid:g}mm is not less than free length {free:g}mm", target=pid))
         elif ptype in {"roller_sprocket", "sprocket"}:
             teeth = _num(part.get("teeth"))
             if teeth is not None and teeth < th["sprocketMinTeeth"]:
-                checks.append(_check("DRC-STD-005", "standard_parts", "warning", "warning", f"链轮 {pid} 齿数 {teeth:g} 低于 {th['sprocketMinTeeth']:g}，磨损/多边形效应风险", target=pid))
+                checks.append(_check("DRC-STD-005", "standard_parts", "warning", "warning", f"Sprocket {pid} tooth count {teeth:g} is below {th['sprocketMinTeeth']:g}; wear/polygonal-effect risk", target=pid))
     if not checks:
-        checks.append(_check("DRC-STD-EVIDENCE", "standard_parts", "info", "info", f"{len(parts)} 个标准件的已提供数据未触发规则；仍需核对完整设计参数"))
+        checks.append(_check("DRC-STD-EVIDENCE", "standard_parts", "info", "info", f"Provided data for {len(parts)} standard part(s) triggered no rules; full design parameters still require review"))
     return checks
 
 
 def rule_assembly(ctx: Mapping[str, Any], th: Mapping[str, float]) -> list[dict[str, Any]]:
     assembly = ctx.get("assembly", {})
     if not assembly:
-        return [_check("DRC-ASM-000", "assembly", "info", "info", "无装配元数据，跳过装配规则")]
+        return [_check("DRC-ASM-000", "assembly", "info", "info", "No assembly metadata; skipping assembly rules")]
     checks: list[dict[str, Any]] = []
     interferences = assembly.get("interferences")
     count = len(interferences) if isinstance(interferences, list) else _num(assembly.get("interferenceCount"))
     if count and count > 0:
-        checks.append(_check("DRC-ASM-001", "assembly", "fail", "critical", f"检测到 {int(count)} 处装配干涉", value=int(count)))
+        checks.append(_check("DRC-ASM-001", "assembly", "fail", "critical", f"Detected {int(count)} assembly interference(s)", value=int(count)))
     components = _num(assembly.get("componentCount"))
     mates = _num(assembly.get("mateCount"))
     if components is not None and mates is not None and components >= 2 and mates == 0:
-        checks.append(_check("DRC-ASM-002", "assembly", "warning", "warning", f"{int(components)} 个组件但无配合，装配欠约束", value=int(components)))
+        checks.append(_check("DRC-ASM-002", "assembly", "warning", "warning", f"{int(components)} components with no mates; assembly is under-constrained", value=int(components)))
     if count is None or components is None or mates is None:
-        checks.append(_check("DRC-ASM-EVIDENCE", "assembly", "info", "info", "装配组件、配合或干涉数据不完整"))
+        checks.append(_check("DRC-ASM-EVIDENCE", "assembly", "info", "info", "Assembly component, mate, or interference data is incomplete"))
     elif not checks:
-        checks.append(_check("DRC-ASM-EVIDENCE", "assembly", "info", "info", "已提供的计数未发现规则问题；配合数量不能证明装配完全约束"))
+        checks.append(_check("DRC-ASM-EVIDENCE", "assembly", "info", "info", "Provided counts show no rule violations; mate count alone cannot prove full constraint"))
     return checks
 
 
 def rule_drawing(ctx: Mapping[str, Any], th: Mapping[str, float]) -> list[dict[str, Any]]:
     drawing = ctx.get("drawing", {})
     if not drawing:
-        return [_check("DRC-DRW-000", "drawing", "info", "info", "无工程图元数据，跳过图纸规则")]
+        return [_check("DRC-DRW-000", "drawing", "info", "info", "No drawing metadata; skipping drawing rules")]
     checks: list[dict[str, Any]] = []
     missing = drawing.get("requiredDimensionsMissing")
     if isinstance(missing, list) and missing:
-        checks.append(_check("DRC-DRW-001", "drawing", "fail", "major", f"工程图缺少必需尺寸: {', '.join(str(m) for m in missing[:8])}", value=len(missing)))
+        checks.append(_check("DRC-DRW-001", "drawing", "fail", "major", f"Drawing is missing required dimensions: {', '.join(str(m) for m in missing[:8])}", value=len(missing)))
     without_tol = _num(drawing.get("dimensionsWithoutTolerance"))
     if without_tol is not None and without_tol > 0:
-        checks.append(_check("DRC-DRW-002", "drawing", "warning", "minor", f"{int(without_tol)} 个尺寸缺少公差标注", value=int(without_tol)))
+        checks.append(_check("DRC-DRW-002", "drawing", "warning", "minor", f"{int(without_tol)} dimension(s) missing tolerance callouts", value=int(without_tol)))
     if not isinstance(missing, list) or without_tol is None:
-        checks.append(_check("DRC-DRW-EVIDENCE", "drawing", "info", "info", "缺少尺寸完整性或公差证据，不能判定工程图完整"))
+        checks.append(_check("DRC-DRW-EVIDENCE", "drawing", "info", "info", "Missing dimension completeness or tolerance evidence; cannot confirm drawing completeness"))
     elif not checks:
-        checks.append(_check("DRC-DRW-OK", "drawing", "pass", "info", "已提供的尺寸和公差证据未触发规则"))
+        checks.append(_check("DRC-DRW-OK", "drawing", "pass", "info", "Provided dimension and tolerance evidence triggered no rules"))
     return checks
 
 
@@ -395,7 +395,7 @@ def rule_ligament(ctx: Mapping[str, Any], th: Mapping[str, float]) -> list[dict[
     """
     holes = [h for h in ctx.get("holes", []) if h.get("x_mm") is not None and h.get("y_mm") is not None and h.get("diameter_mm")]
     if len(holes) < 2:
-        return [_check("DRC-HOLE-005", "holes", "info", "info", "定位孔少于 2，跳过孔间腹板检查")]
+        return [_check("DRC-HOLE-005", "holes", "info", "info", "Fewer than 2 positioned holes; skipping hole-to-hole ligament check")]
     limit = th["ligamentMinMm"]
     checks: list[dict[str, Any]] = []
     worst = None
@@ -408,14 +408,14 @@ def rule_ligament(ctx: Mapping[str, Any], th: Mapping[str, float]) -> list[dict[
                 worst = ligament
             if ligament < limit:
                 checks.append(
-                    _check("DRC-HOLE-005", "holes", "fail", "major", f"孔 {a['id']} 与 {b['id']} 腹板 {ligament:.3g}mm 小于最小 {limit:g}mm", value_mm=round(ligament, 4), required_mm=limit)
+                    _check("DRC-HOLE-005", "holes", "fail", "major", f"Ligament between hole {a['id']} and {b['id']} is {ligament:.3g}mm, below minimum {limit:g}mm", value_mm=round(ligament, 4), required_mm=limit)
                 )
             elif ligament < limit * 1.5:
                 checks.append(
-                    _check("DRC-HOLE-005", "holes", "warning", "minor", f"孔 {a['id']} 与 {b['id']} 腹板 {ligament:.3g}mm 接近最小 {limit:g}mm", value_mm=round(ligament, 4), required_mm=limit)
+                    _check("DRC-HOLE-005", "holes", "warning", "minor", f"Ligament between hole {a['id']} and {b['id']} is {ligament:.3g}mm, close to minimum {limit:g}mm", value_mm=round(ligament, 4), required_mm=limit)
                 )
     if not checks:
-        checks.append(_check("DRC-HOLE-005", "holes", "pass", "info", f"孔间腹板最小 {worst:.3g}mm 合格", value_mm=round(worst, 4), required_mm=limit))
+        checks.append(_check("DRC-HOLE-005", "holes", "pass", "info", f"Minimum hole-to-hole ligament {worst:.3g}mm is acceptable", value_mm=round(worst, 4), required_mm=limit))
     return checks
 
 
@@ -424,9 +424,9 @@ def rule_thread_vs_thickness(ctx: Mapping[str, Any], th: Mapping[str, float]) ->
     thickness = ctx.get("plate_thickness_mm") or ctx.get("min_wall_mm")
     tapped = [h for h in ctx.get("holes", []) if h.get("thread") and h.get("thread_nominal_mm")]
     if not tapped:
-        return [_check("DRC-HOLE-006", "holes", "info", "info", "无攻丝孔，跳过螺纹啮合-板厚检查")]
+        return [_check("DRC-HOLE-006", "holes", "info", "info", "No tapped holes; skipping thread-engagement vs plate-thickness check")]
     if thickness is None:
-        return [_check("DRC-HOLE-006", "holes", "info", "info", "未提供板厚，跳过螺纹啮合-板厚检查")]
+        return [_check("DRC-HOLE-006", "holes", "info", "info", "Plate thickness not provided; skipping thread-engagement vs plate-thickness check")]
     checks: list[dict[str, Any]] = []
     for hole in tapped:
         nominal = hole["thread_nominal_mm"]
@@ -434,10 +434,10 @@ def rule_thread_vs_thickness(ctx: Mapping[str, Any], th: Mapping[str, float]) ->
         required = th["threadEngagementRatio"] * nominal
         if available < required:
             checks.append(
-                _check("DRC-HOLE-006", "holes", "warning", "warning", f"孔 {hole['id']} 可用啮合 {available:g}mm 小于建议 {required:g}mm（板厚 {thickness:g}）", target=hole["id"], value_mm=available, required_mm=required)
+                _check("DRC-HOLE-006", "holes", "warning", "warning", f"Hole {hole['id']} available engagement {available:g}mm is below recommended {required:g}mm (plate thickness {thickness:g})", target=hole["id"], value_mm=available, required_mm=required)
             )
     if not checks:
-        checks.append(_check("DRC-HOLE-006", "holes", "pass", "info", f"{len(tapped)} 个攻丝孔螺纹啮合与板厚匹配"))
+        checks.append(_check("DRC-HOLE-006", "holes", "pass", "info", f"Thread engagement matches plate thickness for {len(tapped)} tapped hole(s)"))
     return checks
 
 
@@ -448,7 +448,7 @@ def rule_relations(ctx: Mapping[str, Any], th: Mapping[str, float]) -> list[dict
     # DRC-REL-001 GD&T 基准存在性
     gdt = ctx.get("gdt", [])
     if not gdt:
-        checks.append(_check("DRC-REL-001", "relations", "info", "info", "无 GD&T 元数据，跳过基准存在性检查"))
+        checks.append(_check("DRC-REL-001", "relations", "info", "info", "No GD&T metadata; skipping datum existence check"))
     else:
         declared = set(ctx.get("datums_declared", []))
         referenced: set[str] = set()
@@ -457,28 +457,28 @@ def rule_relations(ctx: Mapping[str, Any], th: Mapping[str, float]) -> list[dict
                 referenced.add(str(datum))
         missing = sorted(referenced - declared)
         if missing:
-            checks.append(_check("DRC-REL-001", "relations", "fail", "major", f"GD&T 引用了未声明的基准: {', '.join(missing)}", value=missing))
+            checks.append(_check("DRC-REL-001", "relations", "fail", "major", f"GD&T references undeclared datums: {', '.join(missing)}", value=missing))
         else:
-            checks.append(_check("DRC-REL-001", "relations", "pass", "info", "GD&T 引用的基准均已声明"))
+            checks.append(_check("DRC-REL-001", "relations", "pass", "info", "All datums referenced by GD&T are declared"))
 
     # DRC-REL-002 孔表/孔标注覆盖度
     callouts = ctx.get("hole_callouts")
     holes = ctx.get("holes", [])
     if callouts is None or not holes:
-        checks.append(_check("DRC-REL-002", "relations", "info", "info", "无孔标注元数据或无孔，跳过孔表覆盖检查"))
+        checks.append(_check("DRC-REL-002", "relations", "info", "info", "No hole callout metadata or no holes; skipping hole-table coverage check"))
     else:
         specs = {f"{round(h['diameter_mm'], 1)}" for h in holes if h.get("diameter_mm")}
         covered = {str(c).replace("⌀", "").replace("φ", "").strip() for c in callouts}
         uncovered = sorted(s for s in specs if not any(s in c or c in s for c in covered))
         if uncovered:
-            checks.append(_check("DRC-REL-002", "relations", "warning", "warning", f"孔规格未被孔表/标注覆盖: ⌀{', ⌀'.join(uncovered)}", value=uncovered))
+            checks.append(_check("DRC-REL-002", "relations", "warning", "warning", f"Hole sizes not covered by hole table/callouts: ⌀{', ⌀'.join(uncovered)}", value=uncovered))
         else:
-            checks.append(_check("DRC-REL-002", "relations", "pass", "info", "全部孔规格均有孔表/标注覆盖"))
+            checks.append(_check("DRC-REL-002", "relations", "pass", "info", "All hole sizes are covered by hole table/callouts"))
 
     # DRC-REL-003 BOM 与特征数一致性
     bom = ctx.get("bom", [])
     if not bom:
-        checks.append(_check("DRC-REL-003", "relations", "info", "info", "无 BOM 元数据，跳过一致性检查"))
+        checks.append(_check("DRC-REL-003", "relations", "info", "info", "No BOM metadata; skipping consistency check"))
     else:
         features = ctx.get("features", [])
         type_counts: dict[str, int] = {}
@@ -490,11 +490,11 @@ def rule_relations(ctx: Mapping[str, Any], th: Mapping[str, float]) -> list[dict
             ftype = str(item.get("featureType") or "").lower()
             quantity = _num(item.get("quantity"))
             if ftype and quantity is not None and type_counts.get(ftype, 0) != int(quantity):
-                mismatched.append(f"{ftype}: BOM {int(quantity)} vs 特征 {type_counts.get(ftype, 0)}")
+                mismatched.append(f"{ftype}: BOM {int(quantity)} vs features {type_counts.get(ftype, 0)}")
         if mismatched:
-            checks.append(_check("DRC-REL-003", "relations", "warning", "warning", f"BOM 数量与特征数不一致: {'; '.join(mismatched)}", value=mismatched))
+            checks.append(_check("DRC-REL-003", "relations", "warning", "warning", f"BOM quantity mismatches feature count: {'; '.join(mismatched)}", value=mismatched))
         else:
-            checks.append(_check("DRC-REL-003", "relations", "pass", "info", "BOM 数量与特征数一致"))
+            checks.append(_check("DRC-REL-003", "relations", "pass", "info", "BOM quantities match feature counts"))
     return checks
 
 
@@ -510,17 +510,17 @@ def rule_drives(ctx: Mapping[str, Any], th: Mapping[str, float]) -> list[dict[st
     """
     drives = ctx.get("drives", [])
     if not drives:
-        return [_check("DRC-DRV-000", "drive", "info", "info", "无驱动(drive-spec)元数据，跳过电机扭矩核验")]
+        return [_check("DRC-DRV-000", "drive", "info", "info", "No drive (drive-spec) metadata; skipping motor torque sizing")]
     limits = {k: th[k] for k in DRIVE_DEFAULT_LIMITS if k in th}
     checks: list[dict[str, Any]] = []
     for index, spec in enumerate(drives):
         if not isinstance(spec, Mapping):
-            checks.append(_check("DRC-DRV-900", "drive", "fail", "major", f"驱动 {index} 必须是对象", target=str(index)))
+            checks.append(_check("DRC-DRV-900", "drive", "fail", "major", f"Drive {index} must be an object", target=str(index)))
             continue
         try:
             checks.extend(evaluate_drive(spec, limits)["checks"])
         except ValueError as exc:
-            checks.append(_check("DRC-DRV-900", "drive", "fail", "major", f"驱动 {spec.get('id') or index} 的 drive-spec 无效: {exc}", target=str(spec.get("id") or index)))
+            checks.append(_check("DRC-DRV-900", "drive", "fail", "major", f"Drive {spec.get('id') or index} has invalid drive-spec: {exc}", target=str(spec.get("id") or index)))
     return checks
 
 
@@ -538,70 +538,70 @@ BUILTIN_RULES: list[Callable[[Mapping[str, Any], Mapping[str, float]], list[dict
 ]
 
 RULE_CATALOG = [
-    {"id": "DRC-GEO-001", "category": "geometry", "title": "最小壁厚", "thresholds": ["minWallThicknessMm"], "severity": "major"},
-    {"id": "DRC-HOLE-001", "category": "holes", "title": "孔到边缘距离", "thresholds": ["holeEdgeDistanceRatio", "holeEdgeDistanceMinMm"], "severity": "major"},
-    {"id": "DRC-HOLE-002", "category": "holes", "title": "孔间距", "thresholds": ["holeSpacingRatio"], "severity": "warning"},
-    {"id": "DRC-HOLE-003", "category": "holes", "title": "螺纹啮合深度", "thresholds": ["threadEngagementRatio"], "severity": "warning"},
-    {"id": "DRC-HOLE-004", "category": "holes", "title": "孔尺寸有效性", "thresholds": [], "severity": "critical"},
-    {"id": "DRC-HOLE-005", "category": "holes", "title": "孔间腹板厚度(实测)", "thresholds": ["ligamentMinMm"], "severity": "major"},
-    {"id": "DRC-HOLE-006", "category": "holes", "title": "螺纹啮合vs板厚", "thresholds": ["threadEngagementRatio"], "severity": "warning"},
-    {"id": "DRC-STD-001", "category": "standard_parts", "title": "齿轮尖齿", "thresholds": [], "severity": "major"},
-    {"id": "DRC-STD-002", "category": "standard_parts", "title": "齿轮根切齿数", "thresholds": ["gearMinTeeth"], "severity": "warning"},
-    {"id": "DRC-STD-003", "category": "standard_parts", "title": "弹簧指数范围", "thresholds": ["springIndexMin", "springIndexMax", "springIndexHardMin", "springIndexHardMax"], "severity": "major"},
-    {"id": "DRC-STD-004", "category": "standard_parts", "title": "弹簧实体/自由长度", "thresholds": [], "severity": "critical"},
-    {"id": "DRC-STD-005", "category": "standard_parts", "title": "链轮最小齿数", "thresholds": ["sprocketMinTeeth"], "severity": "warning"},
-    {"id": "DRC-ASM-001", "category": "assembly", "title": "装配干涉", "thresholds": [], "severity": "critical"},
-    {"id": "DRC-ASM-002", "category": "assembly", "title": "装配欠约束", "thresholds": [], "severity": "warning"},
-    {"id": "DRC-DRW-001", "category": "drawing", "title": "缺必需尺寸", "thresholds": [], "severity": "major"},
-    {"id": "DRC-DRW-002", "category": "drawing", "title": "尺寸缺公差", "thresholds": [], "severity": "minor"},
-    {"id": "DRC-REL-001", "category": "relations", "title": "GD&T 基准存在性", "thresholds": [], "severity": "major"},
-    {"id": "DRC-REL-002", "category": "relations", "title": "孔表/孔标注覆盖度", "thresholds": [], "severity": "warning"},
-    {"id": "DRC-REL-003", "category": "relations", "title": "BOM 与特征数一致性", "thresholds": [], "severity": "warning"},
-    {"id": "DRC-CSK-001", "category": "fastener", "title": "沉头几何有效性", "thresholds": [], "severity": "major"},
-    {"id": "DRC-CSK-002", "category": "fastener", "title": "沉孔直径容纳螺栓头", "thresholds": [], "severity": "major"},
-    {"id": "DRC-CSK-003", "category": "fastener", "title": "沉孔深度容纳头高", "thresholds": [], "severity": "warning"},
-    {"id": "DRC-CSK-004", "category": "fastener", "title": "沉头朝向配合面", "thresholds": [], "severity": "critical"},
-    {"id": "DRC-CSK-005", "category": "fastener", "title": "同组沉头朝向一致性", "thresholds": [], "severity": "warning"},
-    {"id": "DRC-DRV-001", "category": "drive", "title": "电机峰值转矩(含安全系数)", "thresholds": ["driveTorqueSafetyFactor"], "severity": "major"},
-    {"id": "DRC-DRV-002", "category": "drive", "title": "电机 RMS 转矩 vs 额定", "thresholds": ["driveRmsUtilizationMax"], "severity": "major"},
-    {"id": "DRC-DRV-003", "category": "drive", "title": "需求转速 vs 电机转速", "thresholds": [], "severity": "major"},
-    {"id": "DRC-DRV-004", "category": "drive", "title": "负载/转子惯量比", "thresholds": ["driveInertiaRatioWarn", "driveInertiaRatioMax"], "severity": "major"},
-    {"id": "DRC-DRV-005", "category": "drive", "title": "垂直/倾斜轴抱闸", "thresholds": [], "severity": "critical"},
-    {"id": "DRC-FIT-001", "category": "fastener", "title": "跨零件沉头/头部避让(pilot)", "thresholds": [], "severity": "major"},
+    {"id": "DRC-GEO-001", "category": "geometry", "title": "Minimum wall thickness", "thresholds": ["minWallThicknessMm"], "severity": "major"},
+    {"id": "DRC-HOLE-001", "category": "holes", "title": "Hole edge distance", "thresholds": ["holeEdgeDistanceRatio", "holeEdgeDistanceMinMm"], "severity": "major"},
+    {"id": "DRC-HOLE-002", "category": "holes", "title": "Hole spacing", "thresholds": ["holeSpacingRatio"], "severity": "warning"},
+    {"id": "DRC-HOLE-003", "category": "holes", "title": "Thread engagement depth", "thresholds": ["threadEngagementRatio"], "severity": "warning"},
+    {"id": "DRC-HOLE-004", "category": "holes", "title": "Hole dimension validity", "thresholds": [], "severity": "critical"},
+    {"id": "DRC-HOLE-005", "category": "holes", "title": "Hole-to-hole ligament thickness (measured)", "thresholds": ["ligamentMinMm"], "severity": "major"},
+    {"id": "DRC-HOLE-006", "category": "holes", "title": "Thread engagement vs plate thickness", "thresholds": ["threadEngagementRatio"], "severity": "warning"},
+    {"id": "DRC-STD-001", "category": "standard_parts", "title": "Gear pointed teeth", "thresholds": [], "severity": "major"},
+    {"id": "DRC-STD-002", "category": "standard_parts", "title": "Gear minimum teeth without undercut", "thresholds": ["gearMinTeeth"], "severity": "warning"},
+    {"id": "DRC-STD-003", "category": "standard_parts", "title": "Spring index range", "thresholds": ["springIndexMin", "springIndexMax", "springIndexHardMin", "springIndexHardMax"], "severity": "major"},
+    {"id": "DRC-STD-004", "category": "standard_parts", "title": "Spring solid vs free length", "thresholds": [], "severity": "critical"},
+    {"id": "DRC-STD-005", "category": "standard_parts", "title": "Sprocket minimum teeth", "thresholds": ["sprocketMinTeeth"], "severity": "warning"},
+    {"id": "DRC-ASM-001", "category": "assembly", "title": "Assembly interference", "thresholds": [], "severity": "critical"},
+    {"id": "DRC-ASM-002", "category": "assembly", "title": "Assembly under-constrained", "thresholds": [], "severity": "warning"},
+    {"id": "DRC-DRW-001", "category": "drawing", "title": "Missing required dimensions", "thresholds": [], "severity": "major"},
+    {"id": "DRC-DRW-002", "category": "drawing", "title": "Dimensions missing tolerances", "thresholds": [], "severity": "minor"},
+    {"id": "DRC-REL-001", "category": "relations", "title": "GD&T datum existence", "thresholds": [], "severity": "major"},
+    {"id": "DRC-REL-002", "category": "relations", "title": "Hole table / callout coverage", "thresholds": [], "severity": "warning"},
+    {"id": "DRC-REL-003", "category": "relations", "title": "BOM vs feature count consistency", "thresholds": [], "severity": "warning"},
+    {"id": "DRC-CSK-001", "category": "fastener", "title": "Countersink/counterbore geometry validity", "thresholds": [], "severity": "major"},
+    {"id": "DRC-CSK-002", "category": "fastener", "title": "Counterbore diameter accommodates bolt head", "thresholds": [], "severity": "major"},
+    {"id": "DRC-CSK-003", "category": "fastener", "title": "Counterbore depth accommodates head height", "thresholds": [], "severity": "warning"},
+    {"id": "DRC-CSK-004", "category": "fastener", "title": "Countersink facing mating surface", "thresholds": [], "severity": "critical"},
+    {"id": "DRC-CSK-005", "category": "fastener", "title": "Group countersink orientation consistency", "thresholds": [], "severity": "warning"},
+    {"id": "DRC-DRV-001", "category": "drive", "title": "Motor peak torque (with safety factor)", "thresholds": ["driveTorqueSafetyFactor"], "severity": "major"},
+    {"id": "DRC-DRV-002", "category": "drive", "title": "Motor RMS torque vs rated", "thresholds": ["driveRmsUtilizationMax"], "severity": "major"},
+    {"id": "DRC-DRV-003", "category": "drive", "title": "Required speed vs motor speed", "thresholds": [], "severity": "major"},
+    {"id": "DRC-DRV-004", "category": "drive", "title": "Load-to-rotor inertia ratio", "thresholds": ["driveInertiaRatioWarn", "driveInertiaRatioMax"], "severity": "major"},
+    {"id": "DRC-DRV-005", "category": "drive", "title": "Vertical/inclined axis brake", "thresholds": [], "severity": "critical"},
+    {"id": "DRC-FIT-001", "category": "fastener", "title": "Cross-part head clearance (pilot)", "thresholds": [], "severity": "major"},
 ]
 
 # 每条规则的标准/条款出处，便于审计时追溯依据（非强制法规，供工程复核参考）。
 RULE_CLAUSES = {
-    "DRC-GEO-001": {"standard": "机械设计工艺", "clause": "最小壁厚经验值"},
-    "DRC-HOLE-001": {"standard": "机械设计手册", "clause": "孔边距经验值"},
-    "DRC-HOLE-002": {"standard": "机械设计手册", "clause": "孔间距经验值"},
-    "DRC-HOLE-003": {"standard": "GB/T 196 / GB/T 197", "clause": "螺纹啮合长度"},
-    "DRC-HOLE-004": {"standard": "几何有效性", "clause": "直径为正"},
-    "DRC-HOLE-005": {"standard": "机械设计工艺", "clause": "孔间腹板最小厚度"},
-    "DRC-HOLE-006": {"standard": "GB/T 196 / GB/T 197", "clause": "有效螺纹啮合长度"},
-    "DRC-STD-001": {"standard": "GB/T 1356", "clause": "齿顶变尖"},
-    "DRC-STD-002": {"standard": "GB/T 1356", "clause": "最少齿数/根切"},
-    "DRC-STD-003": {"standard": "GB/T 1239 / GB/T 2089", "clause": "弹簧指数范围"},
-    "DRC-STD-004": {"standard": "GB/T 2089", "clause": "压并高度"},
-    "DRC-STD-005": {"standard": "GB/T 1243", "clause": "链轮最少齿数"},
-    "DRC-ASM-001": {"standard": "装配设计", "clause": "零干涉"},
-    "DRC-ASM-002": {"standard": "装配设计", "clause": "完全约束"},
-    "DRC-DRW-001": {"standard": "GB/T 4458.4", "clause": "必要尺寸完整"},
-    "DRC-DRW-002": {"standard": "GB/T 1800", "clause": "配合公差标注"},
-    "DRC-REL-001": {"standard": "GB/T 1182", "clause": "基准要素引用"},
-    "DRC-REL-002": {"standard": "GB/T 4458.4", "clause": "孔表/孔标注完整"},
-    "DRC-REL-003": {"standard": "GB/T 10609.2", "clause": "明细栏与零件一致"},
-    "DRC-CSK-001": {"standard": "GB/T 152.2/152.3/152.4", "clause": "沉头/锪孔尺寸"},
-    "DRC-CSK-002": {"standard": "GB/T 70.1 / GB/T 70.3", "clause": "螺栓头径容纳"},
-    "DRC-CSK-003": {"standard": "GB/T 70.1", "clause": "柱形沉孔深度/头高"},
-    "DRC-CSK-004": {"standard": "装配设计", "clause": "沉头朝向/结合面"},
-    "DRC-CSK-005": {"standard": "装配设计", "clause": "紧固方向一致性"},
-    "DRC-FIT-001": {"standard": "装配设计", "clause": "紧固件头部避让"},
-    "DRC-DRV-001": {"standard": "伺服选型通用做法(厂商选型手册)", "clause": "峰值转矩校核与安全系数"},
-    "DRC-DRV-002": {"standard": "伺服选型通用做法(厂商选型手册)", "clause": "连续(RMS)转矩校核"},
-    "DRC-DRV-003": {"standard": "伺服选型通用做法(厂商选型手册)", "clause": "转速与转矩-转速曲线"},
-    "DRC-DRV-004": {"standard": "伺服选型通用做法(厂商选型手册)", "clause": "惯量比(随厂商/动态要求而异)"},
-    "DRC-DRV-005": {"standard": "机械安全设计通用做法", "clause": "垂直轴断电保持/抱闸"},
+    "DRC-GEO-001": {"standard": "Mechanical Design Practice", "clause": "Minimum wall thickness guideline"},
+    "DRC-HOLE-001": {"standard": "Mechanical Design Handbook", "clause": "Hole edge distance guideline"},
+    "DRC-HOLE-002": {"standard": "Mechanical Design Handbook", "clause": "Hole spacing guideline"},
+    "DRC-HOLE-003": {"standard": "GB/T 196 / GB/T 197", "clause": "Thread engagement length"},
+    "DRC-HOLE-004": {"standard": "Geometric Validity", "clause": "Positive diameter"},
+    "DRC-HOLE-005": {"standard": "Mechanical Design Practice", "clause": "Minimum hole-to-hole ligament thickness"},
+    "DRC-HOLE-006": {"standard": "GB/T 196 / GB/T 197", "clause": "Effective thread engagement length"},
+    "DRC-STD-001": {"standard": "GB/T 1356", "clause": "Pointed tooth tip"},
+    "DRC-STD-002": {"standard": "GB/T 1356", "clause": "Minimum teeth / undercut"},
+    "DRC-STD-003": {"standard": "GB/T 1239 / GB/T 2089", "clause": "Spring index range"},
+    "DRC-STD-004": {"standard": "GB/T 2089", "clause": "Solid height"},
+    "DRC-STD-005": {"standard": "GB/T 1243", "clause": "Sprocket minimum teeth"},
+    "DRC-ASM-001": {"standard": "Assembly Design", "clause": "Zero interference"},
+    "DRC-ASM-002": {"standard": "Assembly Design", "clause": "Full constraint"},
+    "DRC-DRW-001": {"standard": "GB/T 4458.4", "clause": "Required dimensions completeness"},
+    "DRC-DRW-002": {"standard": "GB/T 1800", "clause": "Fit and tolerance callouts"},
+    "DRC-REL-001": {"standard": "GB/T 1182", "clause": "Datum feature references"},
+    "DRC-REL-002": {"standard": "GB/T 4458.4", "clause": "Hole table / callout completeness"},
+    "DRC-REL-003": {"standard": "GB/T 10609.2", "clause": "BOM consistency with parts"},
+    "DRC-CSK-001": {"standard": "GB/T 152.2/152.3/152.4", "clause": "Countersink/counterbore dimensions"},
+    "DRC-CSK-002": {"standard": "GB/T 70.1 / GB/T 70.3", "clause": "Bolt head diameter accommodation"},
+    "DRC-CSK-003": {"standard": "GB/T 70.1", "clause": "Counterbore depth vs head height"},
+    "DRC-CSK-004": {"standard": "Assembly Design", "clause": "Countersink facing mating surface"},
+    "DRC-CSK-005": {"standard": "Assembly Design", "clause": "Fastening direction consistency"},
+    "DRC-FIT-001": {"standard": "Assembly Design", "clause": "Fastener head clearance"},
+    "DRC-DRV-001": {"standard": "Servo Sizing Practice (Vendor Manuals)", "clause": "Peak torque check and safety factor"},
+    "DRC-DRV-002": {"standard": "Servo Sizing Practice (Vendor Manuals)", "clause": "Continuous (RMS) torque check"},
+    "DRC-DRV-003": {"standard": "Servo Sizing Practice (Vendor Manuals)", "clause": "Speed and torque-speed curve"},
+    "DRC-DRV-004": {"standard": "Servo Sizing Practice (Vendor Manuals)", "clause": "Inertia ratio (varies by vendor/dynamics)"},
+    "DRC-DRV-005": {"standard": "Machine Safety Design Practice", "clause": "Vertical-axis power-off holding / brake"},
 }
 
 
@@ -706,7 +706,7 @@ def _apply_custom_rule(ctx: Mapping[str, Any], rule: Mapping[str, Any]) -> list[
             emit(ctx.get("documentId", "document"), actual)
 
     if not checks:
-        checks.append(_check(rule["id"], rule.get("category", "custom"), "pass", "info", f"自定义规则 {rule['id']} 未发现违规"))
+        checks.append(_check(rule["id"], rule.get("category", "custom"), "pass", "info", f"Custom rule {rule['id']} found no violations"))
     return checks
 
 
@@ -808,7 +808,7 @@ def build_drc_report(
     regression = None
     if regression_gate:
         if not isinstance(baseline_report, Mapping):
-            regression = {"passed": False, "reasons": ["启用回归门禁必须提供 baseline（上一版 DRC 报告）"], "error": "baseline_required"}
+            regression = {"passed": False, "reasons": ["Regression gate requires a baseline (previous DRC report)"], "error": "baseline_required"}
         else:
             regression = assert_no_regression(
                 baseline_report.get("checks", []), checks, weights=risk_weights, tolerance=regression_tolerance
@@ -896,7 +896,7 @@ def write_drc_report(
         except FileExistsError:
             continue
     else:
-        raise FileExistsError("无法分配未使用的 DRC 报告文件名")
+        raise FileExistsError("Unable to allocate an unused DRC report filename")
     report["reportPath"] = str(target)
     report["artifacts"] = [
         {
@@ -937,7 +937,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(json.dumps({"rulePacks": list_rule_packs()}, ensure_ascii=False, indent=2))
         return 0
     if not args.input:
-        parser.error("需要提供 NeutralCadDocument 路径，或使用 --list-rules / --list-rule-packs")
+        parser.error("Provide a NeutralCadDocument path, or use --list-rules / --list-rule-packs")
     waivers = json.loads(Path(args.waivers).read_text(encoding="utf-8")) if args.waivers else None
     kwargs = dict(
         profiles=args.profile or None,

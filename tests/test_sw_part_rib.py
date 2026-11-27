@@ -71,5 +71,5 @@ def test_no_new_feature_does_not_return_an_existing_rib(monkeypatch):
 def test_ambiguous_new_ribs_are_not_reported_as_one_result(monkeypatch):
     model = Model(added=[Feature("Rib1"), Feature("Rib2")])
     monkeypatch.setattr(sw_part, "_ensure_sketch_selected", lambda *_: None)
-    with pytest.raises(RuntimeError, match="新增多个筋特征"):
+    with pytest.raises(RuntimeError, match="multiple rib features"):
         sw_part.rib(model, "profile", .006)

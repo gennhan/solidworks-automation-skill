@@ -28,7 +28,7 @@ def test_api_return_does_not_override_underdefined_state():
     active = sketch_fixture(status=2)
     model = SimpleNamespace(SketchManager=SimpleNamespace(ActiveSketch=active, FullyDefineSketch=lambda *args: 0),
         Extension=SimpleNamespace(SelectByID2=lambda *args: True), ClearSelection2=lambda _: None)
-    with pytest.raises(RuntimeError, match="草图未通过"):
+    with pytest.raises(RuntimeError, match="Sketch failed full-definition"):
         fully_define_sketch(model)
 
 

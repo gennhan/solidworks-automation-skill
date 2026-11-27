@@ -48,7 +48,7 @@ def test_release_check_rejects_mcpb_or_locked_project_version_drift(monkeypatch,
     def drift(path, pattern):
         return "0.0.0" if path == release_check.ROOT / relative else original(path, pattern)
     monkeypatch.setattr(release_check, "_version", drift)
-    with pytest.raises(AssertionError, match="版本不一致"):
+    with pytest.raises(AssertionError, match="Version mismatch"):
         release_check.run_release_check()
 
 

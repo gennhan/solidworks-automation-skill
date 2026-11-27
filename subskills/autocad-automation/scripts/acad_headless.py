@@ -21,7 +21,11 @@ DIMENSION_TYPES = {
     "LARGE_RADIAL_DIMENSION",
 }
 TEXT_TYPES = {"TEXT", "MTEXT", "ATTRIB", "ATTDEF"}
-TITLE_KEYWORDS = ("图号", "名称", "材料", "比例", "单位", "设计", "审核", "CAD STUDIO")
+TITLE_KEYWORDS = (
+    "图号", "名称", "材料", "比例", "单位", "设计", "审核",
+    "TITLE", "DRAWING NO", "MATERIAL", "SCALE", "UNITS", "DESIGNER", "REVIEWER",
+    "CAD STUDIO",
+)
 LAYER_GROUPS = {
     "outline": {"OUTLINE", "OBJECT", "VISIBLE", "粗实线", "轮廓"},
     "center": {"CENTER", "CENTRE", "CENTERLINE", "中心线"},

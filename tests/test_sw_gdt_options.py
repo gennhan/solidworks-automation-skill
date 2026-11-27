@@ -114,17 +114,17 @@ def test_invalid_extended_combinations_are_rejected_before_com(changes):
 def test_common_datum_members_must_all_exist_in_native_drawing_spec():
     request = frame(id="POS", view="front", target={"kind": "dimension", "dimensionId": "HOLE"}, datums=[{"common": ["A", "B"]}])
     value = {"documentType": "part", "professionalAnnotations": {"datums": [{"id": "DAT_A", "label": "A", "view": "front", "target": {}}], "geometricTolerances": [request]}}
-    assert any("未声明的基准" in item["message"] for item in validate_native_requests(value))
+    assert any("undeclared datum" in item["message"] for item in validate_native_requests(value))
 
 
 def test_composite_common_group_cannot_change_shape_or_drop_only_half_a_group():
     upper = frame(datums=[{"common": ["A", "B"]}], options={"zoneShape": "sphericalDiameter"})
     lower = {**deepcopy(upper), "tolerance": "0.1", "composite": True}
     lower["options"]["zoneShape"] = "diameter"
-    with pytest.raises(ValueError, match="形状"):
+    with pytest.raises(ValueError, match="zone shape"):
         build_gtol_xmls({"frames": [upper, lower]})
     lower = {**deepcopy(upper), "tolerance": "0.1", "composite": True, "datums": ["A"]}
-    with pytest.raises(ValueError, match="前缀"):
+    with pytest.raises(ValueError, match="prefix"):
         build_gtol_xmls({"frames": [upper, lower]})
 
 

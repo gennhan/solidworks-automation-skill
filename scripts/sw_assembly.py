@@ -69,7 +69,7 @@ def _as_alias_list(aliases):
         return [aliases]
     names = [str(item) for item in aliases if str(item)]
     if not names:
-        raise ValueError("aliases 不能为空")
+        raise ValueError("aliases cannot be empty")
     return names
 
 
@@ -143,7 +143,7 @@ def add_component(asm_model, part_path, x=0, y=0, z=0, config_name="", sw=None):
     """
     component_path = os.path.abspath(os.path.expandvars(os.path.expanduser(str(part_path))))
     if not os.path.exists(component_path):
-        raise FileNotFoundError(f"组件文件不存在: {component_path}")
+        raise FileNotFoundError(f"Component file not found: {component_path}")
 
     component = None
     errors = []
@@ -167,7 +167,7 @@ def add_component(asm_model, part_path, x=0, y=0, z=0, config_name="", sw=None):
             try:
                 opened = open_document(sw, component_path, read_only=False, silent=True)
                 if opened is None:
-                    errors.append("OpenDoc6: 返回 None")
+                    errors.append("OpenDoc6 returned None")
                 elif _activate_model_document(sw, asm_model):
                     component = _add_component5(
                         asm_model,
@@ -178,13 +178,13 @@ def add_component(asm_model, part_path, x=0, y=0, z=0, config_name="", sw=None):
                         z,
                     )
                     if component is None:
-                        errors.append("open_then_AddComponent5: 返回 None")
+                        errors.append("open_then_AddComponent5 returned None")
                 else:
-                    errors.append("ActivateDoc: 无法重新激活装配体")
+                    errors.append("ActivateDoc: unable to reactivate assembly")
             except Exception as exc:
                 errors.append(f"open_then_AddComponent5: {exc}")
         else:
-            errors.append("GetActiveObject(SldWorks.Application): 返回 None")
+            errors.append("GetActiveObject(SldWorks.Application) returned None")
 
     if component:
         print(f"Added component: {component_path}")
@@ -202,7 +202,7 @@ def resolve_component(component, state=SW_COMPONENT_FULLY_RESOLVED):
     @return SetSuppression2 的返回值；若主状态失败会尝试 3=swComponentResolved。
     """
     if component is None:
-        raise ValueError("component 不能为空")
+        raise ValueError("component cannot be None")
     try:
         return component.SetSuppression2(state)
     except Exception:
@@ -221,14 +221,14 @@ def get_component_model(component, resolve=True, raise_on_error=True):
     """
     if component is None:
         if raise_on_error:
-            raise ValueError("component 不能为空")
+            raise ValueError("component cannot be None")
         return None
     if resolve:
         resolve_component(component)
     model = safe_get_com_member(component, "GetModelDoc2")
     if model is None and raise_on_error:
         name = safe_get_com_member(component, "Name2")
-        raise RuntimeError(f"组件未解析或未加载，无法读取零件文档: {name}")
+        raise RuntimeError(f"Component is unresolved or unloaded; unable to read part document: {name}")
     return model
 
 
@@ -251,7 +251,7 @@ def get_component_feature(component, aliases, resolve=True):
         if feature:
             return feature
     comp_name = safe_get_com_member(component, "Name2")
-    raise RuntimeError(f"组件 {comp_name} 缺少特征: {names}")
+    raise RuntimeError(f"Component {comp_name} is missing feature: {names}")
 
 
 def get_assembly_entity(component, feature_or_face):
@@ -264,7 +264,7 @@ def get_assembly_entity(component, feature_or_face):
     entity = component.GetCorresponding(feature_or_face)
     if entity is None:
         comp_name = safe_get_com_member(component, "Name2")
-        raise RuntimeError(f"无法映射装配体上下文实体: {comp_name}")
+        raise RuntimeError(f"Unable to map assembly context entity for component: {comp_name}")
     return entity
 
 
@@ -317,7 +317,7 @@ def find_largest_cylinder_face(component, min_radius=0.0, max_radius=None, resol
     if best_face is None:
         comp_name = safe_get_com_member(component, "Name2")
         raise RuntimeError(
-            f"未找到圆柱面: {comp_name}, radius=[{min_radius}, {max_radius}]"
+            f"Cylindrical face not found: {comp_name}, radius=[{min_radius}, {max_radius}]"
         )
     return get_assembly_entity(component, best_face)
 
@@ -333,13 +333,13 @@ def select_entities_for_mate(model, entity1, entity2, mark=1):
     """
     model.ClearSelection2(True)
     if not entity1.Select2(False, mark):
-        raise RuntimeError("选择第一个 Mate 实体失败")
+        raise RuntimeError("Failed to select first mate entity")
     if not entity2.Select2(True, mark):
-        raise RuntimeError("选择第二个 Mate 实体失败")
+        raise RuntimeError("Failed to select second mate entity")
     selected_count = model.SelectionManager.GetSelectedObjectCount2(-1)
     if selected_count != 2:
         model.ClearSelection2(True)
-        raise RuntimeError(f"Mate 选择数量错误: selected={selected_count}, expected=2")
+        raise RuntimeError(f"Invalid mate selection count: selected={selected_count}, expected=2")
     return True
 
 
@@ -400,7 +400,7 @@ def add_mate5_checked(
         SW_ADD_MATE_ERROR_NO_ERROR,
     ):
         raise RuntimeError(
-            f"AddMate5 失败: type={mate_type}, error_status={error_status.value}"
+            f"AddMate5 failed: type={mate_type}, error_status={error_status.value}"
         )
     if name:
         try:
@@ -468,7 +468,7 @@ def add_gear_mate_by_cylinders(
     @return Mate2 对象。
     """
     if float(teeth_a) == 0 or float(teeth_b) == 0:
-        raise ValueError("Gear Mate 的齿数/传动比不能为 0")
+        raise ValueError("Gear Mate tooth count / ratio cannot be 0")
     radius_a = radius_a or (0.0, None)
     radius_b = radius_b or (0.0, None)
     face_a = find_largest_cylinder_face(component_a, radius_a[0], radius_a[1])
@@ -541,7 +541,7 @@ def apply_component_transform_x(component, tx, ty, tz, angle_rad=0.0):
     """
     transform = component.Transform2
     if transform is None:
-        raise RuntimeError("组件没有可用 Transform2")
+        raise RuntimeError("Component has no available Transform2")
     transform.ArrayData = build_transform_data_x(tx, ty, tz, angle_rad)
     try:
         if component.SetTransformAndSolve2(transform):
@@ -621,7 +621,7 @@ def inspect_component_dofs(component):
         values = [argument.value for argument in arguments]
         if isinstance(value, (tuple, list)):
             if len(value) != 13:
-                raise ValueError("GetRemainingDOFs 返回数组形状未知")
+                raise ValueError("GetRemainingDOFs returned an unknown array shape")
             value, *values = value
         # 本机实测返回值 0/2 并非自由度数；不得按 swDofStatus_e 猜测私有接口语义。
         result["return_code"] = int(value)
@@ -643,7 +643,7 @@ def create_math_transform(sw, values):
     """
     values = tuple(float(v) for v in values)
     if len(values) != 16 or not all(math.isfinite(v) for v in values):
-        raise ValueError("变换必须含 16 个有限值")
+        raise ValueError("Transform must contain 16 finite values")
     utility = get_com_member(sw, "GetMathUtility")
     # pywin32 可把带参方法缓存成属性；本机最小探针确认需显式标记，禁止默认 DISPID 调用。
     if hasattr(utility, "_FlagAsMethod"):
@@ -651,10 +651,10 @@ def create_math_transform(sw, values):
     transform = get_com_member(utility, "CreateTransform",
                                VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, values))
     if transform is None:
-        raise RuntimeError("MathUtility.CreateTransform 返回空")
+        raise RuntimeError("MathUtility.CreateTransform returned None")
     actual = list(get_com_member(transform, "ArrayData"))
     if len(actual) != 16 or any(abs(a-b) > 1e-10 for a,b in zip(actual,values)):
-        raise RuntimeError("MathTransform 回读与请求不一致")
+        raise RuntimeError("MathTransform readback does not match requested values")
     return transform
 
 
@@ -675,7 +675,7 @@ def inspect_native_mates(model):
             seen.add(name)
             mate = get_com_member(feature, "GetSpecificFeature2")
             if mate is None:
-                raise RuntimeError("Mate2 返回空: " + name)
+                raise RuntimeError("Mate2 returned None: " + name)
             row = {"name": name, "feature_type": kind, "type": int(get_com_member(mate, "Type")),
                    "suppressed": bool(get_com_member(feature, "IsSuppressed")),
                    "health": _feature_health(feature), "entities": []}
@@ -684,7 +684,7 @@ def inspect_native_mates(model):
                 component = entity.ReferenceComponent
                 reference = entity.Reference
                 if component is None or reference is None:
-                    raise RuntimeError("Mate 引用缺失: " + name)
+                    raise RuntimeError("Mate reference missing: " + name)
                 row["entities"].append({"component_id": int(get_com_member(component, "GetID")),
                     "role": str(get_com_member(component, "ComponentReference")),
                     "reference_type": int(entity.ReferenceType2), "entity_params": list(entity.EntityParams),
@@ -774,7 +774,7 @@ def find_component_by_name(asm_model, keyword, top_level_only=True, case_sensiti
     @return 第一个匹配的 IComponent2 对象。
     """
     if not keyword:
-        raise ValueError("keyword 不能为空")
+        raise ValueError("keyword cannot be empty")
     components = safe_get_com_member(asm_model, "GetComponents", top_level_only) or []
     needle = str(keyword) if case_sensitive else str(keyword).lower()
     for component in components:
@@ -782,7 +782,7 @@ def find_component_by_name(asm_model, keyword, top_level_only=True, case_sensiti
         haystack = name if case_sensitive else name.lower()
         if needle in haystack:
             return component
-    raise RuntimeError(f"未找到组件: {keyword}")
+    raise RuntimeError(f"Component not found: {keyword}")
 
 
 def suppress_component(asm_model, component_name):

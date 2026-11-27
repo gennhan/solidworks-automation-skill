@@ -148,18 +148,18 @@ def _normal(triangle: Triangle) -> Point3:
 def _validate_document(document: Any) -> dict[str, Any]:
     """@brief 校验无头写入所需的最小 NeutralCadDocument 结构。"""
     if not isinstance(document, dict):
-        raise ValueError("NeutralCadDocument 必须是 JSON object。")
+        raise ValueError("NeutralCadDocument must be a JSON object.")
     if not str(document.get("documentId") or "").strip():
-        raise ValueError("NeutralCadDocument 缺少 documentId。")
+        raise ValueError("NeutralCadDocument is missing documentId.")
     if not isinstance(document.get("features", []), list):
-        raise ValueError("NeutralCadDocument.features 必须是数组。")
+        raise ValueError("NeutralCadDocument.features must be an array.")
     for feature in document.get("features", []):
         if not isinstance(feature, dict) or not str(feature.get("id") or "").strip() or not str(feature.get("type") or "").strip():
-            raise ValueError("每个 feature 必须包含非空 id 和 type。")
+            raise ValueError("Each feature must contain non-empty id and type.")
         params = _feature_params(feature)
         for key in ("length", "width", "height", "radius", "diameter"):
             if key in params and float(params[key]) <= 0:
-                raise ValueError(f"feature {feature['id']} 的 {key} 必须大于 0。")
+                raise ValueError(f"feature {feature['id']} {key} must be greater than 0.")
     return document
 
 
@@ -367,13 +367,13 @@ def _add_gbt_frame(modelspace: Any, document: dict[str, Any], drawing: dict[str,
         modelspace.add_line((tx0, ty0 + offset), (tx1, ty0 + offset), dxfattribs={"layer": "TITLE"})
     modelspace.add_line((tx0 + title_width * 0.62, ty0), (tx0 + title_width * 0.62, ty1), dxfattribs={"layer": "TITLE"})
     fields = [
-        ("名称", str(document.get("title") or document.get("documentId") or "未命名"), tx0 + 3, ty0 + 34),
-        ("图号", str(drawing.get("drawingNumber") or document.get("documentId") or "-"), tx0 + 3, ty0 + 25),
-        ("材料", str(drawing.get("material") or "待确认"), tx0 + 3, ty0 + 14),
-        ("比例", str(drawing.get("scale") or "1:1"), tx0 + title_width * 0.64, ty0 + 34),
-        ("单位", str(document.get("units") or "mm"), tx0 + title_width * 0.64, ty0 + 25),
-        ("设计", str(drawing.get("designer") or "CAD Studio"), tx0 + title_width * 0.64, ty0 + 14),
-        ("审核", str(drawing.get("reviewer") or "待复核"), tx0 + title_width * 0.64, ty0 + 4),
+        ("Title", str(document.get("title") or document.get("documentId") or "Untitled"), tx0 + 3, ty0 + 34),
+        ("Drawing No.", str(drawing.get("drawingNumber") or document.get("documentId") or "-"), tx0 + 3, ty0 + 25),
+        ("Material", str(drawing.get("material") or "TBD"), tx0 + 3, ty0 + 14),
+        ("Scale", str(drawing.get("scale") or "1:1"), tx0 + title_width * 0.64, ty0 + 34),
+        ("Units", str(document.get("units") or "mm"), tx0 + title_width * 0.64, ty0 + 25),
+        ("Designer", str(drawing.get("designer") or "CAD Studio"), tx0 + title_width * 0.64, ty0 + 14),
+        ("Reviewer", str(drawing.get("reviewer") or "Pending Review"), tx0 + title_width * 0.64, ty0 + 4),
     ]
     for label, value, x, y in fields:
         modelspace.add_text(f"{label}: {value}", height=2.6, dxfattribs={"layer": "TITLE"}).set_placement((x, y))
@@ -586,7 +586,7 @@ def export_headless(document_path: Path, out_dir: Path, formats: list[str]) -> d
         missing_formats.extend(blocked)
         limitations.append("OCP runtime not found; STEP/IGES/BREP/GLB remain blocked.")
     if (not triangles or mesh_blocked) and any(fmt in {"stl", "obj"} and fmt not in occt_handled for fmt in normalized_formats):
-        limitations.append("当前文档不能完整网格化，未写出 STL/OBJ，避免把部分几何当成完整交付。")
+        limitations.append("Current document cannot be fully meshed; STL/OBJ were not written to avoid delivering partial geometry as complete.")
     if unsupported_2d and any(fmt in {"dxf", "svg", "pdf", "png"} for fmt in normalized_formats):
         limitations.append("Current 2D backend cannot fully represent features: " + ", ".join(unsupported_2d))
     for normalized in normalized_formats:

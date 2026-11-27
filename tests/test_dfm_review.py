@@ -219,7 +219,7 @@ def test_empty_material_intersection_blocks_conflicting_profiles(tmp_path: Path)
 
     assert report["status"] == "blocked"
     assert report["error_code"] == "dfm_invalid_profile"
-    assert "交集为空" in report["checks"][0]["message"]
+    assert "intersection is empty" in report["checks"][0]["message"]
 
 
 def test_sheet_metal_profile_checks_forming_space_thickness_and_bend_tooling(tmp_path: Path) -> None:
@@ -312,9 +312,9 @@ def test_profile_rejects_unknown_fields_and_relative_path_escape(tmp_path: Path)
 
     assert escaped["status"] == "blocked"
     assert escaped["error_code"] == "dfm_invalid_profile"
-    assert "逃逸" in escaped["checks"][0]["message"]
+    assert "escapes" in escaped["checks"][0]["message"]
     assert unknown["status"] == "blocked"
-    assert "未知或不允许覆盖" in unknown["checks"][0]["message"]
+    assert "unknown or disallowed override" in unknown["checks"][0]["message"]
 
 
 def test_profile_requires_real_brep_and_rejects_handwritten_claim(tmp_path: Path) -> None:
@@ -351,11 +351,11 @@ def test_profile_requires_real_brep_and_rejects_handwritten_claim(tmp_path: Path
 
     assert missing["status"] == "blocked"
     assert missing["error_code"] == "dfm_brep_evidence_required"
-    assert any("不能证明 SolidWorks" in item or "缺少真实 B-Rep" in item for item in missing["limitations"])
+    assert any("cannot prove SolidWorks" in item or "Missing real B-Rep" in item for item in missing["limitations"])
     assert fake["status"] == "blocked"
     assert fake["error_code"] == "dfm_invalid_brep_evidence"
     assert tampered["status"] == "blocked"
-    assert "SHA-256 不匹配" in tampered["checks"][0]["message"]
+    assert "SHA-256 mismatch" in tampered["checks"][0]["message"]
 
 
 def test_verified_solidworks_brep_is_hashed_and_drives_envelope_check(tmp_path: Path) -> None:
@@ -423,7 +423,7 @@ def test_verified_occt_brep_requires_nonempty_topology(tmp_path: Path) -> None:
     assert ok["status"] == "review_required"
     assert ok["brepEvidence"]["backend"] == "headless_occt"
     assert failed["status"] == "blocked"
-    assert "未证明存在实体" in failed["checks"][0]["message"]
+    assert "does not prove a solid exists" in failed["checks"][0]["message"]
 
 
 def test_non_applicable_profile_is_recorded_but_not_applied(tmp_path: Path) -> None:

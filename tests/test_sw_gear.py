@@ -75,19 +75,19 @@ def test_low_tooth_count_is_allowed_but_explicitly_reports_undercut_risk() -> No
 
     assert geometry.undercut_risk is True
     assert geometry.minimum_teeth_without_undercut >= 17
-    assert any("根切风险" in warning for warning in geometry.warnings)
+    assert any("undercut risk" in warning for warning in geometry.warnings)
     assert geometry.evidence()["profile"]["root_form"] == "radial_transition_plus_root_arc"
 
 
 @pytest.mark.parametrize(
     ("spec", "message"),
     [
-        (SpurGearSpec(module_mm=0.0, teeth=20, face_width_mm=10.0), "模数"),
+        (SpurGearSpec(module_mm=0.0, teeth=20, face_width_mm=10.0), "module"),
         (SpurGearSpec(module_mm=2.0, teeth=5, face_width_mm=10.0), "6..300"),
-        (SpurGearSpec(module_mm=2.0, teeth=20, face_width_mm=0.0), "齿宽"),
-        (SpurGearSpec(module_mm=2.0, teeth=20, face_width_mm=10.0, pressure_angle_deg=40.0), "压力角"),
-        (SpurGearSpec(module_mm=2.0, teeth=20, face_width_mm=10.0, bore_diameter_mm=36.0), "轴孔直径"),
-        (SpurGearSpec(module_mm=2.0, teeth=20, face_width_mm=10.0, involute_segments=2), "渐开线段数"),
+        (SpurGearSpec(module_mm=2.0, teeth=20, face_width_mm=0.0), "face width"),
+        (SpurGearSpec(module_mm=2.0, teeth=20, face_width_mm=10.0, pressure_angle_deg=40.0), "Pressure angle"),
+        (SpurGearSpec(module_mm=2.0, teeth=20, face_width_mm=10.0, bore_diameter_mm=36.0), "Bore diameter"),
+        (SpurGearSpec(module_mm=2.0, teeth=20, face_width_mm=10.0, involute_segments=2), "involute segments"),
     ],
 )
 def test_invalid_or_degenerate_specs_are_rejected(spec: SpurGearSpec, message: str) -> None:

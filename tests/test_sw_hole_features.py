@@ -134,7 +134,7 @@ def test_failed_through_cut_reports_state_without_retrying_or_changing_direction
         calls.append((args, kwargs))
         return None
     monkeypatch.setattr(holes, "extrude_cut", fail)
-    with pytest.raises(holes.HoleFeatureCreationError, match="SolidWorks 未创建特征: H_Reopen") as error:
+    with pytest.raises(holes.HoleFeatureCreationError, match="SolidWorks did not create feature: H_Reopen") as error:
         holes.create_through_hole(FakeModel(), (0.01, 0.02), .006, name="H_Reopen")
     assert len(calls) == 1 and calls[0][0][2] == 0.0 and not calls[0][1]
     assert error.value.code == "SW_HOLE_NOT_CREATED"

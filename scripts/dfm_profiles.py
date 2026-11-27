@@ -75,20 +75,20 @@ def _canonical_hash(payload: dict[str, Any]) -> str:
 def _positive_number(value: Any, field: str) -> float:
     """@brief 校验正有限数。"""
     if isinstance(value, bool):
-        raise DfmProfileError(f"Profile limits.{field} 必须是正数，不能是 boolean。")
+        raise DfmProfileError(f"Profile limits.{field} must be a positive number, not boolean.")
     try:
         number = float(value)
     except (TypeError, ValueError) as exc:
-        raise DfmProfileError(f"Profile limits.{field} 必须是正数。") from exc
+        raise DfmProfileError(f"Profile limits.{field} must be a positive number.") from exc
     if not 0 < number < float("inf"):
-        raise DfmProfileError(f"Profile limits.{field} 必须是正有限数。")
+        raise DfmProfileError(f"Profile limits.{field} must be a positive finite number.")
     return number
 
 
 def _positive_vector(value: Any, field: str) -> list[float]:
     """@brief 校验三轴能力空间。"""
     if not isinstance(value, list) or len(value) != 3:
-        raise DfmProfileError(f"Profile limits.{field} 必须是三个正数的数组。")
+        raise DfmProfileError(f"Profile limits.{field} must be an array of three positive numbers.")
     return [_positive_number(item, field) for item in value]
 
 
@@ -100,42 +100,42 @@ def validate_profile(payload: Any) -> dict[str, Any]:
     @raises DfmProfileError 出现未知字段、危险值或不支持版本时抛出。
     """
     if not isinstance(payload, dict):
-        raise DfmProfileError("DFM Profile 必须是 JSON object。")
+        raise DfmProfileError("DFM Profile must be a JSON object.")
     unknown = sorted(set(payload) - TOP_LEVEL_FIELDS)
     if unknown:
-        raise DfmProfileError("DFM Profile 含未知顶层字段: " + ", ".join(unknown))
+        raise DfmProfileError("DFM Profile contains unknown top-level fields: " + ", ".join(unknown))
     for field in ("schema", "version", "id", "source", "limits"):
         if field not in payload:
-            raise DfmProfileError(f"DFM Profile 缺少必填字段 {field}。")
+            raise DfmProfileError(f"DFM Profile is missing required field {field}.")
     if payload.get("schema") != PROFILE_SCHEMA or str(payload.get("version")) != PROFILE_VERSION:
-        raise DfmProfileError(f"仅支持 {PROFILE_SCHEMA} {PROFILE_VERSION}。")
+        raise DfmProfileError(f"Only {PROFILE_SCHEMA} {PROFILE_VERSION} is supported.")
     profile_id = str(payload.get("id") or "")
     if not _IDENTIFIER.fullmatch(profile_id):
-        raise DfmProfileError("DFM Profile id 只能包含字母、数字、点、下划线和连字符。")
+        raise DfmProfileError("DFM Profile id may only contain letters, digits, dots, underscores, and hyphens.")
 
     source = payload.get("source")
     if not isinstance(source, dict):
-        raise DfmProfileError("DFM Profile source 必须是 object。")
+        raise DfmProfileError("DFM Profile source must be an object.")
     unknown_source = sorted(set(source) - SOURCE_FIELDS)
     if unknown_source:
-        raise DfmProfileError("DFM Profile source 含未知字段: " + ", ".join(unknown_source))
+        raise DfmProfileError("DFM Profile source contains unknown fields: " + ", ".join(unknown_source))
     if not str(source.get("type") or "").strip() or not str(source.get("name") or "").strip():
-        raise DfmProfileError("DFM Profile source 必须包含非空 type 和 name。")
+        raise DfmProfileError("DFM Profile source must contain non-empty type and name.")
 
     processes = payload.get("processes", [])
     if processes is None:
         processes = []
     if not isinstance(processes, list) or any(item not in SUPPORTED_PROCESSES for item in processes):
-        raise DfmProfileError("DFM Profile processes 包含不支持的工艺。")
+        raise DfmProfileError("DFM Profile processes contains unsupported processes.")
     if len(set(processes)) != len(processes):
-        raise DfmProfileError("DFM Profile processes 不得重复。")
+        raise DfmProfileError("DFM Profile processes must not contain duplicates.")
 
     limits = payload.get("limits")
     if not isinstance(limits, dict) or not limits:
-        raise DfmProfileError("DFM Profile limits 必须是非空 object。")
+        raise DfmProfileError("DFM Profile limits must be a non-empty object.")
     unknown_limits = sorted(set(limits) - LIMIT_FIELDS)
     if unknown_limits:
-        raise DfmProfileError("DFM Profile limits 含未知或不允许覆盖的字段: " + ", ".join(unknown_limits))
+        raise DfmProfileError("DFM Profile limits contains unknown or disallowed override fields: " + ", ".join(unknown_limits))
     normalized_limits: dict[str, Any] = {}
     for key, value in limits.items():
         if key in _MINIMUM_LIMITS | _MAXIMUM_LIMITS:
@@ -144,15 +144,15 @@ def validate_profile(payload: Any) -> dict[str, Any]:
             normalized_limits[key] = _positive_vector(value, key)
         elif key == "requiresBrepEvidence":
             if not isinstance(value, bool):
-                raise DfmProfileError("Profile limits.requiresBrepEvidence 必须是 boolean。")
+                raise DfmProfileError("Profile limits.requiresBrepEvidence must be a boolean.")
             normalized_limits[key] = value
         elif key in {"allowedMaterials"}:
             if not isinstance(value, list) or not value or any(not str(item).strip() for item in value):
-                raise DfmProfileError(f"Profile limits.{key} 必须是非空材料名称数组。")
+                raise DfmProfileError(f"Profile limits.{key} must be a non-empty list of material names.")
             normalized_limits[key] = sorted({str(item).strip() for item in value}, key=str.casefold)
         elif key == "availableToolDiameters":
             if not isinstance(value, list) or not value:
-                raise DfmProfileError("Profile limits.availableToolDiameters 必须是非空正数数组。")
+                raise DfmProfileError("Profile limits.availableToolDiameters must be a non-empty list of positive numbers.")
             normalized_limits[key] = sorted({_positive_number(item, key) for item in value})
 
     normalized = {
@@ -176,17 +176,17 @@ def _resolve_profile_path(path: Path, allowed_root: Path | None) -> Path:
         resolved = raw.resolve()
     else:
         if allowed_root is None:
-            raise DfmProfileError("相对 Profile 路径必须提供 allowed_root。")
+            raise DfmProfileError("Relative Profile path requires allowed_root.")
         root = allowed_root.expanduser().resolve()
         resolved = (root / raw).resolve()
         try:
             resolved.relative_to(root)
         except ValueError as exc:
-            raise DfmProfileError("相对 Profile 路径逃逸 allowed_root，已拒绝。") from exc
+            raise DfmProfileError("Relative Profile path escapes allowed_root; rejected.") from exc
     if resolved.suffix.lower() != ".json" or not resolved.is_file():
-        raise DfmProfileError("DFM Profile 必须是存在的 .json 文件。")
+        raise DfmProfileError("DFM Profile must be an existing .json file.")
     if resolved.stat().st_size > MAX_PROFILE_BYTES:
-        raise DfmProfileError("DFM Profile 超过 1 MiB 安全上限。")
+        raise DfmProfileError("DFM Profile exceeds 1 MiB safety limit.")
     return resolved
 
 
@@ -198,7 +198,7 @@ def load_profile(value: str | Path | dict[str, Any], *, allowed_root: Path | Non
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        raise DfmProfileError(f"无法读取 DFM Profile: {exc}") from exc
+        raise DfmProfileError(f"Unable to read DFM Profile: {exc}") from exc
     profile = validate_profile(payload)
     profile["profilePath"] = str(path)
     profile["fileSha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -214,7 +214,7 @@ def load_profiles(
     profiles = [load_profile(value, allowed_root=allowed_root) for value in (values or [])]
     ids = [profile["id"] for profile in profiles]
     if len(ids) != len(set(ids)):
-        raise DfmProfileError("DFM Profile id 不得重复。")
+        raise DfmProfileError("DFM Profile ids must not be duplicated.")
     return profiles
 
 
@@ -246,7 +246,7 @@ def merge_profiles(profiles: list[dict[str, Any]], process: str) -> tuple[dict[s
             "appliedLimits": [],
         }
         if not applicable:
-            record["reason"] = f"Profile 不适用于 {process}。"
+            record["reason"] = f"Profile is not applicable to {process}."
             records.append(record)
             continue
         for key, value in profile["limits"].items():
@@ -269,14 +269,14 @@ def merge_profiles(profiles: list[dict[str, Any]], process: str) -> tuple[dict[s
 
     if "minimumThickness" in effective and "maximumThickness" in effective:
         if effective["minimumThickness"] > effective["maximumThickness"]:
-            raise DfmProfileError("合并后的最小厚度大于最大厚度，Profile 能力交集为空。")
+            raise DfmProfileError("Merged minimum thickness exceeds maximum thickness; Profile capability intersection is empty.")
     if "minimumKerf" in effective and "maximumKerf" in effective:
         if effective["minimumKerf"] > effective["maximumKerf"]:
-            raise DfmProfileError("合并后的最小 kerf 大于最大 kerf，Profile 能力交集为空。")
+            raise DfmProfileError("Merged minimum kerf exceeds maximum kerf; Profile capability intersection is empty.")
     if "allowedMaterials" in effective and not effective["allowedMaterials"]:
-        raise DfmProfileError("Profile 的材料能力交集为空。")
+        raise DfmProfileError("Profile material capability intersection is empty.")
     if "availableToolDiameters" in effective and not effective["availableToolDiameters"]:
-        raise DfmProfileError("Profile 的刀具直径交集为空。")
+        raise DfmProfileError("Profile tool diameter intersection is empty.")
     return effective, records
 
 

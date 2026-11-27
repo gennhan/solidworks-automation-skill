@@ -159,13 +159,13 @@ def read_local_help(executable: Path, version: int, interface: str, member: str,
     if restoring:
         # Authenticode 信任链检查可能访问证书状态服务；离线模式不运行安装源验证。
         if not allow_install:
-            if warnings is not None: warnings.append("未发现本地 API Help；离线或自动配置关闭时不验证和恢复安装源。")
+            if warnings is not None: warnings.append("Local API Help not found; skipping installer source verification and restoration in offline mode or when auto-setup is disabled.")
             return None
         if os.environ.get("SW_API_LOOKUP_AUTO_INSTALL", "on").strip().lower() in {"off", "false", "0"}:
-            if warnings is not None: warnings.append("未发现本地 API Help，自动恢复已关闭。")
+            if warnings is not None: warnings.append("Local API Help not found; auto-restore is disabled.")
             return None
         if _registered_source(executable, version) is None:
-            if warnings is not None: warnings.append("未发现目标安装的本地 API Help 或匹配的本地安装源，将继续使用其他资料。")
+            if warnings is not None: warnings.append("Local API Help or matching local installer source not found for target installation; continuing with other references.")
             return None
     sevenzip = _find_sevenzip()
     if not sevenzip:

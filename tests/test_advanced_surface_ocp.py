@@ -161,7 +161,7 @@ def test_smooth_loft_rejects_excessive_bulge(tmp_path: Path) -> None:
     report = execute_advanced_surface(request, tmp_path)
     assert report["status"] == "failed"
     assert report["error_code"] == "ocp_surface_operation_failed"
-    assert "超出截面理论包络" in report["message"]
+    assert "exceeds theoretical section envelope" in report["message"]
     assert report["artifacts"] == []
 
 

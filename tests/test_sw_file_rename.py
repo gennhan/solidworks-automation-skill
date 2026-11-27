@@ -17,9 +17,9 @@ def test_plan_reports_missing_unsafe_and_duplicate_names():
     ]
     plans = rename.plan_renames(entries, "{图号}")
     assert [plan["status"] for plan in plans] == ["blocked"] * 4
-    assert "冲突" in plans[0]["reason"]
-    assert "保留" in plans[2]["reason"]
-    assert "缺少属性" in plans[3]["reason"]
+    assert "conflict" in plans[0]["reason"]
+    assert "reserved" in plans[2]["reason"]
+    assert "Missing properties" in plans[3]["reason"]
 
 
 def test_plan_detects_existing_source_name_and_allows_distinct_output():

@@ -37,7 +37,7 @@ def fully_define_sketch(model):
     """
     active = get_com_member(model.SketchManager, "ActiveSketch")
     if active is None:
-        raise ValueError("完全定义必须在草图编辑态执行")
+        raise ValueError("Fully define must be executed in sketch edit mode")
     model.ClearSelection2(True)
     try:
         # 原点特征在中英文界面有不同名称；先枚举真实特征名，再构造官方点引用。
@@ -58,14 +58,14 @@ def fully_define_sketch(model):
             if selected:
                 break
         if not selected:
-            raise RuntimeError("无法选择原点作为水平/垂直尺寸基准")
+            raise RuntimeError("Unable to select Origin as horizontal/vertical dimension datum")
         # 1023 是已核对的十种关系组合，不包含固定关系。返回码未定义，必须回读。
         returned = model.SketchManager.FullyDefineSketch(True, True, 1023, True,
             1, create_empty_dispatch_variant(), 1, create_empty_dispatch_variant(), 1, 1)
         record = inspect_sketch(active)
         record["api_return"] = returned
         if record["status"] != "pass":
-            raise RuntimeError(f"草图未通过完全定义与可编辑性验收: {record}")
+            raise RuntimeError(f"Sketch failed full-definition and editability verification: {record}")
         return record
     finally:
         model.ClearSelection2(True)

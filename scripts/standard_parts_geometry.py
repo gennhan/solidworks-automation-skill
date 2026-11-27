@@ -19,10 +19,10 @@ from dataclasses import dataclass, field
 def _finite(name: str, value: float) -> float:
     """@brief 校验有限数值。"""
     if isinstance(value, bool):
-        raise ValueError(f"{name} 必须是数值而非布尔值")
+        raise ValueError(f"{name} must be a number, not boolean")
     number = float(value)
     if not math.isfinite(number):
-        raise ValueError(f"{name} 必须是有限数值")
+        raise ValueError(f"{name} must be a finite number")
     return number
 
 
@@ -30,13 +30,13 @@ def _positive(name: str, value: float) -> float:
     """@brief 校验正有限数值。"""
     number = _finite(name, value)
     if number <= 0.0:
-        raise ValueError(f"{name} 必须大于 0")
+        raise ValueError(f"{name} must be greater than 0")
     return number
 
 
 def _integer(name: str, value: int, minimum: int, maximum: int) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or not minimum <= value <= maximum:
-        raise ValueError(f"{name} 必须是 {minimum}..{maximum} 的整数")
+        raise ValueError(f"{name} must be an integer in {minimum}..{maximum}")
     return value
 
 
@@ -103,7 +103,7 @@ def spur_gear_profile(
     m = _positive("module", module_mm)
     alpha = math.radians(_finite("pressure_angle", pressure_angle_deg))
     if not (0.0 < alpha < math.pi / 2.0):
-        raise ValueError("压力角必须在 0 到 90 度之间")
+        raise ValueError("Pressure angle must be between 0 and 90 degrees")
     ha = _finite("addendum_coeff", addendum_coeff)
     hf = _finite("dedendum_coeff", dedendum_coeff)
     x_shift = _finite("profile_shift_coeff", profile_shift_coeff)
@@ -114,15 +114,15 @@ def spur_gear_profile(
     r_add = r_pitch + m * (ha + x_shift)
     r_root = r_pitch - m * (hf - x_shift)
     if r_root <= 0.0:
-        raise ValueError("齿根圆半径非正，请增大齿数或减小齿根高系数")
+        raise ValueError("Root circle radius is non-positive; increase teeth count or reduce dedendum_coeff")
     if r_add <= r_base:
-        raise ValueError("齿顶圆不高于基圆，无法生成有效渐开线齿廓")
+        raise ValueError("Addendum circle is not above base circle; cannot generate valid involute tooth profile")
 
     bore = _finite("bore_diameter_mm", bore_diameter_mm)
     if bore < 0.0:
-        raise ValueError("中心孔直径不能为负")
+        raise ValueError("Bore diameter cannot be negative")
     if bore >= 2.0 * r_root:
-        raise ValueError("中心孔直径必须小于齿根圆直径")
+        raise ValueError("Bore diameter must be less than root diameter")
 
     inv_alpha = involute(alpha)
     # 分度圆上半齿角 + 变位修正。
@@ -242,11 +242,11 @@ def compression_spring_helix(
     nt = _positive("total_coils", total_coils)
     end = str(end_type).strip().lower()
     if end not in {"closed_ground", "closed", "open"}:
-        raise ValueError("end_type 必须为 closed_ground、closed 或 open")
+        raise ValueError("end_type must be closed_ground, closed, or open")
     if mean_d <= d:
-        raise ValueError("中径必须大于线径")
+        raise ValueError("Mean diameter must be greater than wire diameter")
     if not isinstance(right_handed, bool):
-        raise ValueError("right_handed 必须为布尔值")
+        raise ValueError("right_handed must be a boolean")
 
     if end == "closed_ground":
         active = nt - 2.0
@@ -258,16 +258,16 @@ def compression_spring_helix(
         active = nt
         solid = (nt + 1.0) * d
     if active <= 0.0:
-        raise ValueError("有效圈数非正，请增大总圈数")
+        raise ValueError("Active coils count is non-positive; increase total_coils")
     if solid >= length:
-        raise ValueError("实体长度不小于自由长度，请增大自由长度或减少圈数")
+        raise ValueError("Solid length is not less than free length; increase free_length or reduce coils")
 
     # 当前坐标只生成等螺距中心线，不模拟并紧/磨平端圈；返回值须与点列一致。
     pitch = length / nt
     radius = mean_d / 2.0
     _integer("samples_per_coil", samples_per_coil, 3, 360)
     if samples_per_coil * nt > 20000:
-        raise ValueError("螺旋采样点数超过 20000")
+        raise ValueError("Helix sample count exceeds 20000")
     winding = 1.0 if right_handed else -1.0
     total_points = max(2, int(round(samples_per_coil * nt)) + 1)
     points: list[tuple[float, float, float]] = []
@@ -298,9 +298,9 @@ def compression_spring_helix(
         right_handed=bool(right_handed),
         spring_rate_n_per_mm=rate,
         helix_xyz_mm=points,
-        limitations=["free_length_mm 为中心线轴向行程，不是实体自由高度",
-                     "中心线为等螺距，end_type 不生成并紧或磨平端圈",
-                     "压并高度和刚度仅为理想化估算，不用于制造验收"],
+        limitations=["free_length_mm represents centerline axial travel, not solid free height",
+                     "Centerline has constant pitch; end_type does not generate closed or ground end coils",
+                     "Solid height and spring rate are idealized estimates only and not for manufacturing acceptance"],
     )
 
 
@@ -354,7 +354,7 @@ def roller_sprocket_profile(
     p = _positive("chain_pitch", chain_pitch_mm)
     dr = _positive("roller_diameter", roller_diameter_mm)
     if dr >= p:
-        raise ValueError("滚子直径必须小于链节距")
+        raise ValueError("Roller diameter must be less than chain pitch")
 
     half_angle = math.pi / n
     pd = p / math.sin(half_angle)
@@ -366,9 +366,9 @@ def roller_sprocket_profile(
 
     bore = _finite("bore_diameter_mm", bore_diameter_mm)
     if bore < 0.0:
-        raise ValueError("中心孔直径不能为负")
+        raise ValueError("Bore diameter cannot be negative")
     if bore >= rd:
-        raise ValueError("中心孔直径必须小于齿根圆直径")
+        raise ValueError("Bore diameter must be less than root diameter")
 
     seats = _integer("seat_samples", seat_samples, 3, 64)
     points: list[tuple[float, float]] = []
@@ -394,11 +394,11 @@ def roller_sprocket_profile(
         dx, dy = b[0] - a[0], b[1] - a[1]
         length_squared = dx * dx + dy * dy
         if length_squared <= 0.0:
-            raise ValueError("链轮轮廓包含零长度线段")
+            raise ValueError("Sprocket profile contains a zero-length segment")
         t = max(0.0, min(1.0, -(a[0] * dx + a[1] * dy) / length_squared))
         min_radius = min(min_radius, math.hypot(a[0] + t * dx, a[1] + t * dy))
     if bore >= 2.0 * min_radius:
-        raise ValueError("中心孔直径必须小于离散齿廓的实际最小直径")
+        raise ValueError("Bore diameter must be less than actual minimum diameter of the discrete tooth profile")
 
     return RollerSprocketGeometry(
         chain_pitch_mm=p,

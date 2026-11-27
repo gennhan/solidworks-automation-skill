@@ -135,7 +135,7 @@ def test_headless_writer_does_not_fake_mesh_when_occt_is_unavailable(tmp_path: P
     assert {"cadstudio", "dxf", "png", "preview_manifest"} <= kinds
     assert "stl" not in kinds
     assert "obj" not in kinds
-    assert any("部分几何" in item for item in result["limitations"])
+    assert any("partial geometry" in item for item in result["limitations"])
 
 
 def test_headless_writer_blocks_unknown_formats_without_fake_files(tmp_path: Path):

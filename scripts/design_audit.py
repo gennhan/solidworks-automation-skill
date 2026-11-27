@@ -96,13 +96,13 @@ def _date_le(a: str | None, b: str | None) -> bool:
 def validate_waiver(waiver: Mapping[str, Any]) -> dict[str, Any]:
     """@brief 校验让步单必填项：匹配键、理由、责任人。"""
     if not isinstance(waiver, Mapping):
-        raise ValueError("waiver 必须是对象")
+        raise ValueError("waiver must be an object")
     if not (waiver.get("fingerprint") or waiver.get("ruleId")):
-        raise ValueError("waiver 必须提供 fingerprint 或 ruleId")
+        raise ValueError("waiver must provide fingerprint or ruleId")
     if not str(waiver.get("reason") or "").strip():
-        raise ValueError("waiver 必须提供 reason")
+        raise ValueError("waiver must provide reason")
     if not str(waiver.get("owner") or "").strip():
-        raise ValueError("waiver 必须提供 owner（责任人）")
+        raise ValueError("waiver must provide owner")
     for key in ("createdOn", "expiresOn"):
         if waiver.get(key) is not None:
             try:
@@ -110,9 +110,9 @@ def validate_waiver(waiver: Mapping[str, Any]) -> dict[str, Any]:
                 if not isinstance(value, str) or date.fromisoformat(value).isoformat() != value:
                     raise ValueError
             except ValueError as exc:
-                raise ValueError(f"waiver.{key} 必须是有效 YYYY-MM-DD 日期") from exc
+                raise ValueError(f"waiver.{key} must be a valid YYYY-MM-DD date") from exc
     if waiver.get("createdOn") and waiver.get("expiresOn") and waiver["createdOn"] > waiver["expiresOn"]:
-        raise ValueError("waiver 生效日期不能晚于到期日期")
+        raise ValueError("waiver effective date cannot be later than expiration date")
     return {
         "fingerprint": waiver.get("fingerprint"),
         "ruleId": waiver.get("ruleId"),
@@ -140,7 +140,7 @@ def apply_waivers(
         if not isinstance(as_of_date, str) or date.fromisoformat(as_of_date).isoformat() != as_of_date:
             raise ValueError
     except ValueError as exc:
-        raise ValueError("as_of_date 必须是有效 YYYY-MM-DD 日期") from exc
+        raise ValueError("as_of_date must be a valid YYYY-MM-DD date") from exc
     validated = [validate_waiver(w) for w in waivers]
     active, expired, not_yet_valid = [], [], []
     for waiver in validated:
@@ -268,9 +268,9 @@ def assert_no_regression(
     ]
     reasons: list[str] = []
     if delta > float(tolerance):
-        reasons.append(f"风险分由 {base_risk['score']:g} 升至 {cand_risk['score']:g}（+{delta:g}，容差 {float(tolerance):g}）")
+        reasons.append(f"Risk score increased from {base_risk['score']:g} to {cand_risk['score']:g} (+{delta:g}, tolerance {float(tolerance):g})")
     for finding in blocked_new:
-        reasons.append(f"新增 {finding.get('severity')} 级问题 {finding.get('id')}（{finding.get('target') or '-'}）：{finding.get('message', '')}")
+        reasons.append(f"New {finding.get('severity')} finding {finding.get('id')} ({finding.get('target') or '-'}): {finding.get('message', '')}")
 
     # 问题因缺失证据而消失时，不能把它当作修复。
     info_checks = [item for item in candidate if item.get("status") == "info"]
@@ -281,7 +281,7 @@ def assert_no_regression(
         for info in info_checks
     )]
     if uncertain:
-        reasons.append("候选版本对应类别缺少证据，不能确认基线问题已修复")
+        reasons.append("Candidate is missing evidence in the corresponding category; cannot confirm baseline findings are fixed")
 
     return {
         "passed": not reasons,

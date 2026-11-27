@@ -37,31 +37,31 @@ def validate_dimensions(rows):
     for row in rows:
         if (not isinstance(row, dict) or set(row) - fields or not {"id", "kind", "view", "positionMm"} <= set(row)
                 or row["kind"] not in DIMENSION_TYPES or not orientation(row["view"]) or not _position(row["positionMm"])):
-            raise ValueError("尺寸必须具有可执行种类、标准视图、明确几何目标和值及位置")
+            raise ValueError("Dimension must specify executable kind, standard view, explicit geometric target, value, and position")
         angular = row["kind"] == "angular"
         if not _number(row.get("valueDegrees" if angular else "valueMm"), positive=True):
-            raise ValueError("尺寸必须提供正的 valueMm 或角度 valueDegrees")
+            raise ValueError("Dimension must provide a positive valueMm or angular valueDegrees")
         if angular and "valueMm" in row or not angular and "valueDegrees" in row:
-            raise ValueError("尺寸单位字段冲突")
+            raise ValueError("Conflicting dimension unit fields")
         if row["kind"] in {"linear", "overall"} and row.get("axis") not in {"horizontal", "vertical"}:
-            raise ValueError("线性尺寸必须明确 horizontal/vertical 方向")
+            raise ValueError("Linear dimension must specify horizontal or vertical axis")
         if ("target" in row) == ("targets" in row):
-            raise ValueError("尺寸必须提供一个 target 或一对 targets")
+            raise ValueError("Dimension must provide either a single target or a pair of targets")
         targets = row.get("targets", [row.get("target")])
         if not isinstance(targets, list) or len(targets) not in (1, 2) or angular and len(targets) != 2:
-            raise ValueError("尺寸几何目标数量无效")
+            raise ValueError("Invalid dimension geometric target count")
         if row["kind"] in {"diameter", "radius"} and (len(targets) != 1 or targets[0].get("kind") != "circle"):
-            raise ValueError("径向尺寸必须关联一个圆边")
+            raise ValueError("Radial dimension must reference a single circular edge")
         for target in targets:
             if not isinstance(target, dict) or target.get("kind") not in {"line", "circle"}:
-                raise ValueError("新建尺寸仅接受明确直线或圆边")
+                raise ValueError("New dimensions only accept explicit line or circular edges")
             errors = list(target_validator.iter_errors(target))
             if errors:
-                raise ValueError("尺寸几何选择器结构无效：" + errors[0].message)
+                raise ValueError("Invalid dimension geometry selector structure: " + errors[0].message)
         if "prefix" in row and (not isinstance(row["prefix"], str) or len(row["prefix"]) > 32):
-            raise ValueError("尺寸前缀无效")
+            raise ValueError("Invalid dimension prefix")
         if "basic" in row and not isinstance(row["basic"], bool):
-            raise ValueError("basic 必须为布尔值")
+            raise ValueError("basic must be a boolean")
 
 
 def validate_native_requests(spec):
@@ -73,41 +73,41 @@ def validate_native_requests(spec):
     except (ValueError, TypeError, AttributeError) as error:
         issues.append({"code": "DRAWING_REQUIRED_DIMENSIONS_UNSUPPORTED", "path": "requiredDimensions", "message": str(error)})
     if dimensions and spec.get("insertModelDimensions") is True:
-        issues.append({"code": "DRAWING_DIMENSION_MODE_CONFLICT", "path": "insertModelDimensions", "message": "显式尺寸与批量模型尺寸导入不可同时启用，避免重复标注"})
+        issues.append({"code": "DRAWING_DIMENSION_MODE_CONFLICT", "path": "insertModelDimensions", "message": "Explicit dimensions and bulk model dimension import cannot be enabled simultaneously to avoid duplicate annotations"})
     requests = spec.get("professionalAnnotations") or {}
     if (dimensions or any(requests.get(key) for key in ("datums", "geometricTolerances"))) and spec.get("documentType") != "part":
-        issues.append({"code": "DRAWING_NATIVE_PART_REQUIRED", "path": "documentType", "message": "原生尺寸/GD&T 自动落图当前仅支持单零件，装配体须使用专项入口"})
+        issues.append({"code": "DRAWING_NATIVE_PART_REQUIRED", "path": "documentType", "message": "Automated native dimension/GD&T placement currently supports single parts only; assemblies require a dedicated entrypoint"})
     sheet_mm = {"A4": (297, 210), "A3": (420, 297), "A2": (594, 420), "A1": (841, 594), "A0": (1189, 841)}.get(spec.get("paperSize"))
     placed = list(dimensions) + [row for key in ("datums", "geometricTolerances") for row in requests.get(key) or []]
     placed += [row for row in (spec.get("views") or {}).values() if isinstance(row, dict)]
     if sheet_mm and any(isinstance(row, dict) and "positionMm" in row and
                         (not _position(row["positionMm"]) or any(v >= bound for v, bound in zip(row["positionMm"], sheet_mm))) for row in placed):
-        issues.append({"code": "DRAWING_POSITION_OUTSIDE_SHEET", "path": "positionMm", "message": "明确指定的位置必须位于所选横向图幅内"})
+        issues.append({"code": "DRAWING_POSITION_OUTSIDE_SHEET", "path": "positionMm", "message": "Explicitly specified position must lie within the selected landscape sheet bounds"})
     for key in ("datums", "geometricTolerances"):
         rows = requests.get(key) or []
         if any(not isinstance(row, dict) or "target" not in row or not orientation(row.get("view")) for row in rows):
-            issues.append({"code": "DRAWING_PROFESSIONAL_ANNOTATIONS_UNSUPPORTED", "path": "professionalAnnotations." + key, "message": "必须使用结构化几何目标，不能用文字替代原生标注"})
+            issues.append({"code": "DRAWING_PROFESSIONAL_ANNOTATIONS_UNSUPPORTED", "path": "professionalAnnotations." + key, "message": "Structured geometric targets are required; plain text cannot substitute for native annotations"})
     ids = [row.get("id") for row in dimensions if isinstance(row, dict)]
     ids += [row.get("id") for key in ("datums", "geometricTolerances") for row in requests.get(key) or [] if isinstance(row, dict)]
     if ids and (any(not isinstance(item, str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_.-]{0,63}", item) for item in ids) or len(set(ids)) != len(ids)):
-        issues.append({"code": "DRAWING_BINDING_ID_INVALID", "path": "id", "message": "可执行标注 ID 必须唯一且为 1..64 位字母开头的字母数字、点、横线或下划线"})
+        issues.append({"code": "DRAWING_BINDING_ID_INVALID", "path": "id", "message": "Executable annotation IDs must be unique 1..64 char identifiers starting with a letter and using letters, digits, '.', '-', or '_'"})
     available = {row["label"] for row in requests.get("datums") or [] if isinstance(row, dict) and "label" in row}
     if len(available) != len(requests.get("datums") or []) and requests.get("datums"):
-        issues.append({"code": "DRAWING_DATUM_ID_INVALID", "path": "professionalAnnotations.datums", "message": "必须提供不重复的基准 label"})
+        issues.append({"code": "DRAWING_DATUM_ID_INVALID", "path": "professionalAnnotations.datums", "message": "Unique datum labels are required"})
     for row in requests.get("geometricTolerances") or []:
         if not isinstance(row, dict) or "target" not in row:
             continue
         try:
             build_gtol_xmls(row)
             if not referenced_datums(row) <= available:
-                raise ValueError("公差引用了未声明的基准")
+                raise ValueError("Tolerance references an undeclared datum")
             target = row["target"]
             if target.get("kind") == "dimension" and "dimensionId" in target:
                 matches = [item for item in dimensions if item.get("id") == target["dimensionId"] and orientation(item.get("view")) == orientation(row.get("view"))]
                 if len(matches) != 1:
-                    raise ValueError("公差尺寸 ID 不存在或跨视图")
+                    raise ValueError("Tolerance dimensionId not found or belongs to another view")
             if (target.get("kind") == "dimension") == ("positionMm" in row):
-                raise ValueError("尺寸关联公差自动定位，边线关联公差必须指定位置")
+                raise ValueError("Dimension-attached tolerances auto-position; edge-attached tolerances must specify positionMm")
         except (ValueError, TypeError, KeyError, AttributeError) as error:
             issues.append({"code": "DRAWING_GDT_SPEC_INVALID", "path": "professionalAnnotations.geometricTolerances", "message": str(error)})
     for hole in spec.get("holeRequirements") or []:
@@ -117,7 +117,7 @@ def validate_native_requests(spec):
         if (set(hole) - {"id", "specification", "count", "locationsMm", "view", "datum", "dimensionId"}
                 or not match or len(matches) != 1 or not prefix or int(prefix[1]) != hole.get("count")
                 or not math.isclose(float(match[1]), matches[0].get("valueMm", -1), abs_tol=1e-8)):
-            issues.append({"code": "DRAWING_HOLE_REQUIREMENTS_UNSUPPORTED", "path": "holeRequirements", "message": "自动孔标注须提供对应的直径尺寸 dimensionId、准确数量前缀和明确孔径；孔表/螺纹等仍需专项入口"})
+            issues.append({"code": "DRAWING_HOLE_REQUIREMENTS_UNSUPPORTED", "path": "holeRequirements", "message": "Automated hole callouts require matching diameter dimensionId, exact count prefix, and explicit diameter; hole tables/threads require a dedicated entrypoint"})
     return issues
 
 
@@ -175,7 +175,7 @@ def map_views(drawing, creation):
         if key and len(candidates) == 1:
             result[key] = candidates[0]
     if set(result) != {"front", "top", "right"}:
-        raise ValueError("无法唯一回读标准视图")
+        raise ValueError("Unable to uniquely read back standard views")
     return result
 
 
@@ -188,21 +188,21 @@ def create_dimensions(drawing, rows, views):
         try:
             resolved.append((row, view, [resolve_target(view, target) for target in targets]))
         except ValueError as error:
-            raise ValueError(f"尺寸 {row['id']}：{error}") from error
+            raise ValueError(f"Dimension {row['id']}: {error}") from error
     result = {}
     for row, view, targets in resolved:
         name = str(get_com_member(view, "Name"))
         if not get_com_member(drawing, "ActivateView", name):
-            raise RuntimeError("不能激活尺寸视图")
+            raise RuntimeError("Unable to activate dimension view")
         get_com_member(drawing, "ClearSelection2", True)
         manager = get_com_member(drawing, "SelectionManager")
         data = get_com_member(manager, "CreateSelectData")
         data.View = view
         for index, edge in enumerate(targets):
             if not get_com_member(edge, "Select4", bool(index), data):
-                raise RuntimeError("尺寸边线选择失败")
+                raise RuntimeError("Failed to select dimension edge")
         if get_com_member(manager, "GetSelectedObjectCount2", -1) != len(targets):
-            raise RuntimeError("尺寸选择数与计划不一致")
+            raise RuntimeError("Dimension selection count does not match plan")
         kind = row["kind"]
         method = {"diameter": "AddDiameterDimension2", "radius": "AddRadialDimension2", "angular": "AddDimension2"}.get(kind)
         if kind in {"linear", "overall"}:
@@ -210,26 +210,26 @@ def create_dimensions(drawing, rows, views):
         x, y = (value / 1000 for value in row["positionMm"])
         display = get_com_member(drawing, method, x, y, 0.)
         if display is None:
-            raise RuntimeError("原生尺寸创建失败：" + row["id"])
+            raise RuntimeError("Failed to create native dimension: " + row["id"])
         dimension = get_com_member(display, "GetDimension2", 0)
         expected = math.radians(row["valueDegrees"]) if kind == "angular" else row["valueMm"] / 1000
         if get_com_member(display, "Type2") not in DIMENSION_TYPES[kind] or not math.isclose(get_com_member(dimension, "SystemValue"), expected, rel_tol=0, abs_tol=1e-8):
-            raise RuntimeError("尺寸类型或实际数值与要求不一致：" + row["id"])
+            raise RuntimeError("Dimension type or actual value does not match request: " + row["id"])
         if "prefix" in row:
             get_com_member(display, "SetText", 1, row["prefix"])
             if get_com_member(display, "GetText", 1) != row["prefix"]:
-                raise RuntimeError("尺寸前缀回读失败")
+                raise RuntimeError("Dimension prefix readback failed")
         if row.get("basic"):
             tolerance = get_com_member(dimension, "Tolerance")
             tolerance.Type = 1  # swTolBASIC，2026 类型库确认。
             if get_com_member(tolerance, "Type") != 1:
-                raise RuntimeError("基本尺寸方框未生效")
+                raise RuntimeError("Basic dimension frame did not take effect")
         annotation = get_com_member(display, "GetAnnotation")
         if get_com_member(annotation, "IsDangling") is not False:
-            raise RuntimeError("新建尺寸关联悬空或不可确认")
+            raise RuntimeError("Created dimension attachment is dangling or cannot be confirmed")
         binding = "CAD_DIM__" + kind + "__" + row["id"]
         if not get_com_member(annotation, "SetName", binding) or get_com_member(annotation, "GetName") != binding:
-            raise RuntimeError("无法持久绑定尺寸 ID")
+            raise RuntimeError("Unable to persistently bind dimension ID")
         result[row["id"]] = {"object": display, "view": name, "request": row,
                               "persistent_id": _persistent_id(get_com_member(drawing, "Extension"), annotation)}
     return result
@@ -266,23 +266,23 @@ def verify_dimensions(drawing, dimensions):
                     if _same_id(extension, record["persistent_id"], _persistent_id(extension, ann)):
                         candidates.append(display)
         if len(candidates) != 1:
-            raise RuntimeError("重开后尺寸持久身份不一致：" + identifier)
+            raise RuntimeError("Dimension persistent identity mismatch after reopen: " + identifier)
         display = candidates[0]
         row = record["request"]
         annotation = get_com_member(display, "GetAnnotation")
         if get_com_member(annotation, "IsDangling") is not False:
-            raise RuntimeError("重开后尺寸关联悬空或不可确认")
+            raise RuntimeError("Dimension attachment is dangling or cannot be confirmed after reopen")
         if dimension_binding(get_com_member(annotation, "GetName"), get_com_member(display, "Type2")) != {"id": identifier, "kind": row["kind"]}:
-            raise RuntimeError("重开后尺寸 ID 或类型不一致")
+            raise RuntimeError("Dimension ID or type mismatch after reopen")
         dimension = get_com_member(display, "GetDimension2", 0)
         expected = math.radians(row["valueDegrees"]) if row["kind"] == "angular" else row["valueMm"] / 1000
         if not math.isclose(get_com_member(dimension, "SystemValue"), expected, rel_tol=0, abs_tol=1e-8):
-            raise RuntimeError("重开后尺寸值不一致")
+            raise RuntimeError("Dimension value mismatch after reopen")
         if row.get("basic") and get_com_member(get_com_member(dimension, "Tolerance"), "Type") != 1:
-            raise RuntimeError("重开后基本尺寸方框丢失")
+            raise RuntimeError("Basic dimension frame lost after reopen")
         if "prefix" in row and get_com_member(display, "GetText", 1) != row["prefix"]:
-            raise RuntimeError("重开后尺寸数量前缀丢失")
+            raise RuntimeError("Dimension count prefix lost after reopen")
         if "saved_position" in record:
             actual = get_com_member(annotation, "GetPosition")
             if len(actual) != len(record["saved_position"]) or any(not math.isclose(a, b, abs_tol=1e-8, rel_tol=0) for a, b in zip(actual, record["saved_position"])):
-                raise RuntimeError("重开后尺寸位置不一致")
+                raise RuntimeError("Dimension position mismatch after reopen")

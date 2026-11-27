@@ -34,13 +34,13 @@ class BaseFlangeSpec:
     def validate(self) -> None:
         """@brief 在进入 COM 前拒绝明显无效的制造参数。"""
         if self.thickness <= 0:
-            raise ValueError("钣金厚度必须大于 0")
+            raise ValueError("Sheet metal thickness must be greater than 0")
         if self.bend_radius < 0:
-            raise ValueError("折弯半径不能小于 0")
+            raise ValueError("Bend radius cannot be less than 0")
         if self.depth <= 0:
-            raise ValueError("基体法兰深度必须大于 0")
+            raise ValueError("Base flange depth must be greater than 0")
         if not 0 < self.k_factor < 1:
-            raise ValueError("K 因子必须位于 0 与 1 之间")
+            raise ValueError("K-factor must be between 0 and 1")
         if self.relief_ratio <= 0:
             raise ValueError("Relief ratio must be greater than 0")
 

@@ -131,17 +131,17 @@ def ensure_python_packages(requirements: tuple[str, ...], modules: tuple[str, ..
     if not _missing(modules):
         return None
     if not setup_enabled(allow_network):
-        return "缺少 Python 依赖且自动安装已关闭：" + ", ".join(requirements)
+        return "Missing Python dependencies and auto-install is disabled: " + ", ".join(requirements)
     key = "pip:" + ",".join(requirements)
     with _setup_lock(cancelled) as acquired:
         if not acquired:
-            return "自动配置锁不可用或任务已取消，未安装 Python 依赖。"
+            return "Auto-setup lock unavailable or task cancelled; Python dependencies were not installed."
         if not _missing(modules):
             return None
         if time.monotonic() < _FAILED_UNTIL.get(key, 0):
-            return "Python 依赖安装近期失败，请检查网络或 Python 环境：" + ", ".join(requirements)
+            return "Python dependency installation failed recently; check network or Python environment: " + ", ".join(requirements)
         if cancelled and cancelled():
-            return "任务已取消，未安装 Python 依赖。"
+            return "Task cancelled; Python dependencies were not installed."
         args = [sys.executable, "-m", "pip", "install", "--disable-pip-version-check", "--no-input",
                 "--only-binary=:all:"]
         install_to_user = sys.prefix == getattr(sys, "base_prefix", sys.prefix)
@@ -156,11 +156,11 @@ def ensure_python_packages(requirements: tuple[str, ...], modules: tuple[str, ..
             if not _missing(modules):
                 return None
         except SetupCancelled:
-            return "任务已取消，已停止 Python 依赖安装。"
+            return "Task cancelled; stopped Python dependency installation."
         except (OSError, subprocess.SubprocessError):
             pass
         _FAILED_UNTIL[key] = time.monotonic() + 300
-        return "Python 依赖自动安装失败，请检查网络、pip 和写入权限：" + ", ".join(requirements)
+        return "Python dependency auto-install failed; check network, pip, and write permissions: " + ", ".join(requirements)
 
 
 def _portable_root() -> Path:
@@ -181,7 +181,7 @@ def _download(url: str, expected: str, destination: Path) -> None:
     with urllib.request.urlopen(request, timeout=20) as response:
         data = response.read(5_000_001)
     if len(data) > 5_000_000 or hashlib.sha256(data).hexdigest() != expected:
-        raise ValueError("7-Zip 下载内容与官方版本哈希不一致")
+        raise ValueError("7-Zip download hash mismatch against official release")
     destination.write_bytes(data)
 
 
@@ -191,32 +191,32 @@ def ensure_sevenzip(*, allow_network: bool, cancelled: Callable[[], bool] | None
     if _valid_portable(root):
         return str(root / "7z.exe"), None
     if os.name != "nt" or platform.machine().lower() not in {"amd64", "x86_64"}:
-        return None, "未找到可用的 7-Zip；此平台尚不支持自动配置本地帮助解析器。"
+        return None, "Usable 7-Zip not found; auto-setup of the local help parser is unsupported on this platform."
     if not setup_enabled(allow_network):
-        return None, "未找到 7-Zip，且离线模式或设置禁止自动安装。"
+        return None, "7-Zip not found, and offline mode or settings disallow auto-install."
     with _setup_lock(cancelled) as acquired:
         if not acquired:
-            return None, "自动配置锁不可用或任务已取消，未安装 7-Zip。"
+            return None, "Auto-setup lock unavailable or task cancelled; 7-Zip was not installed."
         if _valid_portable(root):
             return str(root / "7z.exe"), None
         if root.exists():
-            return None, "已存在的便携版 7-Zip 校验失败；未覆盖该目录。"
+            return None, "Existing portable 7-Zip verification failed; directory was not overwritten."
         if time.monotonic() < _FAILED_UNTIL.get("7zip", 0):
-            return None, "7-Zip 自动配置近期失败，请检查网络后重试。"
+            return None, "7-Zip auto-setup failed recently; check network and retry."
         try:
             root.parent.mkdir(parents=True, exist_ok=True)
             with tempfile.TemporaryDirectory(prefix="7zip-setup-", dir=root.parent) as temp:
                 work = Path(temp)
                 for name in ("7zr.exe", "7z2605-x64.exe"):
                     if cancelled and cancelled():
-                        return None, "任务已取消，未安装 7-Zip。"
+                        return None, "Task cancelled; 7-Zip was not installed."
                     _download(_RELEASE + name, _SEVENZIP_FILES[name], work / name)
                 out = work / "portable"
                 out.mkdir()
                 _run_setup([str(work / "7zr.exe"), "e", "-y", "-o" + str(out),
                             str(work / "7z2605-x64.exe"), "7z.exe", "7z.dll"], 30, cancelled)
                 if not _valid_portable(out):
-                    raise ValueError("7-Zip 提取文件校验失败")
+                    raise ValueError("Extracted 7-Zip file verification failed")
                 try:
                     out.rename(root)
                 except OSError:
@@ -224,7 +224,7 @@ def ensure_sevenzip(*, allow_network: bool, cancelled: Callable[[], bool] | None
                         raise
             return str(root / "7z.exe"), None
         except SetupCancelled:
-            return None, "任务已取消，已停止 7-Zip 自动配置。"
+            return None, "Task cancelled; stopped 7-Zip auto-setup."
         except (OSError, ValueError, subprocess.SubprocessError):
             _FAILED_UNTIL["7zip"] = time.monotonic() + 300
-            return None, "7-Zip 自动配置失败；可检查网络并手动安装官方 7-Zip。"
+            return None, "7-Zip auto-setup failed; check network and install official 7-Zip manually."

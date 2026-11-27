@@ -60,25 +60,25 @@ def _load_request(value: str | Path | dict[str, Any]) -> dict[str, Any]:
         return dict(value)
     path = Path(value).expanduser().resolve()
     if path.suffix.lower() != ".json" or not path.is_file():
-        raise ValueError("FEA 请求必须是存在的 JSON 文件。")
+        raise ValueError("FEA request must be an existing JSON file.")
     if path.stat().st_size > _MAX_INPUT_BYTES:
-        raise ValueError("FEA 请求超过 64 MiB 安全上限。")
+        raise ValueError("FEA request exceeds 64 MiB safety limit.")
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
-        raise ValueError("FEA 请求必须是 JSON object。")
+        raise ValueError("FEA request must be a JSON object.")
     return payload
 
 
 def _finite_number(value: Any, field: str, *, positive: bool = False) -> float:
     """@brief 读取有限浮点数并按需要求大于零。"""
     if isinstance(value, bool):
-        raise ValueError(f"{field} 必须是有限数值。")
+        raise ValueError(f"{field} must be a finite number.")
     try:
         number = float(value)
     except (TypeError, ValueError) as exc:
-        raise ValueError(f"{field} 必须是有限数值。") from exc
+        raise ValueError(f"{field} must be a finite number.") from exc
     if not math.isfinite(number) or (positive and number <= 0):
-        raise ValueError(f"{field} 必须是{'大于零的' if positive else ''}有限数值。")
+        raise ValueError(f"{field} must be a {'positive ' if positive else ''}finite number.")
     return number
 
 
@@ -139,7 +139,7 @@ def _identifier(value: Any, field: str) -> str:
     """@brief 验证不会注入 CalculiX 关键字的标识符。"""
     token = str(value or "")
     if not _ID.fullmatch(token):
-        raise ValueError(f"{field} 只能使用字母开头的 1-64 位字母、数字或下划线。")
+        raise ValueError(f"{field} must be 1-64 letters, digits, or underscores starting with a letter.")
     return token
 
 
@@ -157,68 +157,68 @@ def validate_analysis(value: str | Path | dict[str, Any]) -> dict[str, Any]:
     }
     unknown = set(request) - allowed_top
     if unknown:
-        raise ValueError(f"FEA 请求含未允许字段: {', '.join(sorted(unknown))}")
+        raise ValueError(f"FEA request contains disallowed fields: {', '.join(sorted(unknown))}")
     if request.get("schemaVersion") not in {"1.0", "1.1"}:
-        raise ValueError("schemaVersion 必须为 1.0 或 1.1。")
+        raise ValueError("schemaVersion must be 1.0 or 1.1.")
     _identifier(request.get("analysisId"), "analysisId")
     analysis_type = request.get("analysisType")
     if analysis_type not in {"static_linear", "static_nonlinear", "modal", "thermal_steady"}:
-        raise ValueError("analysisType 仅支持 static_linear、static_nonlinear、modal、thermal_steady。")
+        raise ValueError("analysisType supports only static_linear, static_nonlinear, modal, and thermal_steady.")
     if analysis_type == "static_nonlinear" and request.get("schemaVersion") != "1.1":
-        raise ValueError("static_nonlinear 必须使用 FEA schemaVersion 1.1。")
+        raise ValueError("static_nonlinear requires FEA schemaVersion 1.1.")
     solver = request.get("solver")
     if solver not in {"auto", "calculix", "elmer"}:
-        raise ValueError("solver 仅支持 auto、calculix、elmer。")
+        raise ValueError("solver supports only auto, calculix, and elmer.")
     if request.get("units") != {"length": "mm", "force": "N", "stress": "MPa", "temperature": "C"}:
-        raise ValueError("FEA 1.0 当前固定使用 mm/N/MPa/C 一致单位制。")
+        raise ValueError("FEA 1.0 currently requires consistent mm/N/MPa/C units.")
 
     material = request.get("material")
     if not isinstance(material, dict) or set(material) - {"name", "elasticModulusMPa", "poissonRatio", "densityKgM3", "conductivityWmK", "plasticCurve"}:
-        raise ValueError("material 结构无效或含未允许字段。")
+        raise ValueError("material has invalid structure or disallowed fields.")
     if not str(material.get("name") or "").strip() or len(str(material["name"])) > 80:
-        raise ValueError("material.name 必须是 1-80 字符。")
+        raise ValueError("material.name must be 1-80 characters.")
     _finite_number(material.get("elasticModulusMPa"), "material.elasticModulusMPa", positive=True)
     poisson = _finite_number(material.get("poissonRatio"), "material.poissonRatio")
     if not -1 < poisson < 0.5:
-        raise ValueError("material.poissonRatio 必须位于 (-1, 0.5)。")
+        raise ValueError("material.poissonRatio must be in (-1, 0.5).")
     _finite_number(material.get("densityKgM3"), "material.densityKgM3", positive=True)
     if analysis_type == "thermal_steady":
         _finite_number(material.get("conductivityWmK"), "material.conductivityWmK", positive=True)
     plastic_curve = material.get("plasticCurve")
     if plastic_curve is not None:
         if analysis_type != "static_nonlinear":
-            raise ValueError("material.plasticCurve 只允许用于 static_nonlinear。")
+            raise ValueError("material.plasticCurve is allowed only for static_nonlinear.")
         if not isinstance(plastic_curve, list) or not 2 <= len(plastic_curve) <= 64:
-            raise ValueError("material.plasticCurve 必须包含 2-64 个应力/塑性应变点。")
+            raise ValueError("material.plasticCurve must contain 2-64 stress/plastic-strain points.")
         previous_stress = -math.inf
         previous_strain = -math.inf
         for index, point in enumerate(plastic_curve):
             if not isinstance(point, dict) or set(point) != {"yieldStressMPa", "plasticStrain"}:
-                raise ValueError(f"material.plasticCurve[{index}] 结构无效。")
+                raise ValueError(f"material.plasticCurve[{index}] has invalid structure.")
             stress = _finite_number(point["yieldStressMPa"], f"material.plasticCurve[{index}].yieldStressMPa", positive=True)
             strain = _finite_number(point["plasticStrain"], f"material.plasticCurve[{index}].plasticStrain")
             if strain < 0 or stress <= previous_stress or strain <= previous_strain:
-                raise ValueError("material.plasticCurve 的屈服应力和塑性应变必须严格递增且应变非负。")
+                raise ValueError("material.plasticCurve yield stress and plastic strain must strictly increase with non-negative strain.")
             if index == 0 and strain != 0:
-                raise ValueError("material.plasticCurve 首点 plasticStrain 必须为 0。")
+                raise ValueError("material.plasticCurve first point must have plasticStrain equal to 0.")
             previous_stress, previous_strain = stress, strain
 
     mesh = request.get("mesh")
     if not isinstance(mesh, dict) or set(mesh) != {"nodes", "elements", "nodeSets", "elementSets"}:
-        raise ValueError("mesh 必须且只能包含 nodes、elements、nodeSets、elementSets。")
+        raise ValueError("mesh must contain exactly nodes, elements, nodeSets, and elementSets.")
     nodes = mesh.get("nodes")
     elements = mesh.get("elements")
     if not isinstance(nodes, list) or not 4 <= len(nodes) <= 1_000_000:
-        raise ValueError("mesh.nodes 数量必须为 4-1000000。")
+        raise ValueError("mesh.nodes count must be 4-1000000.")
     if not isinstance(elements, list) or not 1 <= len(elements) <= 500_000:
-        raise ValueError("mesh.elements 数量必须为 1-500000。")
+        raise ValueError("mesh.elements count must be 1-500000.")
     node_ids: set[int] = set()
     for index, node in enumerate(nodes):
         if not isinstance(node, dict) or set(node) != {"id", "x", "y", "z"}:
-            raise ValueError(f"mesh.nodes[{index}] 结构无效。")
+            raise ValueError(f"mesh.nodes[{index}] has invalid structure.")
         node_id = node["id"]
         if isinstance(node_id, bool) or not isinstance(node_id, int) or node_id < 1 or node_id in node_ids:
-            raise ValueError(f"mesh.nodes[{index}].id 必须是唯一正整数。")
+            raise ValueError(f"mesh.nodes[{index}].id must be a unique positive integer.")
         node_ids.add(node_id)
         for axis in ("x", "y", "z"):
             _finite_number(node[axis], f"mesh.nodes[{index}].{axis}")
@@ -227,40 +227,40 @@ def validate_analysis(value: str | Path | dict[str, Any]) -> dict[str, Any]:
     element_types: dict[int, str] = {}
     for index, element in enumerate(elements):
         if not isinstance(element, dict) or set(element) != {"id", "type", "nodeIds"}:
-            raise ValueError(f"mesh.elements[{index}] 结构无效。")
+            raise ValueError(f"mesh.elements[{index}] has invalid structure.")
         element_id = element["id"]
         kind = element["type"]
         refs = element["nodeIds"]
         if isinstance(element_id, bool) or not isinstance(element_id, int) or element_id < 1 or element_id in element_ids:
-            raise ValueError(f"mesh.elements[{index}].id 必须是唯一正整数。")
+            raise ValueError(f"mesh.elements[{index}].id must be a unique positive integer.")
         element_ids.add(element_id)
         element_types[element_id] = kind
         if kind not in _ELEMENT_NODES or not isinstance(refs, list) or len(refs) != _ELEMENT_NODES[kind]:
-            raise ValueError(f"mesh.elements[{index}] 的类型或节点数无效。")
+            raise ValueError(f"mesh.elements[{index}] has invalid type or node count.")
         if len(set(refs)) != len(refs) or any(ref not in node_ids for ref in refs):
-            raise ValueError(f"mesh.elements[{index}] 引用了缺失或重复节点。")
+            raise ValueError(f"mesh.elements[{index}] references missing or duplicate nodes.")
 
     node_sets = _validate_sets(mesh["nodeSets"], node_ids, "nodeSets")
     element_sets = _validate_sets(mesh["elementSets"], element_ids, "elementSets")
     constraints = request.get("constraints")
     loads = request.get("loads")
     if not isinstance(constraints, list) or not constraints:
-        raise ValueError("constraints 至少需要一项。")
+        raise ValueError("At least one constraint is required.")
     if not isinstance(loads, list) or not loads:
-        raise ValueError("loads 至少需要一项。")
+        raise ValueError("At least one load is required.")
     seen: set[str] = set()
     for index, item in enumerate(constraints):
         if not isinstance(item, dict) or set(item) - {"id", "type", "nodeSet", "dof", "value"}:
-            raise ValueError(f"constraints[{index}] 结构无效。")
+            raise ValueError(f"constraints[{index}] has invalid structure.")
         item_id = _identifier(item.get("id"), f"constraints[{index}].id")
         if item_id in seen:
-            raise ValueError("载荷和约束 ID 必须全局唯一。")
+            raise ValueError("Load and constraint IDs must be globally unique.")
         seen.add(item_id)
         if item.get("type") not in {"fixed", "displacement"} or item.get("nodeSet") not in node_sets:
-            raise ValueError(f"constraints[{index}] 类型或 nodeSet 无效。")
+            raise ValueError(f"constraints[{index}] has invalid type or nodeSet.")
         if item["type"] == "displacement":
             if item.get("dof") not in {1, 2, 3}:
-                raise ValueError("位移约束 dof 必须为 1、2 或 3。")
+                raise ValueError("Displacement constraint dof must be 1, 2, or 3.")
             _finite_number(item.get("value"), f"constraints[{index}].value")
     for index, item in enumerate(loads):
         _validate_load(item, index, node_sets, element_sets, element_types, seen)
@@ -280,45 +280,45 @@ def _validate_nonlinear_extensions(
     contacts = request.get("contacts")
     if analysis_type != "static_nonlinear":
         if any(value is not None for value in (controls, surfaces, contacts)):
-            raise ValueError("nonlinearControls、surfaces 和 contacts 只允许用于 static_nonlinear。")
+            raise ValueError("nonlinearControls, surfaces, and contacts are allowed only for static_nonlinear.")
         return
     if not isinstance(controls, dict) or set(controls) != {
         "initialIncrement", "timePeriod", "minimumIncrement", "maximumIncrement", "maximumIncrements",
     }:
-        raise ValueError("static_nonlinear 必须提供完整 nonlinearControls。")
+        raise ValueError("static_nonlinear requires complete nonlinearControls.")
     initial = _finite_number(controls["initialIncrement"], "nonlinearControls.initialIncrement", positive=True)
     period = _finite_number(controls["timePeriod"], "nonlinearControls.timePeriod", positive=True)
     minimum = _finite_number(controls["minimumIncrement"], "nonlinearControls.minimumIncrement", positive=True)
     maximum = _finite_number(controls["maximumIncrement"], "nonlinearControls.maximumIncrement", positive=True)
     maximum_increments = controls["maximumIncrements"]
     if isinstance(maximum_increments, bool) or not isinstance(maximum_increments, int) or not 1 <= maximum_increments <= 1000:
-        raise ValueError("nonlinearControls.maximumIncrements 必须是 1-1000 的整数。")
+        raise ValueError("nonlinearControls.maximumIncrements must be an integer in 1-1000.")
     if not minimum <= initial <= maximum <= period:
-        raise ValueError("非线性增量必须满足 minimum <= initial <= maximum <= timePeriod。")
+        raise ValueError("Nonlinear increments must satisfy minimum <= initial <= maximum <= timePeriod.")
     if surfaces is None:
         surfaces = {}
     if not isinstance(surfaces, dict) or len(surfaces) > 64:
-        raise ValueError("surfaces 必须是最多 64 项的 object。")
+        raise ValueError("surfaces must be an object with at most 64 entries.")
     surface_names: set[str] = set()
     surface_element_members: dict[str, set[int]] = {}
     for raw_name, surface in surfaces.items():
-        name = _identifier(raw_name, "surfaces 名称")
+        name = _identifier(raw_name, "surfaces name")
         surface_names.add(name)
         if not isinstance(surface, dict) or set(surface) != {"elementSet", "face"}:
-            raise ValueError(f"surfaces.{name} 必须且只能包含 elementSet 和 face。")
+            raise ValueError(f"surfaces.{name} must contain exactly elementSet and face.")
         element_set = surface.get("elementSet")
         face = str(surface.get("face") or "")
         if element_set not in element_sets or not re.fullmatch(r"S[1-6]", face):
-            raise ValueError(f"surfaces.{name} 必须引用有效 elementSet 和 S1-S6。")
+            raise ValueError(f"surfaces.{name} must reference a valid elementSet and face S1-S6.")
         face_number = int(face[1:])
         referenced_types = {element_types[element_id] for element_id in element_sets[element_set]}
         if any(face_number > _ELEMENT_FACE_LIMITS[element_type] for element_type in referenced_types):
-            raise ValueError(f"surfaces.{name} 的 {face} 不适用于所引用单元。")
+            raise ValueError(f"surfaces.{name} face {face} is not applicable to referenced elements.")
         surface_element_members[name] = set(element_sets[element_set])
     if contacts is None:
         contacts = []
     if not isinstance(contacts, list) or len(contacts) > 32:
-        raise ValueError("contacts 必须是最多 32 项的数组。")
+        raise ValueError("contacts must be an array with at most 32 entries.")
     contact_ids: set[str] = set()
     for index, contact in enumerate(contacts):
         allowed = {
@@ -326,35 +326,35 @@ def _validate_nonlinear_extensions(
             "normalStiffnessMPaPerMm", "tangentialStickSlopeMPaPerMm",
         }
         if not isinstance(contact, dict) or set(contact) != allowed:
-            raise ValueError(f"contacts[{index}] 结构无效。")
+            raise ValueError(f"contacts[{index}] has invalid structure.")
         contact_id = _identifier(contact.get("id"), f"contacts[{index}].id")
         if contact_id in contact_ids:
-            raise ValueError(f"接触 ID 重复: {contact_id}")
+            raise ValueError(f"Duplicate contact ID: {contact_id}")
         contact_ids.add(contact_id)
         master = contact.get("masterSurface")
         slave = contact.get("slaveSurface")
         if master not in surface_names or slave not in surface_names or master == slave:
-            raise ValueError(f"contacts[{index}] 必须引用两个不同的已定义 surface。")
+            raise ValueError(f"contacts[{index}] must reference two distinct defined surfaces.")
         if surface_element_members[master].intersection(surface_element_members[slave]):
-            raise ValueError(f"contacts[{index}] 当前只允许来自不相交单元集的两个 surface；自接触尚未验证。")
+            raise ValueError(f"contacts[{index}] currently allows only two surfaces from disjoint element sets; self-contact is unverified.")
         friction = _finite_number(contact.get("frictionCoefficient"), f"contacts[{index}].frictionCoefficient")
         if not 0 <= friction <= 2:
-            raise ValueError("frictionCoefficient 必须位于 [0, 2]。")
+            raise ValueError("frictionCoefficient must be in [0, 2].")
         _finite_number(contact.get("normalStiffnessMPaPerMm"), f"contacts[{index}].normalStiffnessMPaPerMm", positive=True)
         stick_slope = _finite_number(contact.get("tangentialStickSlopeMPaPerMm"), f"contacts[{index}].tangentialStickSlopeMPaPerMm")
         if stick_slope < 0 or (friction > 0 and stick_slope == 0):
-            raise ValueError("有摩擦接触必须提供大于零的 tangentialStickSlopeMPaPerMm。")
+            raise ValueError("Frictional contact requires a positive tangentialStickSlopeMPaPerMm.")
 
 
 def _validate_sets(value: Any, valid_ids: set[int], field: str) -> dict[str, list[int]]:
     """@brief 校验节点集或单元集。"""
     if not isinstance(value, dict):
-        raise ValueError(f"mesh.{field} 必须是 object。")
+        raise ValueError(f"mesh.{field} must be an object.")
     result: dict[str, list[int]] = {}
     for raw_name, members in value.items():
-        name = _identifier(raw_name, f"mesh.{field} 名称")
+        name = _identifier(raw_name, f"mesh.{field} name")
         if not isinstance(members, list) or not members or any(member not in valid_ids for member in members):
-            raise ValueError(f"mesh.{field}.{name} 必须只引用已有 ID。")
+            raise ValueError(f"mesh.{field}.{name} must reference existing IDs only.")
         result[name] = members
     return result
 
@@ -369,41 +369,41 @@ def _validate_load(
 ) -> None:
     """@brief 校验一个白名单载荷。"""
     if not isinstance(item, dict) or set(item) - {"id", "type", "nodeSet", "elementSet", "face", "dof", "value", "magnitude", "direction"}:
-        raise ValueError(f"loads[{index}] 结构无效。")
+        raise ValueError(f"loads[{index}] has invalid structure.")
     item_id = _identifier(item.get("id"), f"loads[{index}].id")
     if item_id in seen:
-        raise ValueError("载荷和约束 ID 必须全局唯一。")
+        raise ValueError("Load and constraint IDs must be globally unique.")
     seen.add(item_id)
     kind = item.get("type")
     if kind == "force":
         if item.get("nodeSet") not in node_sets or item.get("dof") not in {1, 2, 3}:
-            raise ValueError("force 必须引用有效 nodeSet 且 dof 为 1-3。")
+            raise ValueError("force must reference a valid nodeSet with dof in 1-3.")
         _finite_number(item.get("value"), f"loads[{index}].value")
     elif kind == "pressure":
         if item.get("elementSet") not in element_sets or item.get("face") not in {"P1", "P2", "P3", "P4", "P5", "P6"}:
-            raise ValueError("pressure 必须引用有效 elementSet 并明确实体单元面 P1-P6。")
+            raise ValueError("pressure must reference a valid elementSet and solid element face P1-P6.")
         face_number = int(str(item["face"])[1:])
         referenced_types = {element_types[element_id] for element_id in element_sets[item["elementSet"]]}
         maximum_face = min(4 if element_type == "C3D4" else 6 for element_type in referenced_types)
         if face_number > maximum_face:
-            raise ValueError(f"pressure 面 {item['face']} 不适用于单元集中的 {', '.join(sorted(referenced_types))} 单元。")
+            raise ValueError(f"pressure face {item['face']} is not applicable to {', '.join(sorted(referenced_types))} elements in the set.")
         _finite_number(item.get("magnitude"), f"loads[{index}].magnitude", positive=True)
     elif kind == "gravity":
         direction = item.get("direction")
         if not isinstance(direction, list) or len(direction) != 3:
-            raise ValueError("gravity.direction 必须是三维向量。")
+            raise ValueError("gravity.direction must be a 3D vector.")
         vector = [_finite_number(value, f"loads[{index}].direction") for value in direction]
         if math.sqrt(sum(value * value for value in vector)) <= 1e-12:
-            raise ValueError("gravity.direction 不能是零向量。")
+            raise ValueError("gravity.direction cannot be a zero vector.")
         _finite_number(item.get("magnitude"), f"loads[{index}].magnitude", positive=True)
     else:
-        raise ValueError("载荷类型仅支持 force、pressure、gravity。")
+        raise ValueError("Load type supports only force, pressure, and gravity.")
 
 
 def discover_solver(solver: str = "auto") -> dict[str, Any]:
     """@brief 从显式环境变量和 PATH 发现开放求解器。"""
     if solver not in {"auto", "calculix", "elmer"}:
-        raise ValueError("求解器仅支持 auto、calculix、elmer。")
+        raise ValueError("Solver supports only auto, calculix, and elmer.")
     order = ("calculix", "elmer") if solver == "auto" else (solver,)
     checked: list[dict[str, Any]] = []
     for name in order:
@@ -428,7 +428,7 @@ def discover_solver(solver: str = "auto") -> dict[str, Any]:
         "status": "blocked", "solver": solver, "executable": None, "checked": checked,
         "error_code": "fea_solver_missing", "retryable": False,
         "missingDependencies": ["CalculiX ccx" if solver in {"auto", "calculix"} else "ElmerSolver"] + (["ElmerSolver"] if solver == "auto" else []),
-        "message": "未发现开放 FEA 求解器。请安装 CalculiX 或 Elmer，并加入 PATH；也可设置 CADSTUDIO_CALCULIX_EXE / CADSTUDIO_ELMER_EXE。",
+        "message": "Open FEA solver not found. Install CalculiX or Elmer and add to PATH, or set CADSTUDIO_CALCULIX_EXE / CADSTUDIO_ELMER_EXE.",
     }
 
 
@@ -577,7 +577,7 @@ def parse_calculix_results(job_dir: str | Path, stem: str) -> dict[str, Any]:
     failure_markers = re.findall(r"(?i)\b(?:ERROR|DIVERGED|DIVERGENCE|NOT\s+CONVERGED|FAILED)\b", sta_text + "\n" + cvg_text)
     converged = bool(increment_lines) and result_terminated and node_sets_match and not duplicate_node and not failure_markers and finite
     checks = [
-        {"id": "fea-result-version", "status": "pass" if solver_version else "warning", "message": f"CalculiX {solver_version}" if solver_version else "未读取到求解器版本"},
+        {"id": "fea-result-version", "status": "pass" if solver_version else "warning", "message": f"CalculiX {solver_version}" if solver_version else "Solver version not read"},
         {"id": "fea-result-displacement", "status": "pass" if displacements and finite else "fail", "count": len(displacements)},
         {"id": "fea-result-stress", "status": "pass" if stresses and finite else "fail", "count": len(stresses)},
         {"id": "fea-result-node-identity", "status": "pass" if node_sets_match and not duplicate_node else "fail", "nodeSetsMatch": node_sets_match, "duplicateNode": duplicate_node},
@@ -619,10 +619,10 @@ def build_calculix_input(value: str | Path | dict[str, Any], output_path: str | 
     """@brief 生成不可注入任意关键字、且不覆盖旧文件的 CalculiX 输入文件。"""
     request = validate_analysis(value)
     if request["analysisType"] not in {"static_linear", "static_nonlinear"}:
-        return _blocked("generate_input", "fea_calculix_analysis_unsupported", "CalculiX 输入生成当前仅开放 static_linear/static_nonlinear。")
+        return _blocked("generate_input", "fea_calculix_analysis_unsupported", "CalculiX input generation currently supports only static_linear/static_nonlinear (unsupported analysisType).")
     target = _versioned_target(Path(output_path).expanduser().resolve())
     if target.suffix.lower() != ".inp":
-        raise ValueError("CalculiX 输入文件扩展名必须是 .inp。")
+        raise ValueError("CalculiX input file extension must be .inp.")
     target.parent.mkdir(parents=True, exist_ok=True)
     lines = ["** CAD Studio generated; structured whitelist only", "*HEADING", request["analysisId"], "*NODE"]
     for node in request["mesh"]["nodes"]:
@@ -731,12 +731,12 @@ def run_analysis(value: str | Path | dict[str, Any], output_dir: str | Path, *, 
     except (ValueError, json.JSONDecodeError) as exc:
         return _blocked("validate", "fea_invalid_request", str(exc))
     if request["analysisType"] not in {"static_linear", "static_nonlinear"}:
-        return _blocked("generate_input", "fea_calculix_analysis_unsupported", "CalculiX 执行当前仅开放 static_linear/static_nonlinear。")
+        return _blocked("generate_input", "fea_calculix_analysis_unsupported", "CalculiX execution currently supports only static_linear/static_nonlinear (unsupported analysisType).")
     preflight = discover_solver(request["solver"])
     if preflight["status"] != "pass":
         return _blocked("preflight", "fea_solver_missing", preflight["message"], preflight=preflight)
     if preflight["solver"] != "calculix":
-        return _blocked("generate_input", "fea_elmer_adapter_not_implemented", "已发现 ElmerSolver，但安全输入适配器尚未实现。", preflight=preflight)
+        return _blocked("generate_input", "fea_elmer_adapter_not_implemented", "ElmerSolver found, but the safe input adapter is not implemented yet.", preflight=preflight)
     out_dir = Path(output_dir).expanduser().resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
     job_dir = _versioned_target(out_dir / request["analysisId"])
@@ -748,7 +748,7 @@ def run_analysis(value: str | Path | dict[str, Any], output_dir: str | Path, *, 
     try:
         completed = subprocess.run([preflight["executable"], "-i", stem], cwd=job_dir, capture_output=True, text=True, timeout=max(1, min(int(timeout_seconds), 86_400)), shell=False, check=False)
     except subprocess.TimeoutExpired:
-        return _blocked("solve", "fea_solver_timeout", "CalculiX 求解超时，未生成成功结论。", retryable=True, preflight=preflight)
+        return _blocked("solve", "fea_solver_timeout", "CalculiX solve timeout; no passing conclusion generated.", retryable=True, preflight=preflight)
     evidence = [job_dir / f"{stem}.dat", job_dir / f"{stem}.frd", job_dir / f"{stem}.sta", job_dir / f"{stem}.cvg", job_dir / f"{stem}.cel"]
     artifacts = [deck["artifacts"][0]]
     artifacts.extend({"kind": path.suffix.lstrip("."), "path": str(path), "sha256": _sha256(path), "sizeBytes": path.stat().st_size, "producedThisRun": True} for path in evidence if path.is_file() and path.stat().st_size > 0)

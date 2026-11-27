@@ -59,7 +59,7 @@ def test_validate_convergence_requires_strict_mesh_refinement() -> None:
     request = _study()
     assert validate_convergence_request(request)["studyId"] == "cantilever_convergence"
     request["cases"][2]["characteristicSizeMm"] = 5
-    with pytest.raises(ValueError, match="严格递减"):
+    with pytest.raises(ValueError, match="strictly decrease"):
         validate_convergence_request(request)
 
 
@@ -79,7 +79,7 @@ def test_validate_convergence_accepts_nonlinear_and_fingerprints_contact_control
         })
     assert validate_convergence_request(request)["cases"][0]["analysis"]["analysisType"] == "static_nonlinear"
     request["cases"][1]["analysis"]["nonlinearControls"]["maximumIncrement"] = 0.25
-    with pytest.raises(ValueError, match="完全一致"):
+    with pytest.raises(ValueError, match="identical"):
         validate_convergence_request(request)
 
 
@@ -87,7 +87,7 @@ def test_validate_convergence_rejects_changed_physics() -> None:
     """@brief 不同网格之间不得悄悄改变材料、载荷或约束。"""
     request = _study()
     request["cases"][2]["analysis"]["material"]["elasticModulusMPa"] = 70000
-    with pytest.raises(ValueError, match="材料、载荷和约束"):
+    with pytest.raises(ValueError, match="Material, loads, and constraints"):
         validate_convergence_request(request)
 
 

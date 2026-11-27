@@ -55,7 +55,7 @@ def test_invalid_plan_is_rejected_before_com(change):
 def test_changed_source_is_blocked_without_creating_output(tmp_path):
     source = tmp_path / "source.slddrw"
     source.write_bytes(b"changed")
-    with pytest.raises(ValueError, match="源图纸已经变化"):
+    with pytest.raises(ValueError, match="Source drawing has changed"):
         annotate_copy(source, plan(), tmp_path / "new")
     assert not (tmp_path / "new").exists()
     assert source.read_bytes() == b"changed"
@@ -70,7 +70,7 @@ def test_existing_output_is_never_overwritten(tmp_path):
     important.write_bytes(b"user work")
     value = plan()
     value["sourceSha256"] = _sha256(source)
-    with pytest.raises(ValueError, match="输出目录必须不存在"):
+    with pytest.raises(ValueError, match="Output directory must not exist"):
         annotate_copy(source, value, output)
     assert important.read_bytes() == b"user work"
 
@@ -103,7 +103,7 @@ def test_dimension_target_requires_exact_name_value_and_unique_candidate():
     target = plan()["geometricTolerances"][0]["target"]
     assert resolve_target(View([wrong, right]), target) is right
     for dimensions in ([wrong], [right, Dimension("RD3@Front", .01)], [Dimension("RD3@Front", .02)]):
-        with pytest.raises(ValueError, match="唯一确认"):
+        with pytest.raises(ValueError, match="uniquely resolved"):
             resolve_target(View(dimensions), target)
 
 
@@ -120,7 +120,7 @@ def test_line_target_matches_model_coordinates_in_either_direction_but_not_nearb
     assert resolve_target(view, target) is edge
     assert resolve_target(view, {**target, "startMm": target["endMm"], "endMm": target["startMm"]}) is edge
     view.GetVisibleEntities2 = lambda *_: [edge, line([.04, -.03, .02], [-.04, -.03, .02])]
-    with pytest.raises(ValueError, match="候选数 2"):
+    with pytest.raises(ValueError, match="candidates=2"):
         resolve_target(view, target)
 
 
@@ -137,7 +137,7 @@ def test_saved_layout_is_baseline_for_automatically_positioned_symbol():
     _capture_saved_positions([record])
     assert record["position"] == (.2, .21, 0.)
     record["request"] = {"positionMm": [200, 200]}
-    with pytest.raises(RuntimeError, match="显式请求位置"):
+    with pytest.raises(RuntimeError, match="explicitly requested position"):
         _capture_saved_positions([record])
 
 

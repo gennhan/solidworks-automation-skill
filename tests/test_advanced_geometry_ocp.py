@@ -47,14 +47,14 @@ def test_native_stdout_guard_allows_gui_process_without_console(monkeypatch) -> 
 @pytest.mark.parametrize(
     ("change", "message"),
     [
-        (lambda request: request.update({"command": "cmd.exe"}), "未允许字段"),
+        (lambda request: request.update({"command": "cmd.exe"}), "disallowed fields"),
         (lambda request: request.update({"modelId": "bad/../name"}), "modelId"),
-        (lambda request: request["sections"][1].update({"z": 0}), "严格递增"),
+        (lambda request: request["sections"][1].update({"z": 0}), "strictly increase"),
         (lambda request: request["sections"][0].update({"radius": 0}), "radius"),
         (lambda request: request.update({"outputs": ["step", "exe"]}), "outputs"),
-        (lambda request: request.update({"outputs": ["stl"]}), "至少包含 step 或 brep"),
+        (lambda request: request.update({"outputs": ["stl"]}), "at least step or brep"),
         (lambda request: request.update({"ruled": False}), "ruled=true"),
-        (lambda request: request["sections"].__setitem__(1, {"id": "middle", "type": "polygon", "z": 30, "points": [[-5, -5], [5, -5], [5, 5], [-5, 5]]}), "不能与多边形"),
+        (lambda request: request["sections"].__setitem__(1, {"id": "middle", "type": "polygon", "z": 30, "points": [[-5, -5], [5, -5], [5, 5], [-5, 5]]}), "cannot be mixed with polygon"),
     ],
 )
 def test_validate_ocp_loft_request_rejects_unsafe_or_degenerate_input(change, message: str) -> None:
@@ -72,7 +72,7 @@ def test_polygon_section_rejects_zero_area() -> None:
         {"id": "bottom", "type": "polygon", "z": 0, "points": [[0, 0], [1, 0], [2, 0]]},
         {"id": "top", "type": "polygon", "z": 20, "points": [[0, 0], [1, 0], [2, 0]]},
     ]
-    with pytest.raises(ValueError, match="退化多边形"):
+    with pytest.raises(ValueError, match="degenerate polygon"):
         validate_ocp_loft_request(request)
 
 
@@ -83,7 +83,7 @@ def test_polygon_section_rejects_self_intersection() -> None:
         {"id": "bottom", "type": "polygon", "z": 0, "points": [[0, 0], [4, 4], [0, 3], [4, 0]]},
         {"id": "top", "type": "polygon", "z": 20, "points": [[0, 0], [4, 4], [0, 3], [4, 0]]},
     ]
-    with pytest.raises(ValueError, match="自交"):
+    with pytest.raises(ValueError, match="self-intersection"):
         validate_ocp_loft_request(request)
 
 

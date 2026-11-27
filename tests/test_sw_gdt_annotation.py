@@ -66,7 +66,7 @@ def test_position_setter_success_does_not_hide_adjusted_position():
         def GetPosition(self):
             return (0.141, 0.1, 0.0)
 
-    with pytest.raises(RuntimeError, match="实际位置"):
+    with pytest.raises(RuntimeError, match="Actual annotation position"):
         _set_position(Annotation(), 0.07, 0.1)
     _set_position(Annotation(), 0.141, 0.1)
 

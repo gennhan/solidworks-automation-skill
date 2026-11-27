@@ -67,5 +67,5 @@ def test_check_json_files_rejects_duplicate_workflow_id(monkeypatch):
 
     monkeypatch.setattr(Path, "read_text", fake_read_text)
 
-    with pytest.raises(AssertionError, match="唯一"):
+    with pytest.raises(AssertionError, match="unique"):
         validate_skill.check_json_files()

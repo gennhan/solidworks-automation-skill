@@ -18,7 +18,7 @@ BUNDLED_SKILL = ROOT / "apps/workbench-ui/src-tauri/resources/skill"
 def _version(path: Path, pattern: str) -> str:
     match = re.search(pattern, path.read_text(encoding="utf-8"))
     if not match:
-        raise AssertionError(f"无法读取版本: {path}")
+        raise AssertionError(f"Unable to read version: {path}")
     return match.group(1)
 
 
@@ -63,12 +63,12 @@ def run_release_check() -> dict[str, object]:
     if len({ui_version, tauri_version, cargo_version, app_version, skill_version, python_version,
             ui_lock["version"], ui_lock["packages"][""]["version"], cargo_lock_version,
             mcpb_version, uv_project_version}) != 1:
-        raise AssertionError(f"版本不一致: npm={ui_version}, tauri={tauri_version}, cargo={cargo_version}, app={app_version}")
+        raise AssertionError(f"Version mismatch: npm={ui_version}, tauri={tauri_version}, cargo={cargo_version}, app={app_version}")
     manifest = json.loads((ROOT / "capabilities.yaml").read_text(encoding="utf-8"))
     capabilities = manifest.get("capabilities", [])
     ids = [item.get("id") for item in capabilities]
     if len(ids) != len(set(ids)) or len(ids) < 10:
-        raise AssertionError("能力清单 ID 重复或数量不足")
+        raise AssertionError("Capability manifest has duplicate IDs or insufficient entries")
     required = [
         "SKILL.md",
         "README.md",
@@ -79,13 +79,13 @@ def run_release_check() -> dict[str, object]:
     ]
     missing = [item for item in required if not (ROOT / item).is_file()]
     if missing:
-        raise AssertionError("发布文件缺失: " + ", ".join(missing))
+        raise AssertionError("Missing release files: " + ", ".join(missing))
     expected_runtime_files = collect_runtime_files(ROOT)
     bundled_drift = find_bundled_skill_drift(ROOT, BUNDLED_SKILL, expected_runtime_files)
     if bundled_drift:
         preview = ", ".join(bundled_drift[:10])
         suffix = " ..." if len(bundled_drift) > 10 else ""
-        raise AssertionError(f"桌面内嵌 Skill 与根 Skill 不一致: {preview}{suffix}")
+        raise AssertionError(f"Desktop bundled skill differs from root skill: {preview}{suffix}")
     bundled_file_count = sum(1 for path in BUNDLED_SKILL.rglob("*") if path.is_file())
     return {
         "status": "pass",

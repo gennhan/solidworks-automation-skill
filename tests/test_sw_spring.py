@@ -33,14 +33,14 @@ def test_invalid_or_out_of_scope_input_is_rejected(spec):
 
 def test_existing_body_is_rejected_before_creating_sketch():
     model = SimpleNamespace(GetType=lambda: 1, GetBodies2=lambda *_: [object()])
-    with pytest.raises(ValueError, match="无实体"):
+    with pytest.raises(ValueError, match="no solid bodies"):
         create_open_helical_spring(model, OpenHelicalSpringSpec(3, 24, 48, 6))
 
 
 def test_incorrect_helix_rotation_is_rejected():
     definition = SimpleNamespace(Clockwise=True, DefinedBy=1, Height=.048, Pitch=.008, Revolution=6.)
     helix = SimpleNamespace(GetDefinition=lambda: definition)
-    with pytest.raises(RuntimeError, match="旋向"):
+    with pytest.raises(RuntimeError, match="Helix direction"):
         verify_helix_definition(helix, OpenHelicalSpringSpec(3, 24, 48, 6, False), 8.)
 
 
@@ -55,5 +55,5 @@ def test_extreme_bounds_use_out_parameters_and_reject_missing_point():
     class Missing:
         def GetExtremePoint(self, *_):
             return False
-    with pytest.raises(RuntimeError, match="极值点"):
+    with pytest.raises(RuntimeError, match="extreme point"):
         exact_body_bounds_mm(Missing())

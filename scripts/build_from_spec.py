@@ -167,7 +167,7 @@ def _create_base(model, base):
     if base_type == "none":
         return None, "Front Plane", []
 
-    return None, "Front Plane", [f"不支持的 base.type={base_type!r}"]
+    return None, "Front Plane", [f"Unsupported base.type={base_type!r}"]
 
 
 def validate_holes_inside_base(holes, base):
@@ -187,8 +187,8 @@ def validate_holes_inside_base(holes, base):
             radius = hole["diameter_mm"] / 2.0
             if x_mm - radius < -1e-6 or y_mm - radius < -1e-6 or x_mm + radius > width + 1e-6 or y_mm + radius > height + 1e-6:
                 problems.append(
-                    f"孔 {hole.get('id')} 位于 ({x_mm}, {y_mm})，直径 {hole['diameter_mm']}mm，"
-                    f"超出了板料范围 {width}x{height}mm（原点在左下角）。"
+                    f"Hole {hole.get('id')} at ({x_mm}, {y_mm}) with diameter {hole['diameter_mm']}mm "
+                    f"exceeds plate bounds {width}x{height}mm (origin at bottom-left)."
                 )
     elif base.get("type") == "cylinder":
         diameter = base["diameter_mm"]
@@ -198,7 +198,7 @@ def validate_holes_inside_base(holes, base):
             distance = math.hypot(x_mm, y_mm)
             if distance + hole["diameter_mm"] / 2.0 > radius_base + 1e-6:
                 problems.append(
-                    f"孔 {hole.get('id')} 中心距轴心 {distance:.3f}mm，超出圆柱半径 {radius_base}mm。"
+                    f"Hole {hole.get('id')} center distance {distance:.3f}mm from axis exceeds cylinder radius {radius_base}mm."
                 )
     return problems
 
@@ -223,14 +223,14 @@ def _create_hole(model, hole):
     的行为做测试，也避免模块导入顺序影响实际调用的实现。
     """
     hole_type = hole.get("type")
-    hole_name = hole.get("id", "孔")
+    hole_name = hole.get("id", "Hole")
 
     if hole_type == "through":
         return create_through_hole(
             model,
             center=_hole_center_m(hole),
             diameter=mm(hole["diameter_mm"]),
-            name=hole.get("id", "通孔"),
+            name=hole.get("id", "ThroughHole"),
         )
     if hole_type == "blind":
         return create_blind_hole(
@@ -258,7 +258,7 @@ def _create_hole(model, hole):
             included_angle_deg=hole.get("angle_deg", 90.0),
             name=hole_name,
         )
-    raise ValueError(f"不支持的孔类型: {hole_type!r}")
+    raise ValueError(f"Unsupported hole type: {hole_type!r}")
 
 
 def build_from_spec(model, spec: Dict[str, Any], apply_fillets=True, verify_geometry=True):
@@ -285,7 +285,7 @@ def build_from_spec(model, spec: Dict[str, Any], apply_fillets=True, verify_geom
     feature, plane_name, base_errors = _create_base(model, spec.get("base") or {})
     errors.extend(base_errors)
     if feature is None and not base_errors and (spec.get("base") or {}).get("type") != "none":
-        errors.append("基础实体创建失败：特征未生成。请检查模板是否可用。")
+        errors.append("Base solid creation failed: no feature generated. Check whether the template is available.")
     steps.append({
         "step": "base",
         "type": (spec.get("base") or {}).get("type"),
@@ -317,7 +317,7 @@ def build_from_spec(model, spec: Dict[str, Any], apply_fillets=True, verify_geom
 
     if errors:
         # 孔位越界属于规格错误，继续建孔只会得到一串误导性的"特征未创建"。
-        steps.append({"step": "holes", "ok": False, "reason": "孔位越界，已跳过建孔"})
+        steps.append({"step": "holes", "ok": False, "reason": "Hole positions out of bounds; skipped hole creation"})
         return {
             "status": "error",
             "steps": steps,
@@ -329,12 +329,12 @@ def build_from_spec(model, spec: Dict[str, Any], apply_fillets=True, verify_geom
     for hole in holes:
         hole_type = hole.get("type")
         if hole_type not in _SUPPORTED_HOLE_TYPES:
-            errors.append(f"孔 {hole.get('id')}: 不支持的孔类型 {hole_type!r}")
+            errors.append(f"Hole {hole.get('id')}: unsupported hole type {hole_type!r}")
             continue
         try:
             result = _create_hole(model, hole)
         except Exception as exc:
-            errors.append(f"孔 {hole.get('id')} 创建失败: {exc}")
+            errors.append(f"Hole {hole.get('id')} creation failed: {exc}")
             steps.append({"step": "hole", "id": hole.get("id"), "type": hole_type, "ok": False})
             continue
 
@@ -354,8 +354,8 @@ def build_from_spec(model, spec: Dict[str, Any], apply_fillets=True, verify_geom
         })
         if not ok:
             errors.append(
-                f"孔 {hole.get('id')} 未成功创建（SolidWorks 未返回特征名）。"
-                "常见原因：孔位在实体之外，或与前一个孔重叠。"
+                f"Hole {hole.get('id')} was not created (SolidWorks returned no feature name). "
+                "Common causes: hole outside solid or overlapping a previous hole."
             )
 
     # ---- 圆角 ----
@@ -382,8 +382,8 @@ def build_from_spec(model, spec: Dict[str, Any], apply_fillets=True, verify_geom
             }
             if selection.get("status") != "ok":
                 warnings.append(
-                    f"圆角 {index}: 未选中任何边线（条件 {edge_spec}）；已跳过该圆角。"
-                    f"可用 solidworks_list_edges 查看模型边线。"
+                    f"Fillet {index}: no edges selected (criteria {edge_spec}); skipped this fillet. "
+                    "Use solidworks_list_edges to inspect model edges."
                 )
                 fillet_results.append(entry)
                 steps.append(entry)
@@ -397,11 +397,11 @@ def build_from_spec(model, spec: Dict[str, Any], apply_fillets=True, verify_geom
                 entry["ok"] = created is not None
                 entry["feature"] = _feature_name(created, f"Fillet{index + 1}")
                 if created is None:
-                    warnings.append(f"圆角 {index}: 选中了 {entry['selected_count']} 条边但特征未生成，"
-                                    "通常是半径过大导致自交。")
+                    warnings.append(f"Fillet {index}: selected {entry['selected_count']} edge(s) but no feature was generated, "
+                                    "usually due to self-intersection from an oversized radius.")
             except Exception as exc:
                 entry["error"] = str(exc)
-                warnings.append(f"圆角 {index} 失败: {exc}")
+                warnings.append(f"Fillet {index} failed: {exc}")
             finally:
                 try:
                     model.ClearSelection2(True)
@@ -421,11 +421,11 @@ def build_from_spec(model, spec: Dict[str, Any], apply_fillets=True, verify_geom
         try:
             bounding = sw_measure.collect_bounding_box(model)
         except Exception as exc:
-            bounding = {"errors": [f"包围盒回读失败: {exc}"]}
+            bounding = {"errors": [f"Bounding box readback failed: {exc}"]}
         try:
             mass = sw_measure.collect_mass_properties(model)
         except Exception as exc:
-            mass = {"errors": [f"质量属性回读失败: {exc}"]}
+            mass = {"errors": [f"Mass properties readback failed: {exc}"]}
 
         measurements = {
             "bounding_box": {key: value for key, value in bounding.items() if key != "errors"},
@@ -450,7 +450,7 @@ def build_from_spec(model, spec: Dict[str, Any], apply_fillets=True, verify_geom
     actual_hole_count = len([item for item in created_holes if item["ok"]])
     if holes and actual_hole_count < len(holes):
         errors.append(
-            f"规格定义 {len(holes)} 个孔，实际成功创建 {actual_hole_count} 个；请核对失败的孔定义。"
+            f"Spec defines {len(holes)} hole(s), but only {actual_hole_count} were created; check failed hole definitions."
         )
 
     status = "ok"

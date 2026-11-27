@@ -89,17 +89,17 @@ def _load_document(path: Path) -> dict[str, Any]:
     """@brief 读取并做 NeutralCadDocument 最小结构校验。"""
     document = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(document, dict):
-        raise ValueError("NeutralCadDocument 必须是 JSON object。")
+        raise ValueError("NeutralCadDocument must be a JSON object.")
     if not str(document.get("documentId") or "").strip():
-        raise ValueError("NeutralCadDocument 缺少 documentId。")
+        raise ValueError("NeutralCadDocument is missing documentId.")
     features = document.get("features", [])
     if not isinstance(features, list):
-        raise ValueError("NeutralCadDocument.features 必须是数组。")
+        raise ValueError("NeutralCadDocument.features must be an array.")
     for feature in features:
         if not isinstance(feature, dict):
-            raise ValueError("NeutralCadDocument.features 只能包含 object。")
+            raise ValueError("NeutralCadDocument.features may only contain objects.")
         if not str(feature.get("id") or "").strip() or not str(feature.get("type") or "").strip():
-            raise ValueError("每个 feature 必须包含非空 id 和 type。")
+            raise ValueError("Each feature must contain non-empty id and type.")
     return document
 
 
@@ -107,7 +107,7 @@ def _document_to_mm(document: dict[str, Any]) -> tuple[dict[str, Any], str]:
     """@brief 将 DFM 涉及的 NeutralCadDocument 长度字段规范化为毫米。"""
     source_units = str(document.get("units") or "mm").strip().lower()
     if source_units not in UNIT_TO_MM:
-        raise ValueError(f"DFM 不支持单位 {source_units}。")
+        raise ValueError(f"Unsupported DFM units: {source_units}.")
     normalized = copy.deepcopy(document)
     geometry_factor = UNIT_TO_MM[source_units]
     for feature in normalized.get("features", []):
@@ -122,7 +122,7 @@ def _document_to_mm(document: dict[str, Any]) -> tuple[dict[str, Any], str]:
     manufacturing = metadata.get("manufacturing") if isinstance(metadata.get("manufacturing"), dict) else {}
     manufacturing_units = str(manufacturing.get("unit") or source_units).strip().lower()
     if manufacturing_units not in UNIT_TO_MM:
-        raise ValueError(f"DFM 不支持制造元数据单位 {manufacturing_units}。")
+        raise ValueError(f"Unsupported DFM manufacturing metadata units: {manufacturing_units}.")
     manufacturing_factor = UNIT_TO_MM[manufacturing_units]
     for key in MANUFACTURING_LENGTH_FIELDS:
         if key in manufacturing and isinstance(manufacturing[key], (int, float)) and not isinstance(manufacturing[key], bool):
@@ -292,7 +292,7 @@ def _load_brep_evidence(
 ) -> dict[str, Any]:
     """@brief 装载并验证 B-Rep 证据来源，不把普通参数声明冒充几何测量。"""
     if value is None:
-        return {"available": False, "verifiedSource": False, "reason": "未提供 B-Rep 证据。"}
+        return {"available": False, "verifiedSource": False, "reason": "B-Rep evidence not provided."}
     evidence_path: Path | None = None
     if isinstance(value, dict):
         payload = dict(value)
@@ -303,64 +303,64 @@ def _load_brep_evidence(
             try:
                 evidence_path.relative_to(allowed_root.resolve())
             except ValueError as exc:
-                raise ValueError("相对 B-Rep 证据路径逃逸模型目录，已拒绝。") from exc
+                raise ValueError("Relative B-Rep evidence path escapes model directory; rejected.") from exc
         else:
             evidence_path = raw.resolve()
         if evidence_path.suffix.lower() != ".json" or not evidence_path.is_file():
-            raise ValueError("B-Rep 证据必须是存在的 JSON 文件。")
+            raise ValueError("B-Rep evidence must be an existing JSON file.")
         if evidence_path.stat().st_size > 4 * 1024 * 1024:
-            raise ValueError("B-Rep 证据超过 4 MiB 安全上限。")
+            raise ValueError("B-Rep evidence exceeds 4 MiB safety limit.")
         payload = json.loads(evidence_path.read_text(encoding="utf-8"))
         if not isinstance(payload, dict):
-            raise ValueError("B-Rep 证据必须是 JSON object。")
+            raise ValueError("B-Rep evidence must be a JSON object.")
 
     backend = str(payload.get("backend") or "")
     evidence = payload.get("measurements") if isinstance(payload.get("measurements"), dict) else None
     if backend == "solidworks_brep":
         if not evidence:
-            raise ValueError("SolidWorks B-Rep 证据必须包含 measurements。")
+            raise ValueError("SolidWorks B-Rep evidence must contain measurements.")
         if str(evidence.get("units") or "").lower() != "mm":
-            raise ValueError("SolidWorks B-Rep measurements 必须明确声明 units=mm。")
+            raise ValueError("SolidWorks B-Rep measurements must explicitly declare units=mm.")
         measurement_source = str(evidence.get("measurement_source") or "")
         if "solidworks api" not in measurement_source.lower() or "b-rep" not in measurement_source.lower():
-            raise ValueError("SolidWorks B-Rep measurements 缺少受认可的 API 测量来源。")
+            raise ValueError("SolidWorks B-Rep measurements lack an approved API measurement source.")
         allowed_extensions = {".sldprt"}
     elif backend == "headless_occt":
         evidence = payload.get("geometryEvidence") if isinstance(payload.get("geometryEvidence"), dict) else None
         if not evidence:
-            raise ValueError("OCCT B-Rep 证据必须包含 geometryEvidence。")
+            raise ValueError("OCCT B-Rep evidence must contain geometryEvidence.")
         if str(payload.get("units") or evidence.get("units") or "").lower() != "mm":
-            raise ValueError("OCCT B-Rep 证据必须明确声明 units=mm。")
+            raise ValueError("OCCT B-Rep evidence must explicitly declare units=mm.")
         measurement_source = "OCCT B-Rep topology"
         allowed_extensions = {".brep", ".step", ".stp"}
     else:
-        raise ValueError("B-Rep 证据后端未经认可；不得把普通参数或手工 JSON 标记为 SolidWorks B-Rep。")
+        raise ValueError("Unrecognized B-Rep evidence backend; manual JSON or plain parameters cannot be labeled as SolidWorks B-Rep.")
     if payload.get("producedThisRun") is not True:
-        raise ValueError("B-Rep 证据未标记 producedThisRun=true，不能用于本轮制造判断。")
+        raise ValueError("B-Rep evidence is not marked producedThisRun=true and cannot be used for this run's manufacturing checks.")
     artifact_raw = payload.get("sourceArtifact")
     if not str(artifact_raw or "").strip():
-        raise ValueError("B-Rep 证据缺少 sourceArtifact。")
+        raise ValueError("B-Rep evidence is missing sourceArtifact.")
     artifact_path = Path(str(artifact_raw)).expanduser()
     if not artifact_path.is_absolute():
         artifact_path = (allowed_root / artifact_path).resolve()
         try:
             artifact_path.relative_to(allowed_root.resolve())
         except ValueError as exc:
-            raise ValueError("B-Rep sourceArtifact 路径逃逸模型目录，已拒绝。") from exc
+            raise ValueError("B-Rep sourceArtifact path escapes model directory; rejected.") from exc
     else:
         artifact_path = artifact_path.resolve()
     if artifact_path.suffix.lower() not in allowed_extensions or not artifact_path.is_file():
-        raise ValueError("B-Rep sourceArtifact 不存在或格式与后端不匹配。")
+        raise ValueError("B-Rep sourceArtifact does not exist or format does not match backend.")
     expected_artifact_hash = str(payload.get("sourceSha256") or "").lower()
     actual_artifact_hash = _sha256_file(artifact_path)
     if len(expected_artifact_hash) != 64 or expected_artifact_hash != actual_artifact_hash:
-        raise ValueError("B-Rep sourceArtifact SHA-256 不匹配，证据已失去绑定。")
+        raise ValueError("B-Rep sourceArtifact SHA-256 mismatch; evidence binding is broken.")
     size = _brep_size(evidence)
     topology = evidence.get("topology") if isinstance(evidence.get("topology"), dict) else {}
     if size is None:
-        raise ValueError("B-Rep 证据缺少有效的三轴包络。")
+        raise ValueError("B-Rep evidence is missing a valid 3-axis envelope.")
     if backend == "headless_occt" and int(topology.get("solids") or 0) < 1:
-        raise ValueError("OCCT B-Rep 证据未证明存在实体。")
+        raise ValueError("OCCT B-Rep evidence does not prove a solid exists.")
     sha256 = _sha256_file(evidence_path) if evidence_path else _canonical_sha256(payload)
     return {
         "available": True,
@@ -434,14 +434,14 @@ def _common_checks(
             "material_declared",
             "pass" if material else "fail",
             "critical",
-            f"材料已声明: {material}" if material else "缺少材料，不能进行制造风险判断。",
+            f"Material declared: {material}" if material else "Missing material; cannot assess manufacturing risks.",
             material=material or None,
         ),
         _check(
             "bounds_available",
             "pass" if bounds.get("available") else "warning",
             "medium",
-            "已提取基础包络尺寸。" if bounds.get("available") else "未能从基础特征估算包络尺寸。",
+            "Base envelope dimensions extracted." if bounds.get("available") else "Unable to estimate envelope dimensions from base features.",
             bounds=bounds,
         ),
     ]
@@ -453,12 +453,12 @@ def _common_checks(
                 "hole_diameter_inventory",
                 "pass",
                 "medium",
-                f"已识别 {len(holes)} 个孔类特征，最小孔径 {min_hole:g} mm。",
+                f"Identified {len(holes)} hole feature(s); minimum diameter {min_hole:g} mm.",
                 holes=holes,
             )
         )
     else:
-        checks.append(_check("hole_diameter_inventory", "warning", "low", "未识别孔类特征；如零件含孔槽，应补齐规格和定位证据。"))
+        checks.append(_check("hole_diameter_inventory", "warning", "low", "No hole features identified; if the part contains holes/slots, provide specs and location evidence."))
     return checks
 
 
@@ -476,7 +476,7 @@ def _machining_checks(
             "machining_min_wall",
             "pass" if wall is not None and wall >= min_wall else "fail",
             "high",
-            f"最小壁厚/筋厚 {wall:g} mm，大于建议阈值 {min_wall:g} mm。" if wall is not None and wall >= min_wall else f"机加工壁厚低于建议阈值 {min_wall:g} mm 或缺失。",
+            f"Minimum wall/rib thickness {wall:g} mm meets recommended threshold {min_wall:g} mm." if wall is not None and wall >= min_wall else f"Machined wall thickness is below recommended threshold {min_wall:g} mm or missing.",
             wallThickness=wall,
             minimumWallThickness=min_wall,
         )
@@ -488,15 +488,15 @@ def _machining_checks(
             "machining_min_drill",
             "warning" if small_holes else "pass",
             "medium",
-            f"{len(small_holes)} 个孔径低于建议最小钻孔 {min_drill:g} mm。" if small_holes else f"孔径未低于建议最小钻孔 {min_drill:g} mm。",
+            f"{len(small_holes)} hole diameter(s) below recommended minimum drill {min_drill:g} mm." if small_holes else f"Hole diameters meet recommended minimum drill {min_drill:g} mm.",
             minimumDrillDiameter=min_drill,
             smallHoles=small_holes or None,
         )
     )
     if _number(manufacturing.get("internalCornerRadius")) is None:
-        checks.append(_check("machining_internal_corner_radius", "warning", "medium", "未声明内角半径/刀具半径，方形内角可能无法按模型直接加工。"))
+        checks.append(_check("machining_internal_corner_radius", "warning", "medium", "Internal corner radius / tool radius not declared; sharp internal corners may not be directly machinable."))
     else:
-        checks.append(_check("machining_internal_corner_radius", "pass", "medium", "已声明内角半径/刀具半径。", internalCornerRadius=_number(manufacturing.get("internalCornerRadius"))))
+        checks.append(_check("machining_internal_corner_radius", "pass", "medium", "Internal corner radius / tool radius declared.", internalCornerRadius=_number(manufacturing.get("internalCornerRadius"))))
     return checks
 
 
@@ -515,7 +515,7 @@ def _sheet_metal_checks(
             "sheet_bend_radius",
             "pass" if thickness is not None and bend is not None and bend >= thickness * 0.8 else "warning",
             "high",
-            "折弯内半径与板厚比例在常见可制造范围内。" if thickness is not None and bend is not None and bend >= thickness * 0.8 else "折弯内半径小于 0.8 倍板厚或缺失，需要确认材料和折弯模具。",
+            "Inside bend radius to thickness ratio is within typical manufacturable range." if thickness is not None and bend is not None and bend >= thickness * 0.8 else "Inside bend radius is less than 0.8x thickness or missing; verify material and bending die.",
             wallThickness=thickness,
             bendRadius=bend,
         )
@@ -525,7 +525,7 @@ def _sheet_metal_checks(
             "sheet_k_factor",
             "pass" if k_factor is not None and 0.2 <= k_factor <= 0.55 else "fail",
             "critical",
-            "K 因子处于常见展开计算范围。" if k_factor is not None and 0.2 <= k_factor <= 0.55 else "K 因子缺失或超出常见范围，展开长度不可复核。",
+            "K-factor is within typical flat-pattern calculation range." if k_factor is not None and 0.2 <= k_factor <= 0.55 else "K-factor is missing or outside typical range; flat-pattern length cannot be verified.",
             kFactor=k_factor,
         )
     )
@@ -536,7 +536,7 @@ def _sheet_metal_checks(
             "sheet_hole_vs_thickness",
             "warning" if small_holes else "pass",
             "medium",
-            f"{len(small_holes)} 个孔径小于板厚/1mm 建议值。" if small_holes else "孔径未小于板厚/1mm 建议值。",
+            f"{len(small_holes)} hole diameter(s) smaller than thickness/1mm guideline." if small_holes else "Hole diameters meet thickness/1mm guideline.",
             smallHoles=small_holes or None,
         )
     )
@@ -557,7 +557,7 @@ def _laser_checks(
             "laser_kerf_declared",
             "pass" if kerf is not None and kerf > 0 else "fail",
             "critical",
-            f"已声明割缝 {kerf:g} mm。" if kerf else "缺少割缝 kerf，无法复核孔槽补偿。",
+            f"Kerf declared: {kerf:g} mm." if kerf else "Missing kerf; cannot verify hole/slot compensation.",
             kerf=kerf,
         )
     )
@@ -567,7 +567,7 @@ def _laser_checks(
                 "laser_kerf_ratio",
                 "warning" if kerf > thickness * 0.35 else "pass",
                 "medium",
-                "割缝相对板厚偏大，需要确认机台参数。" if kerf > thickness * 0.35 else "割缝相对板厚处于可复核范围。",
+                "Kerf is large relative to sheet thickness; confirm machine parameters." if kerf > thickness * 0.35 else "Kerf relative to sheet thickness is within verifiable range.",
                 wallThickness=thickness,
                 kerf=kerf,
             )
@@ -579,7 +579,7 @@ def _laser_checks(
             "laser_min_hole_slot",
             "warning" if small_holes else "pass",
             "medium",
-            f"{len(small_holes)} 个孔/槽特征低于建议最小值 {min_slot:g} mm。" if small_holes else f"孔/槽特征未低于建议最小值 {min_slot:g} mm。",
+            f"{len(small_holes)} hole/slot feature(s) below recommended minimum {min_slot:g} mm." if small_holes else f"Hole/slot features meet recommended minimum {min_slot:g} mm.",
             minimumHoleOrSlot=min_slot,
             smallHoles=small_holes or None,
         )
@@ -602,7 +602,7 @@ def _printing_checks(
             "printing_min_wall",
             "pass" if wall is not None and wall >= recommended_wall else "warning",
             "high",
-            f"壁厚 {wall:g} mm 满足当前默认建议 {recommended_wall:g} mm。" if wall is not None and wall >= recommended_wall else f"壁厚低于当前默认建议 {recommended_wall:g} mm 或缺失。",
+            f"Wall thickness {wall:g} mm meets default recommendation {recommended_wall:g} mm." if wall is not None and wall >= recommended_wall else f"Wall thickness is below default recommendation {recommended_wall:g} mm or missing.",
             wallThickness=wall,
             minimumWallThickness=recommended_wall,
         )
@@ -617,18 +617,18 @@ def _printing_checks(
                 "printing_build_volume",
                 "pass" if fits else "fail",
                 "critical",
-                "模型包络位于打印机成型空间内。" if fits else "模型包络超出打印机成型空间。",
+                "Model envelope fits within printer build volume." if fits else "Model envelope exceeds printer build volume.",
                 modelSize=size,
                 buildVolume=build,
             )
         )
     else:
-        checks.append(_check("printing_build_volume", "fail", "critical", "缺少成型空间或模型包络，无法判断是否可打印。", buildVolume=build, bounds=bounds))
+        checks.append(_check("printing_build_volume", "fail", "critical", "Missing build volume or model envelope; cannot determine printability.", buildVolume=build, bounds=bounds))
     overhang = _number(manufacturing.get("maxUnsupportedOverhangDeg"))
     if overhang is None:
-        checks.append(_check("printing_overhang", "warning", "medium", "未声明悬垂角/支撑策略，需要人工检查打印方向和支撑。"))
+        checks.append(_check("printing_overhang", "warning", "medium", "Overhang angle / support strategy not declared; manually inspect build orientation and supports."))
     else:
-        checks.append(_check("printing_overhang", "warning" if overhang > 45 else "pass", "medium", "悬垂角超过 45°，通常需要支撑。" if overhang > 45 else "悬垂角处于常见免支撑范围。", maxUnsupportedOverhangDeg=overhang))
+        checks.append(_check("printing_overhang", "warning" if overhang > 45 else "pass", "medium", "Overhang angle exceeds 45°; supports are typically required." if overhang > 45 else "Overhang angle is within typical support-free range.", maxUnsupportedOverhangDeg=overhang))
     return checks
 
 
@@ -654,40 +654,40 @@ def _injection_molding_checks(document, manufacturing, brep_evidence=None):
             return None
     wall = declared_number(manufacturing.get("wallThickness"))
     if wall is None or wall <= 0:
-        checks.append(_check("injection_wall_positive", "fail", "critical", "注塑主壁厚必须是正数。"))
+        checks.append(_check("injection_wall_positive", "fail", "critical", "Injection molding nominal wall thickness must be positive."))
 
     def compare(identifier, value, limit, minimum, label):
         if value is None or limit is None:
-            checks.append(_check(identifier, "warning", "high", label + "缺少声明或明确工艺阈值，无法复核。"))
+            checks.append(_check(identifier, "warning", "high", label + " is missing a declaration or explicit process threshold and cannot be verified."))
             return
         passed = value >= 0 and math.isfinite(value) and (value >= limit if minimum else value <= limit)
         checks.append(_check(identifier, "pass" if passed and limit > 0 else "fail", "critical",
-            label + ("满足声明工艺约束。" if passed and limit > 0 else "未满足声明工艺约束。"), value=value, limit=limit, evidenceSource="declared_metadata"))
+            label + (" meets declared process constraint." if passed and limit > 0 else " does not meet declared process constraint."), value=value, limit=limit, evidenceSource="declared_metadata"))
 
     compare("injection_draft_angle", declared_number(manufacturing.get("draftAngleDeg")),
-        declared_number(manufacturing.get("minimumDraftAngleDeg")), True, "拔模角")
+        declared_number(manufacturing.get("minimumDraftAngleDeg")), True, "Draft angle")
     rib = declared_number(manufacturing.get("ribThickness"))
     compare("injection_rib_wall_ratio", rib / wall if rib is not None and wall and wall > 0 else None,
-        declared_number(manufacturing.get("maximumRibWallRatio")), False, "筋厚/主壁厚比例")
+        declared_number(manufacturing.get("maximumRibWallRatio")), False, "Rib-to-wall thickness ratio")
     maximum_wall = declared_number(manufacturing.get("maxWallThickness"))
     compare("injection_wall_uniformity", maximum_wall / wall if maximum_wall is not None and wall and wall > 0 else None,
-        declared_number(manufacturing.get("maximumWallThicknessVariation")), False, "最大壁厚变化")
+        declared_number(manufacturing.get("maximumWallThicknessVariation")), False, "Maximum wall thickness variation")
     # 带 Mm 后缀的历史字段明确是毫米；无后缀字段按 document.units 归一。
     clearance = declared_number(manufacturing.get("ejectorWaterClearanceMm"))
     if clearance is None:
         clearance = declared_number(manufacturing.get("ejectorWaterClearance"))
     compare("injection_ejector_water_clearance", clearance,
-        declared_number(manufacturing.get("minimumEjectorWaterClearance")), True, "顶针与水路间距")
+        declared_number(manufacturing.get("minimumEjectorWaterClearance")), True, "Ejector-to-waterline clearance")
     undercuts = declared_number(manufacturing.get("undercutCount"))
     if undercuts is None:
-        checks.append(_check("injection_undercut_side_action", "warning", "high", "未声明倒扣数量及侧向抽芯方案。"))
+        checks.append(_check("injection_undercut_side_action", "warning", "high", "Undercut count and side-action strategy not declared."))
     elif undercuts < 0 or int(undercuts) != undercuts or (undercuts > 0 and manufacturing.get("sideActionDeclared") is not True):
-        checks.append(_check("injection_undercut_side_action", "fail", "critical", "倒扣数量无效或没有明确侧向抽芯方案。"))
+        checks.append(_check("injection_undercut_side_action", "fail", "critical", "Invalid undercut count or missing explicit side-action strategy."))
     else:
-        checks.append(_check("injection_undercut_side_action", "pass", "high", "倒扣数量与方案已有声明，真实脱模可行性仍需工程复核。"))
+        checks.append(_check("injection_undercut_side_action", "pass", "high", "Undercut count and strategy declared; actual demolding feasibility still requires engineering review."))
     gate = manufacturing.get("gateOnCosmeticFace")
     checks.append(_check("injection_gate_location", "pass" if gate is False else "warning", "high",
-        "声明浇口避开外观面。" if gate is False else "浇口与外观面的关系需人工确认。"))
+        "Gate declared clear of cosmetic faces." if gate is False else "Gate placement relative to cosmetic faces requires manual confirmation."))
     return checks
 
 
@@ -709,7 +709,7 @@ def _profile_checks(
                 "profile_material_capability",
                 "pass" if compatible else "fail",
                 "critical",
-                "材料在 Profile 能力范围内。" if compatible else f"供应商/设备 Profile 不支持材料 {material}。",
+                "Material is within Profile capability." if compatible else f"Supplier/equipment Profile does not support material {material}.",
                 material=material,
                 allowedMaterials=allowed,
             )
@@ -732,7 +732,7 @@ def _profile_checks(
                 "profile_equipment_envelope",
                 "pass" if fits else "fail",
                 "critical",
-                "模型包络位于设备能力空间内。" if fits else "模型包络超出供应商/设备能力空间，或缺少可核验包络。",
+                "Model envelope fits within equipment capacity." if fits else "Model envelope exceeds supplier/equipment capacity or lacks verifiable envelope.",
                 modelSize=size,
                 equipmentEnvelope=capacity,
                 evidenceSource=bounds.get("source"),
@@ -748,7 +748,7 @@ def _profile_checks(
                 "profile_minimum_wall",
                 "pass" if passed else "fail",
                 "high",
-                "壁厚满足 Profile 最小值。" if passed else "壁厚低于供应商/工艺 Profile 最小值。",
+                "Wall thickness meets Profile minimum." if passed else "Wall thickness is below supplier/process Profile minimum.",
                 wallThickness=wall,
                 minimumWallThickness=minimum_wall,
             )
@@ -768,7 +768,7 @@ def _profile_checks(
                 "profile_material_thickness",
                 "pass" if passed else "fail",
                 "critical",
-                "材料厚度位于 Profile 范围内。" if passed else "材料厚度超出供应商/设备 Profile 范围。",
+                "Material thickness is within Profile range." if passed else "Material thickness is outside supplier/equipment Profile range.",
                 wallThickness=thickness,
                 minimumThickness=minimum_thickness,
                 maximumThickness=maximum_thickness,
@@ -785,7 +785,7 @@ def _profile_checks(
                     "profile_minimum_drill",
                     "fail" if violations else "pass",
                     "high",
-                    f"{len(violations)} 个孔小于 Profile 最小钻孔直径。" if violations else "孔径满足 Profile 最小钻孔直径。",
+                    f"{len(violations)} hole(s) smaller than Profile minimum drill diameter." if violations else "Hole diameters meet Profile minimum drill diameter.",
                     minimumDrillDiameter=minimum_drill,
                     violations=violations or None,
                 )
@@ -798,7 +798,7 @@ def _profile_checks(
                     "profile_tool_inventory",
                     "fail" if unavailable else "pass",
                     "high",
-                    f"{len(unavailable)} 个孔没有匹配的钻具（直径容差 0.05 mm）。" if unavailable else "孔径均有匹配钻具。",
+                    f"{len(unavailable)} hole(s) have no matching drill tool (0.05 mm diameter tolerance)." if unavailable else "All hole diameters have matching drill tools.",
                     availableToolDiameters=tools,
                     violations=unavailable or None,
                 )
@@ -812,7 +812,7 @@ def _profile_checks(
                     "profile_internal_corner_tooling",
                     "pass" if passed else "fail",
                     "high",
-                    "内角半径适配可用刀具。" if passed else "内角半径小于 Profile 刀具能力或未声明。",
+                    "Internal corner radius fits available tooling." if passed else "Internal corner radius is below Profile tooling capability or not declared.",
                     internalCornerRadius=actual_corner,
                     minimumInternalCornerRadius=minimum_corner,
                 )
@@ -833,7 +833,7 @@ def _profile_checks(
                     "profile_hole_depth_ratio",
                     "fail" if deep_holes else "pass",
                     "high",
-                    "深径比满足刀具能力。" if not deep_holes else f"{len(deep_holes)} 个孔超出最大深径比。",
+                    "Depth-to-diameter ratio meets tooling capability." if not deep_holes else f"{len(deep_holes)} hole(s) exceed maximum depth-to-diameter ratio.",
                     maximumHoleDepthDiameterRatio=max_ratio,
                     violations=deep_holes or None,
                 )
@@ -854,7 +854,7 @@ def _profile_checks(
                     "profile_bending_capability",
                     "pass" if passed else "fail",
                     "critical",
-                    "折弯半径满足模具 Profile。" if passed else "折弯半径不满足供应商模具能力。",
+                    "Bend radius satisfies tooling Profile." if passed else "Bend radius does not satisfy supplier tooling capability.",
                     bendRadius=bend,
                     minimumBendRadius=minimum_bend,
                     minimumBendRadiusRatio=minimum_ratio,
@@ -873,7 +873,7 @@ def _profile_checks(
                     "profile_laser_kerf",
                     "pass" if passed else "fail",
                     "high",
-                    "割缝位于机台 Profile 范围内。" if passed else "割缝超出机台 Profile 范围。",
+                    "Kerf is within machine Profile range." if passed else "Kerf is outside machine Profile range.",
                     kerf=kerf,
                     minimumKerf=lower,
                     maximumKerf=upper,
@@ -886,7 +886,7 @@ def _profile_checks(
                     "profile_laser_minimum_feature",
                     "fail" if violations else "pass",
                     "high",
-                    "孔槽尺寸满足激光工艺 Profile。" if not violations else f"{len(violations)} 个孔槽小于供应商能力。",
+                    "Hole/slot dimensions meet laser process Profile." if not violations else f"{len(violations)} hole/slot feature(s) below supplier capability.",
                     minimumHoleOrSlot=minimum_feature,
                     violations=violations or None,
                 )
@@ -901,7 +901,7 @@ def _profile_checks(
                 "profile_printing_overhang",
                 "pass" if passed else "fail",
                 "high",
-                "悬垂角满足打印机/材料 Profile。" if passed else "悬垂角超出打印机/材料 Profile 或未声明。",
+                "Overhang angle meets printer/material Profile." if passed else "Overhang angle exceeds printer/material Profile or not declared.",
                 maxUnsupportedOverhangDeg=overhang,
                 profileMaximumOverhangDeg=maximum,
             )
@@ -987,7 +987,7 @@ def build_dfm_report(
                         "dfm_process_selected",
                         "fail",
                         "critical",
-                        "未指定受支持的制造工艺；可选 machining、sheet_metal、laser_cutting、3d_printing。",
+                        "No supported manufacturing process specified; allowed: machining, sheet_metal, laser_cutting, 3d_printing.",
                     )
                 ],
             }
@@ -1034,17 +1034,17 @@ def build_dfm_report(
                         "dfm_brep_evidence",
                         "fail",
                         "critical",
-                        "当前 Profile 要求真实 B-Rep 证据；未提供时不能进行该能力判断。",
+                        "Current Profile requires real B-Rep evidence; capability check cannot proceed without it.",
                     )
                 ],
-                "limitations": report["limitations"] + ["缺少真实 B-Rep，未把 NeutralCadDocument 参数估算冒充实体测量。"],
+                "limitations": report["limitations"] + ["Missing real B-Rep evidence; NeutralCadDocument parameter estimates are not treated as solid measurements."],
             }
         )
         return report
     if brep.get("available"):
         report["limitations"].append("B-Rep evidence covers only the envelope/topology recorded in this report and does not constitute full manufacturing certification.")
     else:
-        report["limitations"].append("未提供 B-Rep 证据；包络来自 NeutralCadDocument 参数估算，不能证明 SolidWorks 实体拓扑。")
+        report["limitations"].append("No B-Rep evidence provided; envelope is estimated from NeutralCadDocument parameters and cannot prove SolidWorks solid topology.")
 
     missing = _critical_missing(document, manufacturing, normalized_process)
     if missing:
@@ -1058,7 +1058,7 @@ def build_dfm_report(
                         "dfm_required_inputs",
                         "fail",
                         "critical",
-                        "缺少关键制造输入，不能进行无人值守 DFM 判断。",
+                        "Missing critical manufacturing inputs; unattended DFM assessment cannot proceed.",
                         missingInputs=missing,
                     )
                 ],

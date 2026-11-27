@@ -33,7 +33,7 @@ def _point(value: Any) -> list[float]:
     x = float(value.x if hasattr(value, "x") else value[0])
     y = float(value.y if hasattr(value, "y") else value[1])
     if not math.isfinite(x) or not math.isfinite(y):
-        raise ValueError("DXF 包含非有限坐标")
+        raise ValueError("DXF contains non-finite coordinates")
     return [x, y]
 
 
@@ -127,18 +127,18 @@ def dxf_to_preview_scene(source: str | Path, output: str | Path | None = None) -
 
     source_path = Path(source).expanduser().resolve()
     if source_path.suffix.lower() != ".dxf":
-        raise ValueError("PreviewScene 转换只接受 DXF")
+        raise ValueError("PreviewScene conversion accepts DXF files only")
     if not source_path.is_file():
         raise FileNotFoundError(source_path)
     if source_path.stat().st_size > MAX_DXF_BYTES:
-        raise ValueError(f"DXF 超过 {MAX_DXF_BYTES // 1024 // 1024} MB 安全上限")
+        raise ValueError(f"DXF exceeds {MAX_DXF_BYTES // 1024 // 1024} MB safety limit")
     document = ezdxf.readfile(source_path)
     modelspace = document.modelspace()
     entities = []
     unsupported = Counter()
     for index, entity in enumerate(modelspace):
         if index >= MAX_ENTITIES:
-            raise ValueError(f"DXF 实体数超过 {MAX_ENTITIES} 安全上限")
+            raise ValueError(f"DXF entity count exceeds {MAX_ENTITIES} safety limit")
         if entity.dxftype() not in SUPPORTED_TYPES:
             unsupported[entity.dxftype()] += 1
             continue
@@ -150,7 +150,7 @@ def dxf_to_preview_scene(source: str | Path, output: str | Path | None = None) -
         {"name": name, "color": LAYER_COLORS.get(name.upper(), "#42514e"), "count": count, "visible": True}
         for name, count in sorted(layer_counts.items())
     ]
-    warnings = [f"未显示 {kind}: {count}" for kind, count in sorted(unsupported.items())]
+    warnings = [f"Not displayed {kind}: {count}" for kind, count in sorted(unsupported.items())]
     scene = {
         "schemaVersion": "1.0",
         "kind": "dxf-scene",
@@ -165,9 +165,9 @@ def dxf_to_preview_scene(source: str | Path, output: str | Path | None = None) -
     if output is not None:
         target = Path(output).expanduser().resolve()
         if target.suffix.lower() != ".json" or not target.name.lower().endswith(".scene.json"):
-            raise ValueError("PreviewScene 输出必须使用 .scene.json 后缀")
+            raise ValueError("PreviewScene output must use the .scene.json suffix")
         if target.exists():
-            raise FileExistsError(f"拒绝覆盖已有 PreviewScene: {target.name}")
+            raise FileExistsError(f"Refusing to overwrite existing PreviewScene: {target.name}")
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(json.dumps(scene, ensure_ascii=False, indent=2), encoding="utf-8")
     return scene

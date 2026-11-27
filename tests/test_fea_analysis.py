@@ -76,7 +76,7 @@ def test_validate_analysis_accepts_consistent_mesh_and_references() -> None:
     ("mutator", "message"),
     [
         (lambda payload: payload.update({"analysisId": "bad\n*INCLUDE"}), "analysisId"),
-        (lambda payload: payload["mesh"]["elements"][0].update({"nodeIds": [1, 2, 3, 99]}), "缺失"),
+        (lambda payload: payload["mesh"]["elements"][0].update({"nodeIds": [1, 2, 3, 99]}), "missing or duplicate nodes"),
         (lambda payload: payload["material"].update({"poissonRatio": 0.5}), "poissonRatio"),
         (lambda payload: payload["loads"][0].update({"nodeSet": "Missing"}), "nodeSet"),
     ],
@@ -147,9 +147,9 @@ def test_nonlinear_contact_input_uses_only_whitelisted_keywords(tmp_path: Path) 
     ("mutator", "message"),
     [
         (lambda payload: payload["nonlinearControls"].update({"initialIncrement": 2}), "minimum <= initial"),
-        (lambda payload: payload["surfaces"]["MasterFace"].update({"face": "S5"}), "不适用于"),
-        (lambda payload: payload["contacts"][0].update({"masterSurface": "Missing"}), "已定义 surface"),
-        (lambda payload: payload["material"]["plasticCurve"][1].update({"plasticStrain": 0}), "严格递增"),
+        (lambda payload: payload["surfaces"]["MasterFace"].update({"face": "S5"}), "not applicable"),
+        (lambda payload: payload["contacts"][0].update({"masterSurface": "Missing"}), "defined surfaces"),
+        (lambda payload: payload["material"]["plasticCurve"][1].update({"plasticStrain": 0}), "strictly increase"),
     ],
 )
 def test_nonlinear_extensions_reject_invalid_increment_surface_contact_and_curve(mutator, message: str) -> None:
@@ -181,7 +181,7 @@ def test_tetrahedral_pressure_rejects_nonexistent_face() -> None:
     """@brief C3D4 四面体只有 P1-P4，不能生成无效 P5/P6 压力载荷。"""
     request = _request()
     request["loads"] = [{"id": "Pressure1", "type": "pressure", "elementSet": "AllElements", "face": "P5", "magnitude": 2.5}]
-    with pytest.raises(ValueError, match="不适用于"):
+    with pytest.raises(ValueError, match="not applicable to"):
         validate_analysis(request)
 
 

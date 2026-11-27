@@ -93,7 +93,7 @@ def test_unexpected_source_change_stops_with_evidence(tmp_path, source, monkeypa
         source.write_bytes(b"changed while copying")
     monkeypatch.setattr(tool.shutil, "copyfileobj", mutate_after_copy)
     result = tool.copy_batch([plan(source)], tmp_path / "out")
-    assert result["status"] == "blocked" and "源文件发生变化" in result["error"]
+    assert result["status"] == "blocked" and "Source file changed" in result["error"]
     assert not result["outputs"] and Path(result["manifest"]).exists()
 
 
@@ -104,7 +104,7 @@ def test_same_named_open_document_is_not_closed_or_reused(tmp_path, source, read
     doc = SimpleNamespace(GetTitle=lambda: "source.sldprt", GetPathName=lambda: str(other / "source.sldprt"))
     session = FakeSession()
     session._owned_documents.append(doc)
-    with pytest.raises(ValueError, match="同名"):
+    with pytest.raises(ValueError, match="same name"):
         tool._open_checked(session, source, read_only=read_only)
     assert session._owned_documents == [doc]
 
@@ -117,7 +117,7 @@ def test_unknown_returned_document_is_disowned_without_closing(source, read_only
         session._owned_documents.append(unknown)
         return unknown
     session.open = open_unknown
-    with pytest.raises(RuntimeError, match="路径不一致"):
+    with pytest.raises(RuntimeError, match="path does not match"):
         tool._open_checked(session, source, read_only=read_only)
     assert session._owned_documents == []
 
@@ -152,10 +152,10 @@ def test_multiconfiguration_and_unknown_dirty_state_are_blocked():
     model = SimpleNamespace(GetType=lambda: 1, GetSaveFlag=lambda: False,
                             GetDependencies2=lambda *_: (), GetBodies2=lambda *_: [1],
                             GetConfigurationNames=lambda: ("Default", "Other"))
-    with pytest.raises(ValueError, match="单配置"):
+    with pytest.raises(ValueError, match="single-configuration"):
         tool._snapshot(model)
     model.GetSaveFlag = lambda: None
-    with pytest.raises(ValueError, match="未保存"):
+    with pytest.raises(ValueError, match="unsaved changes"):
         tool._snapshot(model)
 
 
@@ -164,5 +164,5 @@ def test_additional_external_reference_count_is_not_ignored():
                             GetDependencies2=lambda *_: (), GetConfigurationNames=lambda: ("Default",),
                             ListAuxiliaryExternalFileReferencesCount=lambda: 1,
                             Extension=SimpleNamespace(ListExternalFileReferencesCount=lambda: 0))
-    with pytest.raises(ValueError, match="外部引用"):
+    with pytest.raises(ValueError, match="External references"):
         tool._snapshot(model)

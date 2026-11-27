@@ -16,21 +16,21 @@ RESERVED = re.compile(r"^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\..*)?$", re.IGNO
 
 def template_fields(template: str) -> list[str]:
     if not isinstance(template, str) or not template or len(template) > 200:
-        raise ValueError("模板必须是 1..200 字符的字符串")
+        raise ValueError("Template must be a string of 1..200 characters")
     fields = []
     try:
         parts = list(string.Formatter().parse(template))
     except ValueError as exc:
-        raise ValueError("模板括号无效") from exc
+        raise ValueError("Invalid template braces") from exc
     for _, name, fmt, conversion in parts:
         if name is None:
             continue
         if not name or any(ch in name for ch in ".[]{}\\/") or fmt or conversion:
-            raise ValueError("模板仅支持简单属性占位符，不支持属性访问、格式表达式或转换")
+            raise ValueError("Template only supports simple property placeholders; attribute access, format specs, and conversions are unsupported")
         if name not in fields:
             fields.append(name)
     if not fields or len(fields) > 32:
-        raise ValueError("模板需要 1..32 个属性占位符")
+        raise ValueError("Template requires 1..32 property placeholders")
     return fields
 
 
@@ -42,7 +42,7 @@ def _valid_filename(name: str) -> bool:
 def plan_renames(entries: Sequence[Mapping[str, Any]], template: str) -> list[dict[str, Any]]:
     fields = template_fields(template)
     if len(entries) > 2000:
-        raise ValueError("文件数量超过 2000，请拆分预览")
+        raise ValueError("File count exceeds 2000; split preview into smaller batches")
     originals = {Path(str(entry.get("path", ""))).name.casefold() for entry in entries}
     plans = []
     for entry in entries:
@@ -51,25 +51,25 @@ def plan_renames(entries: Sequence[Mapping[str, Any]], template: str) -> list[di
         missing = [key for key in fields if key not in props or not str(props[key]).strip()]
         plan = {"source": str(path), "old_name": path.name, "new_name": "", "status": "blocked", "reason": ""}
         if path.suffix.casefold() not in NATIVE_EXTENSIONS:
-            plan["reason"] = "不是支持的 SolidWorks 原生文件"
+            plan["reason"] = "Unsupported SolidWorks native file type"
         elif missing:
-            plan["reason"] = "缺少属性: " + ", ".join(missing)
+            plan["reason"] = "Missing properties: " + ", ".join(missing)
         else:
             candidate = template.format_map({key: str(props[key]) for key in fields}) + path.suffix
             plan["new_name"] = candidate
             if not _valid_filename(candidate):
-                plan["reason"] = "目标文件名无效或为 Windows 保留名称"
+                plan["reason"] = "Target filename is invalid or a Windows reserved name"
             elif candidate.casefold() == path.name.casefold():
-                plan.update(status="unchanged", reason="文件名未改变")
+                plan.update(status="unchanged", reason="Filename unchanged")
             elif candidate.casefold() in originals:
-                plan["reason"] = "目标名称与源目录中的文件冲突"
+                plan["reason"] = "Target name conflicts with an existing file in the source directory"
             else:
                 plan["status"] = "planned"
         plans.append(plan)
     proposed = Counter(item["new_name"].casefold() for item in plans if item["status"] == "planned")
     for plan in plans:
         if plan["status"] == "planned" and proposed[plan["new_name"].casefold()] > 1:
-            plan.update(status="blocked", reason="多个文件的目标名称冲突")
+            plan.update(status="blocked", reason="Target name conflict across multiple files")
     return plans
 
 
@@ -81,11 +81,11 @@ def collect_entries(session: Any, folder: str | Path, properties: Sequence[str])
         from sw_document_data import read_custom_property
     root = Path(folder).expanduser().resolve()
     if not root.is_dir():
-        raise ValueError("输入目录不存在")
+        raise ValueError("Input directory not found")
     files = sorted((p for p in root.iterdir() if not p.name.startswith("~$") and p.is_file() and not p.is_symlink()
                     and p.suffix.casefold() in NATIVE_EXTENSIONS), key=lambda p: p.name.casefold())
     if len(files) > 2000:
-        raise ValueError("文件数量超过 2000，请拆分预览")
+        raise ValueError("File count exceeds 2000; split preview into smaller batches")
     entries = []
     for path in files:
         model = session.open(str(path), read_only=True, silent=True)
