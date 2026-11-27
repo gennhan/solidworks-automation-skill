@@ -9,11 +9,29 @@ from pathlib import Path
 import os
 
 try:
-    from .sw_connect import close_owned_solidworks, connect_solidworks, get_com_member, new_document, open_document, save_document
+    from .sw_connect import (
+        close_owned_solidworks,
+        connect_solidworks,
+        ensure_visible_user_control,
+        get_com_member,
+        new_document,
+        open_document,
+        save_document,
+        zoom_document_to_fit,
+    )
     from .sw_export import export_to_dxf, export_to_iges, export_to_pdf, export_to_stl, export_to_step
     from .sw_live_preview import close_preview_document, preview_checkpoint, preview_document
 except ImportError:
-    from sw_connect import close_owned_solidworks, connect_solidworks, get_com_member, new_document, open_document, save_document
+    from sw_connect import (
+        close_owned_solidworks,
+        connect_solidworks,
+        ensure_visible_user_control,
+        get_com_member,
+        new_document,
+        open_document,
+        save_document,
+        zoom_document_to_fit,
+    )
     from sw_export import export_to_dxf, export_to_iges, export_to_pdf, export_to_stl, export_to_step
     from sw_live_preview import close_preview_document, preview_checkpoint, preview_document
 
@@ -41,32 +59,70 @@ class SolidWorksSession:
         session.export(model, r"C:\\temp\\part.step")
     """
 
-    def __init__(self, version=None, wait_seconds=5, visible=True, *, max_documents=8):
+    def __init__(
+        self,
+        version=None,
+        wait_seconds=5,
+        visible=True,
+        *,
+        max_documents=8,
+        user_control=None,
+        ensure_visible=None,
+        keep_open=True,
+        zoom_to_fit=True,
+    ):
         """
         初始化并连接 SolidWorks。
 
         参数:
-            version: SolidWorks 年份，当前验收目标为 2026；None 表示自动连接默认 ProgID。
+            version: SolidWorks 年份（如 2024）；None 表示自动连接默认 ProgID。
             wait_seconds: 新启动实例后的等待秒数。
-            visible: 新启动实例是否显示窗口。
+            visible: 是否在屏幕上显示 SolidWorks 窗口（默认 True）。
+            user_control: 是否设置 swApp.UserControl（None 时与 visible 一致，默认 True）。
+            ensure_visible: 是否确保既有/新实例均设为可见并交由用户控制（None 时与 visible 一致）。
+            keep_open: 退出上下文时是否保持文档与 SolidWorks 打开供实时检查（默认 True）。
+            zoom_to_fit: 保存与退出会话前是否调用 ViewZoomtofit2()（默认 True）。
         """
+        self.visible = bool(visible)
+        self.user_control = self.visible if user_control is None else bool(user_control)
+        self.ensure_visible = self.visible if ensure_visible is None else bool(ensure_visible)
+        self.keep_open = bool(keep_open)
+        self.zoom_to_fit = bool(zoom_to_fit)
+
         self.sw, self.model, self.connection_info = connect_solidworks(
             version=version,
             wait_seconds=wait_seconds,
-            visible=visible,
+            visible=self.visible,
+            user_control=self.user_control,
+            ensure_visible=self.ensure_visible,
             return_metadata=True,
         )
+        if self.ensure_visible:
+            ensure_visible_user_control(self.sw, visible=self.visible, user_control=self.user_control)
         self.max_documents = int(max_documents)
         if self.max_documents < 1:
             raise ValueError("文档预算必须大于零")
         self._owned_documents = []
 
     def __enter__(self):
-        """@brief 进入受控会话，自动清理仅针对本轮登记的文档。"""
+        """@brief 进入受控会话；默认保持 SolidWorks 可见且保留文档供实时检查。"""
         return self
 
     def __exit__(self, *_):
-        """@brief 结束时清理自有文档；共享实例与用户文档保持打开。"""
+        """@brief 结束时按 keep_open 决定保留文档用于实时检查或清理自有文档。"""
+        if self.keep_open:
+            if self.ensure_visible:
+                ensure_visible_user_control(self.sw, visible=self.visible, user_control=self.user_control)
+            if self.zoom_to_fit:
+                target_model = self.model
+                if target_model is None:
+                    try:
+                        target_model = self.active_doc
+                    except Exception:
+                        target_model = None
+                if target_model is not None:
+                    zoom_document_to_fit(target_model)
+            return
         self.close_owned_documents()
         self.quit_owned_instance()
 
@@ -147,18 +203,22 @@ class SolidWorksSession:
             self._remember(self.model, existing)
         return self.model
 
-    def save(self, model=None, file_path=None):
+    def save(self, model=None, file_path=None, *, zoom_to_fit=None):
         """
-        保存文档。
+        保存文档并保持打开，默认执行缩放到适合屏幕以便实时检查。
 
         参数:
             model: 指定文档；None 表示当前活动文档。
             file_path: 另存为路径；None 表示保存到当前位置。
+            zoom_to_fit: 是否调用 ViewZoomtofit2()；None 表示沿用会话配置。
         """
         model = model if model is not None else self.model
         if model is None:
             raise RuntimeError("当前没有可保存的活动文档")
-        saved = save_document(model, file_path=file_path)
+        do_zoom = self.zoom_to_fit if zoom_to_fit is None else bool(zoom_to_fit)
+        saved = save_document(model, file_path=file_path, zoom_to_fit=do_zoom)
+        if saved and self.ensure_visible:
+            ensure_visible_user_control(self.sw, visible=self.visible, user_control=self.user_control)
         preview_checkpoint(model)
         return saved
 
@@ -234,10 +294,27 @@ class SolidWorksSession:
         )
 
 
-def session(version=None, wait_seconds=5, visible=True):
+def session(
+    version=None,
+    wait_seconds=5,
+    visible=True,
+    *,
+    user_control=None,
+    ensure_visible=None,
+    keep_open=True,
+    zoom_to_fit=True,
+):
     """
     创建 SolidWorksSession 的便捷函数。
 
     参数同 SolidWorksSession。
     """
-    return SolidWorksSession(version=version, wait_seconds=wait_seconds, visible=visible)
+    return SolidWorksSession(
+        version=version,
+        wait_seconds=wait_seconds,
+        visible=visible,
+        user_control=user_control,
+        ensure_visible=ensure_visible,
+        keep_open=keep_open,
+        zoom_to_fit=zoom_to_fit,
+    )

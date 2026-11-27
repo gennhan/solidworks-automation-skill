@@ -287,9 +287,10 @@ class BaseInput(BaseModel):
 class SolidWorksConnectInput(BaseInput):
     """Input for connecting to SolidWorks."""
 
-    visible: bool = Field(default=True, description="Whether a newly started SolidWorks instance should be visible.")
+    visible: bool = Field(default=True, description="Ensure SolidWorks is visible on screen (swApp.Visible = True).")
+    user_control: bool = Field(default=True, description="Set swApp.UserControl = True so SolidWorks stays interactive for live inspection.")
     wait_seconds: int = Field(default=5, ge=0, le=60, description="Seconds to wait after starting SolidWorks.")
-    version: Optional[int] = Field(default=None, ge=2010, le=2035, description="Optional target SolidWorks year; reject a different connected version.")
+    version: Optional[int] = Field(default=None, ge=2010, le=2035, description="Optional target SolidWorks year (e.g. 2024); reject a different connected version.")
     response_format: ResponseFormat = Field(default=ResponseFormat.JSON, description="Return format.")
 
 
@@ -1814,7 +1815,12 @@ def solidworks_connect(params: SolidWorksConnectInput = SolidWorksConnectInput()
     """Connect to a running SolidWorks instance or start one; return the SolidWorks version (revision) and active document status."""
 
     def op():
-        kwargs = {"wait_seconds": params.wait_seconds, "visible": params.visible}
+        kwargs = {
+            "wait_seconds": params.wait_seconds,
+            "visible": params.visible,
+            "user_control": params.user_control,
+            "ensure_visible": params.visible,
+        }
         if params.version is not None:
             kwargs["version"] = params.version
         sw, model = connect_solidworks(**kwargs)

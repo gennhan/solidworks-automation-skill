@@ -276,14 +276,48 @@ def _attach_existing_with_pid_check(before, requested_version):
     return candidate
 
 
-def connect_solidworks(version=None, wait_seconds=5, visible=True, return_metadata=False):
+def ensure_visible_user_control(sw, *, visible=True, user_control=True):
+    """确保 SolidWorks 窗口可见且交由用户交互控制（退出脚本后不自动关闭）。"""
+    if sw is None:
+        return False
+    updated = False
+    for attr_name, value in (("Visible", bool(visible)), ("UserControl", bool(user_control))):
+        try:
+            setattr(sw, attr_name, value)
+            updated = True
+        except Exception:
+            pass
+    return updated
+
+
+def zoom_document_to_fit(model):
+    """将当前文档视图缩放至适合屏幕，便于用户实时检查。"""
+    if model is None:
+        return False
+    try:
+        get_com_member(model, "ViewZoomtofit2")
+        return True
+    except Exception:
+        return False
+
+
+def connect_solidworks(
+    version=None,
+    wait_seconds=5,
+    visible=True,
+    user_control=None,
+    ensure_visible=False,
+    return_metadata=False,
+):
     """
     连接到 SolidWorks 实例。
 
     参数:
         version: SolidWorks 版本年份（如 2024），None 则自动检测
         wait_seconds: 启动新实例后等待秒数
-        visible: 启动新实例后是否显示窗口
+        visible: 启动新实例后是否显示窗口（默认 True）
+        user_control: 是否设置 swApp.UserControl（None 时与 visible 一致）
+        ensure_visible: 为 True 时，即使附着到既有实例也显式设置 Visible/UserControl
 
     返回:
         (sw, model) 元组，model 可能为 None（无打开的文档时）
@@ -296,6 +330,7 @@ def connect_solidworks(version=None, wait_seconds=5, visible=True, return_metada
     sw = None
     launched_here = False
     dispatched = False
+    resolved_user_control = bool(visible) if user_control is None else bool(user_control)
 
     # 启动和附着共享同一把互斥锁，避免多个 worker 同时拉起实例。
     with _LaunchGuard():
@@ -329,12 +364,9 @@ def connect_solidworks(version=None, wait_seconds=5, visible=True, return_metada
                         launched_here = before is not None and pid > 0 and pid not in before
                     except Exception:
                         launched_here = False
-                # visible 只适用于本轮新启动的实例，附着不得改变用户窗口。
+                # visible/UserControl 默认适用于本轮新启动的实例；附着时仅在显式请求时写入。
                 if launched_here:
-                    try:
-                        sw.Visible = visible
-                    except Exception:
-                        pass
+                    ensure_visible_user_control(sw, visible=bool(visible), user_control=resolved_user_control)
                 print(f"已连接 SolidWorks（ProgID: {prog_id}）")
                 _wait_until_ready(sw, wait_seconds)
             except SolidWorksConnectionError:
@@ -354,6 +386,8 @@ def connect_solidworks(version=None, wait_seconds=5, visible=True, return_metada
         if version is not None and actual["year"] != int(version):
             close_owned_solidworks(sw, launched_here)
             raise SolidWorksConnectionError("SW_VERSION_MISMATCH", "verify", f"请求 {version}，实际连接 {actual['year']}")
+        if launched_here or ensure_visible or user_control is not None:
+            ensure_visible_user_control(sw, visible=bool(visible), user_control=resolved_user_control)
 
     if sw is None:
         raise SolidWorksConnectionError("SW_NO_INSTANCE", "connect", "未获得 SolidWorks COM 实例")
@@ -655,13 +689,14 @@ def open_document(sw, file_path, read_only=False, silent=False, raise_on_error=F
     return model
 
 
-def save_document(model, file_path=None):
+def save_document(model, file_path=None, *, zoom_to_fit=True):
     """
-    保存文档。
+    保存文档并保持打开，默认缩放视图以适合屏幕供实时检查。
 
     参数:
         model: IModelDoc2 对象
         file_path: 另存为路径，None 则保存到当前位置
+        zoom_to_fit: 保存成功后是否执行 ViewZoomtofit2()
 
     返回:
         bool 成功/失败
@@ -679,6 +714,8 @@ def save_document(model, file_path=None):
         success = model.Save3(1, errors, warnings)
 
     if success:
+        if zoom_to_fit:
+            zoom_document_to_fit(model)
         print(f"保存成功: {file_path or get_com_member(model, 'GetPathName')}")
     else:
         print(f"保存失败, 错误码: {errors.value}, 警告码: {warnings.value}")

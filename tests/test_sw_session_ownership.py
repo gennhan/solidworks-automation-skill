@@ -178,9 +178,10 @@ def test_attachment_never_writes_existing_window_visibility(monkeypatch, route, 
 
 @pytest.mark.parametrize("visible", [True, False])
 def test_owned_new_instance_applies_requested_visibility(monkeypatch, visible):
-    """新建实例仍遵循显示参数，不把附着规则误用到启动路径。"""
+    """新建实例仍遵循显示参数，并同步设置 UserControl。"""
     app = App()
     app.Visible = not visible
+    app.UserControl = not visible
     connection_fixture(monkeypatch, app, {})
     def missing(_):
         raise RuntimeError("ROT unavailable")
@@ -188,7 +189,25 @@ def test_owned_new_instance_applies_requested_visibility(monkeypatch, visible):
         GetActiveObject=missing, Dispatch=lambda _: app))
     _, _, metadata = sw_connect.connect_solidworks(version=2026, visible=visible, return_metadata=True)
     assert app.Visible is visible
+    assert app.UserControl is visible
     assert metadata["started_by_cad_studio"] is True
+
+
+def test_ensure_visible_sets_visible_and_user_control_on_existing_instance(monkeypatch):
+    """显式请求 ensure_visible=True 时，即使附着到隐藏实例也设为可见并交由用户控制。"""
+    app = App()
+    app.RevisionNumber = lambda: "32.0.1"
+    app.Visible = False
+    app.UserControl = False
+    connection_fixture(monkeypatch, app, {7: 2024})
+    monkeypatch.setattr(sw_connect, "win32com_client", SimpleNamespace(GetActiveObject=lambda _: app))
+    actual, _, metadata = sw_connect.connect_solidworks(
+        version=2024, visible=True, user_control=True, ensure_visible=True, return_metadata=True
+    )
+    assert actual is app
+    assert app.Visible is True
+    assert app.UserControl is True
+    assert metadata["started_by_cad_studio"] is False
 
 
 def test_dispatch_cannot_claim_a_preexisting_pid(monkeypatch):
@@ -199,6 +218,41 @@ def test_dispatch_cannot_claim_a_preexisting_pid(monkeypatch):
     monkeypatch.setattr(sw_connect, "win32com_client", SimpleNamespace(GetActiveObject=missing, Dispatch=lambda _: app))
     _, _, metadata = sw_connect.connect_solidworks(version=2026, return_metadata=True)
     assert metadata["started_by_cad_studio"] is False
+
+
+def test_context_default_keeps_document_open_visible_and_zoomed(monkeypatch):
+    """默认会话保持 SolidWorks 可见且 UserControl=True，保存后不关闭文档并缩放到适合屏幕。"""
+    app = App()
+    app.Visible = False
+    app.UserControl = False
+    zoom_calls = []
+    created = SimpleNamespace(
+        GetTitle=lambda: "本轮零件",
+        GetPathName=lambda: r"C:\temp\part.sldprt",
+        Save3=lambda *args: True,
+        ViewZoomtofit2=lambda: zoom_calls.append(True),
+    )
+    monkeypatch.setattr(
+        sw_session,
+        "connect_solidworks",
+        lambda **_: (app, None, {"started_by_cad_studio": True, "process_id": 7}),
+    )
+
+    def new(*args, **kwargs):
+        app.docs.append(created)
+        app.ActiveDoc = created
+        return created
+
+    monkeypatch.setattr(sw_session, "new_document", new)
+    with sw_session.SolidWorksSession(version=2024) as session:
+        model = session.new_part()
+        assert session.save(model) is True
+    assert app.Visible is True
+    assert app.UserControl is True
+    assert app.closed == []
+    assert app.docs == [created]
+    assert app.exited is False
+    assert len(zoom_calls) >= 2
 
 
 def test_context_closes_only_created_documents(monkeypatch):
@@ -213,7 +267,7 @@ def test_context_closes_only_created_documents(monkeypatch):
         app.ActiveDoc = created
         return created
     monkeypatch.setattr(sw_session, "new_document", new)
-    with sw_session.SolidWorksSession() as session:
+    with sw_session.SolidWorksSession(keep_open=False) as session:
         session.new_part()
     assert app.closed == ["本轮零件"]
     assert app.docs == [user]

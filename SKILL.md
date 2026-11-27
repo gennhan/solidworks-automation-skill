@@ -13,11 +13,18 @@ metadata: { "openclaw": { "homepage": "https://github.com/wzyn20051216/solidwork
 - **GB/T, GB & JB/T Reference Only**: Treat all `GB/T`, `GB`, and `JB/T` standards in this repo as **reference only** unless explicitly requested by the user.
 - **No Fabricated TCVN Codes**: Never guess or invent undocumented TCVN codes; fall back to the harmonized `ISO` equivalent and flag it for user verification.
 
+## Live Inspection & SolidWorks 2024 Defaults (Mandatory Override)
+
+- **Target SolidWorks 2024**: Default interactive desktop automation to **SolidWorks 2024** (`version=2024`, ProgID `SldWorks.Application.32`) unless the user explicitly specifies another version.
+- **Visible & User-Controlled Window**: Always make SolidWorks 2024 visible on screen by setting `swApp.Visible = True` and `swApp.UserControl = True` (enforced automatically by `SolidWorksSession(version=2024)` / `connect_solidworks(..., visible=True, user_control=True, ensure_visible=True)` / `ensure_visible_user_control(sw)`).
+- **Keep Document Open After Saving**: Always keep the created or modified document open in SolidWorks after saving (`keep_open=True` default in `SolidWorksSession`); do **not** call `CloseDoc` or exit SolidWorks unless the user explicitly requests automated cleanup (`keep_open=False`).
+- **Zoom to Fit for Live Inspection**: Always call `model.ViewZoomtofit2()` (enforced automatically by `save_document(..., zoom_to_fit=True)` and `SolidWorksSession`) after saving and before finishing so the user can inspect the model live.
+
 ## Quick Start
 
 ### Environment Requirements
 
-- Windows OS; native SolidWorks operations target SolidWorks 2026 for support and acceptance; headless open-format writing does not require CAD software installation
+- Windows OS; local interactive CAD automation targets **SolidWorks 2024** (`version=2024`, visible live inspection by default) while maintaining SolidWorks 2026 compatibility; headless open-format writing does not require CAD software installation
 - Python 3.10+; native Windows CAD automation also requires `pywin32` / `comtypes`
 - MCP / tool-based invocation requires `mcp` / `pydantic`
 - Final engineering drawing delivery review requires `PyMuPDF`; it reads back actual dimension text bounding boxes from SolidWorks-exported PDFs and is included in `requirements.txt`
@@ -87,7 +94,7 @@ from sw_part import sketch, sketch_circle, extrude_boss
 from sw_sketch_quality import fully_define_sketch
 from sw_session import SolidWorksSession
 
-with SolidWorksSession(version=2026) as session:
+with SolidWorksSession(version=2024, visible=True, keep_open=True, zoom_to_fit=True) as session:
     model = session.new_part()
 
     with sketch(model, "Front Plane") as sketch_name:
@@ -100,13 +107,15 @@ with SolidWorksSession(version=2026) as session:
         raise RuntimeError("保存失败")
     if not session.export(model, r"C:\temp\cylinder.step"):
         raise RuntimeError("导出失败")
+    # SolidWorks 2024 stays visible (Visible=True, UserControl=True),
+    # the document remains open after saving, and ViewZoomtofit2() frames it for live inspection.
 ```
 
 > Replace `SKILL_DIR` with the actual installation path of this skill.
 
 For model delivery, read back Sketch constraint states, dimensions, and relations—batch-applying Fix relations to substitute for design parameters is prohibited; after saving and reopening, verify that the Sketch is consumed by the target feature, key dimensions remain editable, and hole positions remain accurate. Basic circles/rectangles may use `fully_define_sketch()`; complex Sketches should explicitly specify design dimensions and relations and be verified with `inspect_model_sketches()`, retaining manual review when evidence is lacking.
 
-The session context cleans up only documents registered during the current run and confirmed-owned empty instances; when the document budget is reached, process the current run's files first. Do not claim task completion if execution flags failure, rebuild fails, check results are unknown, or manual review is incomplete. Remote MCP retrieves PNG or raw files via `artifact_refs` and verifies SHA-256 checksums; see `mcp-server/README.md` for rules.
+By default (`keep_open=True`, `visible=True`, `zoom_to_fit=True`), `SolidWorksSession` keeps SolidWorks visible (`swApp.Visible = True`, `swApp.UserControl = True`), leaves the saved document open, and zooms to fit (`ViewZoomtofit2()`) for live inspection. Pass `keep_open=False` only when automated batch cleanup is explicitly desired—in cleanup mode, the session context closes only documents registered during the current run and confirmed-owned empty instances; when the document budget is reached, process the current run's files first. Do not claim task completion if execution flags failure, rebuild fails, check results are unknown, or manual review is incomplete. Remote MCP retrieves PNG or raw files via `artifact_refs` and verifies SHA-256 checksums; see `mcp-server/README.md` for rules.
 
 ## Core Workflows
 
