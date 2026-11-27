@@ -101,7 +101,7 @@ class SolidWorksSession:
             ensure_visible_user_control(self.sw, visible=self.visible, user_control=self.user_control)
         self.max_documents = int(max_documents)
         if self.max_documents < 1:
-            raise ValueError("文档预算必须大于零")
+            raise ValueError("Document budget must be greater than zero")
         self._owned_documents = []
 
     def __enter__(self):
@@ -191,7 +191,7 @@ class SolidWorksSession:
         before = {os.path.normcase(str(get_com_member(doc, "GetPathName") or "")) for doc in existing}
         requested = os.path.normcase(os.path.abspath(os.path.expandvars(str(file_path))))
         if requested not in before and len(existing) >= self.max_documents:
-            raise RuntimeError("打开文档数已达会话预算")
+            raise RuntimeError("Open document count reached session budget")
         self.model = open_document(
             self.sw,
             file_path,
@@ -214,7 +214,7 @@ class SolidWorksSession:
         """
         model = model if model is not None else self.model
         if model is None:
-            raise RuntimeError("当前没有可保存的活动文档")
+            raise RuntimeError("No active document available to save")
         do_zoom = self.zoom_to_fit if zoom_to_fit is None else bool(zoom_to_fit)
         saved = save_document(model, file_path=file_path, zoom_to_fit=do_zoom)
         if saved and self.ensure_visible:
@@ -234,9 +234,9 @@ class SolidWorksSession:
         """
         model = model if model is not None else self.model
         if model is None:
-            raise RuntimeError("当前没有可导出的活动文档")
+            raise RuntimeError("No active document available to export")
         if not output_path:
-            raise ValueError("必须提供 output_path")
+            raise ValueError("output_path is required")
 
         output = Path(os.path.expandvars(str(output_path))).expanduser()
         output.parent.mkdir(parents=True, exist_ok=True)
@@ -246,7 +246,7 @@ class SolidWorksSession:
 
         exporter = EXPORTERS.get(ext)
         if exporter is None:
-            raise ValueError(f"暂不支持导出格式: {ext}")
+            raise ValueError(f"Unsupported export format: {ext}")
         exported = exporter(model, str(output), **kwargs)
         preview_checkpoint(model)
         return exported

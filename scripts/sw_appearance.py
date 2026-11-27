@@ -49,12 +49,12 @@ def rgb01(color):
         value = PRESET_COLORS.get(color, color).strip()
         match = re.fullmatch(r"#?([0-9a-fA-F]{6})", value)
         if not match:
-            raise ValueError(f"未知颜色: {color}")
+            raise ValueError(f"Unknown color: {color}")
         hex_value = match.group(1)
         return tuple(int(hex_value[i:i + 2], 16) / 255.0 for i in (0, 2, 4))
 
     if len(color) != 3:
-        raise ValueError("RGB 颜色必须包含 3 个值")
+        raise ValueError("RGB color must contain 3 values")
     if max(color) > 1:
         return tuple(float(v) / 255.0 for v in color)
     return tuple(float(v) for v in color)
@@ -75,7 +75,7 @@ def material_values(color, ambient=0.35, diffuse=0.75, specular=0.45,
 def material_variant(values):
     """把九位材质数组封装为 COM SAFEARRAY(double)，防止 RGB 通道错位。"""
     if len(values) != 9:
-        raise ValueError("SolidWorks 材质数组必须包含 9 个值")
+        raise ValueError("SolidWorks material array must contain 9 values")
     return VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_R8, [float(v) for v in values])
 
 
@@ -199,8 +199,8 @@ def apply_component_palette(assignments, strict=True):
         reports.append(report)
         if strict and not report["ok"]:
             raise RuntimeError(
-                f"组件 {index} 外观验证失败: 预期 {report['expected_rgb']}，"
-                f"实际 {report['actual_rgb']}"
+                f"Component {index} appearance verification failed: expected {report['expected_rgb']}, "
+                f"actual {report['actual_rgb']}"
             )
     return reports
 

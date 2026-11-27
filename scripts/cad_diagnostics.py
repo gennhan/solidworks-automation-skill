@@ -40,7 +40,7 @@ def create_diagnostic_bundle(output: Path, *, events: Any = None) -> Path:
         "createdAt": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "doctor": _redact(run_doctor(probe_cad=False)),
         "events": _redact(events or []),
-        "privacy": {"telemetry": "off", "redacted": ["prompt", "API key", "token", "完整私人路径"]},
+        "privacy": {"telemetry": "off", "redacted": ["prompt", "API key", "token", "full private path"]},
     }
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("diagnostic.json", json.dumps(payload, ensure_ascii=False, indent=2))

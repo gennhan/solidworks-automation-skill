@@ -133,41 +133,41 @@ async def _with_session(mode: str, check) -> str:
 async def _check_full(session: ClientSession) -> str:
     names = {tool.name for tool in (await session.list_tools()).tools}
     if names & DISCOVERY_TOOLS:
-        raise AssertionError(f"完整模式不应暴露发现入口: {sorted(names & DISCOVERY_TOOLS)}")
+        raise AssertionError(f"Full mode should not expose discovery entry points: {sorted(names & DISCOVERY_TOOLS)}")
     missing = sorted(REQUIRED_TOOLS - names)
     if missing:
-        raise AssertionError("完整模式缺少工具: " + ", ".join(missing))
-    return f"完整模式 {len(names)} 个工具可见。"
+        raise AssertionError("Full mode missing tools: " + ", ".join(missing))
+    return f"Full mode: {len(names)} tools visible."
 
 
 async def _check_search(session: ClientSession) -> str:
     listed = {tool.name for tool in (await session.list_tools()).tools}
     if listed != DISCOVERY_TOOLS:
-        raise AssertionError(f"发现模式应只暴露 {sorted(DISCOVERY_TOOLS)}，实际 {sorted(listed)}")
+        raise AssertionError(f"Search mode should expose only {sorted(DISCOVERY_TOOLS)}, got {sorted(listed)}")
 
     for name in sorted(REQUIRED_TOOLS):
         found = await session.call_tool("sw_search_tools", {"query": name, "limit": 5})
         if found.isError:
-            raise AssertionError(f"检索 {name} 失败: {found.content[0].text}")
+            raise AssertionError(f"Search for {name} failed: {found.content[0].text}")
         payload = json.loads(found.content[0].text)
         hits = [item["name"] for item in payload["results"]]
         if name not in hits:
-            raise AssertionError(f"按名称检索不到 {name}，实际候选: {hits}")
+            raise AssertionError(f"Tool {name} not found by name search; candidates: {hits}")
 
         described = await session.call_tool("sw_describe_tool", {"name": name})
         if described.isError:
-            raise AssertionError(f"读取 {name} 的 Schema 失败: {described.content[0].text}")
+            raise AssertionError(f"Failed to read schema for {name}: {described.content[0].text}")
         detail = json.loads(described.content[0].text)
         if detail.get("name") != name or not detail.get("inputSchema"):
-            raise AssertionError(f"{name} 的 describe 结果不完整: {detail}")
+            raise AssertionError(f"Incomplete describe result for {name}: {detail}")
 
-    return f"发现模式 3 个入口，{len(REQUIRED_TOOLS)} 个必需工具均可按名称检索并读取 Schema。"
+    return f"Search mode: 3 entry points; all {len(REQUIRED_TOOLS)} required tools searchable by name with readable schemas."
 
 
 async def _main(mode: str) -> int:
     """执行 MCP 工具清单检查。"""
     if not SERVER_PATH.exists():
-        raise FileNotFoundError(f"找不到 MCP Server: {SERVER_PATH}")
+        raise FileNotFoundError(f"MCP Server not found: {SERVER_PATH}")
     if mode in ("both", "full"):
         print("MCP validation passed: " + await _with_session("full", _check_full))
     if mode in ("both", "search"):

@@ -26,7 +26,7 @@ def generate_package(spec_source, output_dir, drawing_filename="drawing.slddrw",
 
     validation = validate_drawing_spec(spec_source)
     if not isinstance(overwrite, bool):
-        raise ValueError("overwrite 必须是布尔值")
+        raise ValueError("overwrite must be a boolean")
     if validation["status"] == "blocked":
         return validation
     spec = validation["spec"]
@@ -35,16 +35,16 @@ def generate_package(spec_source, output_dir, drawing_filename="drawing.slddrw",
         return capability
     source = Path(spec["sourceModel"]).expanduser().resolve(strict=True)
     if source.suffix.casefold() != (".sldasm" if spec["documentType"] == "assembly" else ".sldprt"):
-        raise ValueError("源文件类型与 DrawingSpec.documentType 不一致")
+        raise ValueError("Source file type does not match DrawingSpec.documentType")
     if Path(drawing_filename).name != drawing_filename or not _valid_filename(drawing_filename) or Path(drawing_filename).suffix.casefold() != ".slddrw":
-        raise ValueError("drawing_filename 必须是合法的 SLDDRW 文件名")
+        raise ValueError("drawing_filename must be a valid SLDDRW filename")
     output = Path(output_dir).expanduser().resolve()
     drawing_path = output / drawing_filename
     pdf_path = drawing_path.with_suffix(".pdf")
     report_path = output / (drawing_path.stem + "_review_report.json")
     for path in (drawing_path, pdf_path, report_path):
         if path.is_symlink() or (path.exists() and not overwrite):
-            raise ValueError("输出已存在或为符号链接，拒绝覆盖")
+            raise ValueError("Output already exists or is a symlink; refusing to overwrite")
     native = bool(spec.get("requiredDimensions")) or any((spec.get("professionalAnnotations") or {}).get(key) for key in ("datums", "geometricTolerances"))
     hashes = {source: _sha256(source)}
     result = {"status": "blocked", "capability": "solidworks-engineering-drawing", "sourceModel": str(source),
@@ -53,16 +53,16 @@ def generate_package(spec_source, output_dir, drawing_filename="drawing.slddrw",
         with SolidWorksReadGuard(), SolidWorksSession(version=2026 if native else None, visible=True) as session:
             # 排队等待锁期间可能有其他进程完成同名输出；不得覆盖其结果或报告。
             if any(path.is_symlink() or (path.exists() and not overwrite) for path in (drawing_path, pdf_path, report_path)):
-                return {**result, "error_code": "DRAWING_OUTPUT_EXISTS", "message": "等待期间同名输出已出现，拒绝覆盖"}
+                return {**result, "error_code": "DRAWING_OUTPUT_EXISTS", "message": "Output file appeared while waiting; refusing to overwrite"}
             model = _open_checked(session, source)
             if get_com_member(model, "GetSaveFlag") not in (False, 0):
-                raise ValueError("源模型存在未保存修改")
+                raise ValueError("Source model has unsaved changes")
             expected_type = 2 if spec["documentType"] == "assembly" else 1
             if get_com_member(model, "GetType") != expected_type:
-                raise ValueError("源模型实际类型与规格不一致")
+                raise ValueError("Source model actual type does not match specification")
             dependencies = get_com_member(model, "GetDependencies2", True, True, False)
             if not isinstance(dependencies, (list, tuple)) or len(dependencies) % 2:
-                raise ValueError("不能确认模型依赖清单")
+                raise ValueError("Unable to verify model dependency list")
             for index in range(1, len(dependencies), 2):
                 path = Path(str(dependencies[index])).resolve(strict=True)
                 hashes[path] = _sha256(path)
@@ -70,12 +70,12 @@ def generate_package(spec_source, output_dir, drawing_filename="drawing.slddrw",
                 from scripts.sw_measure import collect_bounding_box
                 bounds = collect_bounding_box(model)
                 if bounds.get("errors") or len(bounds.get("size_mm") or []) != 3 or any(not math.isclose(a, b, abs_tol=.01, rel_tol=0) for a, b in zip(bounds["size_mm"], spec["modelSizeMm"])):
-                    raise ValueError("modelSizeMm 与真实模型包围盒不一致")
+                    raise ValueError("modelSizeMm does not match actual model bounding box")
             for document in session._documents():
                 path = str(get_com_member(document, "GetPathName") or "")
                 title = str(get_com_member(document, "GetTitle") or "")
                 if (Path(path).name.casefold() == drawing_path.name.casefold() or title.casefold() in {drawing_path.name.casefold(), drawing_path.stem.casefold()}):
-                    raise ValueError("已打开同名输出文档，拒绝复用或关闭用户文档")
+                    raise ValueError("An output document with the same name is already open; refusing to reuse or close user document")
             output.mkdir(parents=True, exist_ok=True)
             drawing = session.new_drawing()
             context = {}
@@ -85,7 +85,7 @@ def generate_package(spec_source, output_dir, drawing_filename="drawing.slddrw",
                 result.update(generation=generation, error_code=generation.get("error_code"), stage=generation.get("stage"))
             else:
                 if not get_com_member(drawing, "ForceRebuild3", False) or not session.save(drawing, str(drawing_path)):
-                    raise RuntimeError("最终工程图重建或保存失败")
+                    raise RuntimeError("Final drawing rebuild or save failed")
                 records = context.get("native_records") or []
                 _capture_saved_positions(records)
                 dimensions = context.get("dimensions") or {}
@@ -98,11 +98,11 @@ def generate_package(spec_source, output_dir, drawing_filename="drawing.slddrw",
                     sheet = get_com_member(drawing, "GetCurrentSheet")
                     properties = get_com_member(sheet, "GetProperties2")
                     if len(properties) != 8 or not math.isclose(properties[2] / properties[3], generation["layout"]["scale"], abs_tol=1e-8, rel_tol=0):
-                        raise RuntimeError("重开后图纸比例不一致")
+                        raise RuntimeError("Sheet scale mismatch after reopening")
                     for view in map_views(drawing, generation["views"]).values():
                         ratio = get_com_member(view, "ScaleRatio")
                         if not math.isclose(ratio[0] / ratio[1], generation["layout"]["scale"], abs_tol=1e-8, rel_tol=0):
-                            raise RuntimeError("重开后视图比例不一致")
+                            raise RuntimeError("View scale mismatch after reopening")
                 _verify_reopened(drawing, records)
                 verify_dimensions(drawing, dimensions)
                 structure = inspect_drawing_structure(drawing, paper_size_hint=spec["paperSize"], title_block_box=generation["layout"].get("title_block_box"))
@@ -117,7 +117,7 @@ def generate_package(spec_source, output_dir, drawing_filename="drawing.slddrw",
                 if native and status == "pass":
                     status = "review_required"
                 if get_com_member(model, "GetSaveFlag") not in (False, 0):
-                    raise RuntimeError("出图期间源模型出现未保存修改")
+                    raise RuntimeError("Source model acquired unsaved changes during drawing generation")
                 result.update(status=status, generation=generation, review=review, native_validation="pass",
                               manual_review_required=native or bool(review.get("manual_review_required", True)),
                               outputs={"slddrw": {"path": str(drawing_path), "exists": drawing_path.is_file(), "size_bytes": drawing_path.stat().st_size if drawing_path.is_file() else 0},

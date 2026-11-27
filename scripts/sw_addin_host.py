@@ -105,25 +105,25 @@ def probe_addin_host(assembly_path: str | Path | None = None) -> dict[str, Any]:
 
     blockers: list[dict[str, str]] = []
     if not assembly.is_file():
-        blockers.append({"code": "ASSEMBLY_MISSING", "message": "先构建 net48 x64 Add-in 程序集。"})
+        blockers.append({"code": "ASSEMBLY_MISSING", "message": "Build the net48 x64 Add-in assembly first."})
     if not type_library.is_file():
-        blockers.append({"code": "TYPE_LIBRARY_MISSING", "message": "缺少与 Add-in 同目录的 COM 类型库。"})
+        blockers.append({"code": "TYPE_LIBRARY_MISSING", "message": "Missing COM type library alongside the Add-in."})
     if not current_user_type_library and not machine_type_library:
         blockers.append({
             "code": "TYPE_LIBRARY_REGISTRATION_MISSING",
-            "message": "使用 64 位 RegAsm /tlb 注册类型库，否则 SolidWorks 可能只装入 DLL 而不实例化 ISwAddin。",
+            "message": "Register the type library with 64-bit RegAsm /tlb, otherwise SolidWorks may load the DLL without instantiating ISwAddin.",
         })
     if not machine_discovery:
         blockers.append({
             "code": "HKLM_ADDIN_REGISTRATION_MISSING",
-            "message": "SolidWorks 进程内发现需要提升权限执行 Machine 注册；当前用户 COM 注册只用于激活冒烟测试。",
+            "message": "In-process SolidWorks discovery requires elevated Machine registration; current-user COM registration is only for activation smoke tests.",
         })
     if machine_discovery and not connected:
-        blockers.append({"code": "ADDIN_NOT_CONNECTED", "message": "注册存在，但诊断未显示 ConnectToSW 已连接。"})
+        blockers.append({"code": "ADDIN_NOT_CONNECTED", "message": "Registration exists, but diagnostics do not show ConnectToSW connected."})
     if connected and not in_process_host:
-        blockers.append({"code": "DIAGNOSTIC_NOT_IN_PROCESS", "message": "诊断并非由仍在运行的 SLDWORKS.exe 进程写出，不能作为 Add-in 真机证据。"})
+        blockers.append({"code": "DIAGNOSTIC_NOT_IN_PROCESS", "message": "Diagnostics were not written by a running SLDWORKS.exe process and cannot serve as live Add-in evidence."})
     if connected and not ui_ready:
-        blockers.append({"code": "ADDIN_UI_NOT_READY", "message": "Add-in 已进入连接流程，但回调或 UI 子系统未全部就绪。"})
+        blockers.append({"code": "ADDIN_UI_NOT_READY", "message": "Add-in entered connection flow, but callbacks or UI subsystems are not all ready."})
     if diagnostic_error:
         blockers.append({"code": "DIAGNOSTIC_JSON_INVALID", "message": diagnostic_error})
 

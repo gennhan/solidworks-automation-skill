@@ -55,7 +55,7 @@ class LifecycleHarness:
 def run_regression(iterations: int = 20) -> dict[str, object]:
     """@brief 执行生命周期回归并返回可审计结果。"""
     if iterations < 1:
-        raise ValueError("iterations 必须大于 0")
+        raise ValueError("iterations must be greater than 0")
     harness = LifecycleHarness()
     process_ids: list[int] = []
     for _ in range(iterations):

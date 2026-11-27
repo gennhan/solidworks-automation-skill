@@ -12,7 +12,7 @@ from pathlib import Path
 def collect_tool_cards(repo_root: Path, mode: str = "search") -> list[dict[str, object]]:
     """@brief 从完整注册表选择与运行模式一致的工具卡。"""
     if mode not in ("search", "full"):
-        raise ValueError(f"未知 MCP 模式: {mode}")
+        raise ValueError(f"Unknown MCP mode: {mode}")
     server_dir = repo_root / "mcp-server"
     if str(server_dir) not in sys.path:
         sys.path.insert(0, str(server_dir))
@@ -35,7 +35,7 @@ def build_smithery_bundle(source: Path, target: Path, mode: str = "search", repo
     repo_root = (repo_root or source.resolve().parent.parent).resolve()
     tools = collect_tool_cards(repo_root, mode=mode)
     if not tools:
-        raise RuntimeError("MCP Server 未注册任何工具")
+        raise RuntimeError("MCP Server registered no tools")
 
     with zipfile.ZipFile(source, "r") as archive:
         manifest = json.loads(archive.read("manifest.json").decode("utf-8"))

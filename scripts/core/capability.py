@@ -99,7 +99,7 @@ def get_capability_status(capability_id: str, payload: Mapping[str, Any] | None 
             "allowed_modes": [],
             "backends": [],
             "capability": None,
-            "reason": "能力不在 capabilities.yaml 真源中",
+            "reason": "Capability is not in capabilities.yaml source of truth",
         }
     level = item.get("level", "not_implemented")
     return {

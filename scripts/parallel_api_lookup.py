@@ -42,16 +42,16 @@ def _official_url(url: Any, version: int, interface: str, member: str) -> bool:
 
 def _payload(result: Any) -> dict[str, Any]:
     if result.isError:
-        raise ParallelLookupError("Parallel MCP 工具返回错误")
+        raise ParallelLookupError("Parallel MCP tool returned an error")
     blocks = [getattr(item, "text", "") for item in result.content if getattr(item, "text", None)]
     if len(blocks) != 1 or len(blocks[0].encode("utf-8")) > _MAX_MCP_TEXT:
-        raise ParallelLookupError("Parallel 返回内容缺失或超过限制")
+        raise ParallelLookupError("Parallel response content missing or exceeds limit")
     try:
         data = json.loads(blocks[0])
     except (TypeError, ValueError) as exc:
-        raise ParallelLookupError("Parallel 返回内容不是有效 JSON") from exc
+        raise ParallelLookupError("Parallel response content is not valid JSON") from exc
     if not isinstance(data, dict):
-        raise ParallelLookupError("Parallel 返回结构无效")
+        raise ParallelLookupError("Parallel response structure is invalid")
     return data
 
 
@@ -113,7 +113,7 @@ async def _query(version: int, interface: str, member: str, url: str) -> dict[st
                 candidates = [item.get("url") for item in candidates if isinstance(item, dict)
                               and _official_url(item.get("url"), version, interface, member)]
                 if not candidates:
-                    raise ParallelLookupError("Parallel 未找到匹配版本的官方 API 页面")
+                    raise ParallelLookupError("Parallel did not find an official API page matching the target version")
                 second_args: dict[str, Any] = {"urls": [candidates[0]], "objective": objective, "full_content": False}
                 next_session = search.get("session_id") or session_id
                 if isinstance(next_session, str) and len(next_session) <= 1000:
@@ -122,7 +122,7 @@ async def _query(version: int, interface: str, member: str, url: str) -> dict[st
                 verified = _verified_extract(second, version, interface, member)
                 if verified:
                     return verified
-                raise ParallelLookupError("Parallel 返回的官方页面未能确认接口和版本")
+                raise ParallelLookupError("Official page returned by Parallel could not confirm interface and version")
 
 
 async def _guard(version: int, interface: str, member: str, url: str,
@@ -132,10 +132,10 @@ async def _guard(version: int, interface: str, member: str, url: str,
     try:
         while not task.done():
             if cancelled and cancelled():
-                raise ParallelLookupCancelled("用户已取消 API 查证")
+                raise ParallelLookupCancelled("API lookup cancelled by user")
             remaining = deadline - asyncio.get_running_loop().time()
             if remaining <= 0:
-                raise ParallelLookupError("Parallel MCP 查证超时")
+                raise ParallelLookupError("Parallel MCP lookup timeout")
             await asyncio.wait({task}, timeout=min(0.2, remaining))
         return task.result()
     finally:
@@ -148,10 +148,10 @@ def retrieve_parallel_document(version: int, interface: str, member: str, url: s
                                cancelled: Callable[[], bool] | None = None, timeout: float = 35.0) -> dict[str, Any]:
     """同步入口；只发送版本、接口、方法和官方 URL，不接受凭据或用户任务文本。"""
     if not _official_url(url, version, interface, member):
-        raise ParallelLookupError("拒绝非目标版本的官方 API URL")
+        raise ParallelLookupError("Rejected official API URL not matching target version")
     try:
         return asyncio.run(_guard(version, interface, member, url, cancelled, timeout))
     except (ParallelLookupError, ParallelLookupCancelled):
         raise
     except Exception as exc:
-        raise ParallelLookupError(f"Parallel MCP 不可用: {type(exc).__name__}") from exc
+        raise ParallelLookupError(f"Parallel MCP unavailable: {type(exc).__name__}") from exc

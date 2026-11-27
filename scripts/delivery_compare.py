@@ -70,7 +70,7 @@ def build_regeneration_request(
 ) -> dict[str, Any]:
     """@brief 创建不覆盖旧产物的局部重新生成请求。"""
     if not project_id.strip() or not source_job_id.strip() or not failed_stage.strip():
-        raise ValueError("project_id、source_job_id、failed_stage 不能为空")
+        raise ValueError("project_id, source_job_id, and failed_stage must not be empty")
     return {
         "schemaVersion": "1.0",
         "type": "regeneration_request",

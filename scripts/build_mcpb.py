@@ -37,21 +37,21 @@ def build_mcpb(root: Path, output: Path) -> int:
     files = {name: source for name, source in files.items() if name in tracked}
     missing = (REQUIRED_FILES | set(EXTRA_FILES)) - files.keys()
     if missing:
-        raise ValueError(f"MCPB 缺少受 Git 跟踪的运行时文件: {sorted(missing)}")
+        raise ValueError(f"MCPB missing Git-tracked runtime files: {sorted(missing)}")
     if len({name.casefold() for name in files}) != len(files):
-        raise ValueError("MCPB 有 Windows 文件名冲突")
+        raise ValueError("MCPB has Windows filename collision")
 
     payload = {}
     for name, source in files.items():
         if not source.resolve(strict=True).is_relative_to(root):
-            raise ValueError(f"MCPB 源文件越出仓库: {name}")
+            raise ValueError(f"MCPB source file escapes repository: {name}")
         payload[name] = source.read_bytes()
 
     manifest = json.loads(payload["manifest.json"])
     if manifest.get("manifest_version") != "0.4" or manifest.get("version") != release_version(root):
-        raise ValueError("MCPB 清单格式或发布版本不一致")
+        raise ValueError("MCPB manifest format or release version mismatch")
     if manifest["server"]["entry_point"] not in payload:
-        raise ValueError("MCPB 启动入口缺失")
+        raise ValueError("MCPB entry point missing")
 
     output.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(output, "x", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
@@ -63,7 +63,7 @@ def build_mcpb(root: Path, output: Path) -> int:
             archive.writestr(info, data)
     with zipfile.ZipFile(output) as archive:
         if archive.namelist() != sorted(payload) or any(archive.read(name) != data for name, data in payload.items()):
-            raise ValueError("MCPB 回读校验失败")
+            raise ValueError("MCPB readback verification failed")
     return len(payload)
 
 

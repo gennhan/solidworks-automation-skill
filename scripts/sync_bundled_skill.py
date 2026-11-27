@@ -52,7 +52,7 @@ def _validate_target(root: Path, target: Path) -> None:
     expected_parent = (root / "apps/workbench-ui/src-tauri/resources").resolve()
     resolved_target = target.resolve()
     if resolved_target.parent != expected_parent or resolved_target.name != "skill":
-        raise ValueError(f"拒绝写入非预期内嵌 Skill 目录: {resolved_target}")
+        raise ValueError(f"Refusing to write to unexpected bundled skill directory: {resolved_target}")
 
 
 def _is_runtime_file(path: Path, source_root: Path) -> bool:
@@ -67,12 +67,12 @@ def collect_runtime_files(root: Path) -> dict[Path, Path]:
     for relative_name in (*TOP_LEVEL_FILES, *RUNTIME_FILES):
         source = root / relative_name
         if not source.is_file():
-            raise FileNotFoundError(f"内嵌 Skill 源文件缺失: {source}")
+            raise FileNotFoundError(f"Bundled skill source file missing: {source}")
         files[Path(relative_name)] = source
     for relative_root in RUNTIME_ROOTS:
         source_root = root / relative_root
         if not source_root.is_dir():
-            raise FileNotFoundError(f"内嵌 Skill 源目录缺失: {source_root}")
+            raise FileNotFoundError(f"Bundled skill source directory missing: {source_root}")
         for source in source_root.rglob("*"):
             if source.is_file() and _is_runtime_file(source, source_root):
                 files[source.relative_to(root)] = source

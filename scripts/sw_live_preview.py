@@ -37,7 +37,7 @@ def preview_document(sw, model, process_id, existing=()):
         path = Path(path)
         try:
             if any(_same_document(doc, model) for doc in existing):
-                raise RuntimeError("该文档在本轮打开前已存在")
+                raise RuntimeError("Document already existed before this modeling run")
         except Exception:
             _target.set(None)
             _clear_frame(path)
@@ -77,7 +77,7 @@ def _capture_model_window(sw, model, process_id):
     def window():
         active = get_com_member(sw, "ActiveDoc")
         if active is None or not _same_document(active, model):
-            raise RuntimeError("当前活动文档不属于本轮建模")
+            raise RuntimeError("Active document does not belong to this modeling run")
         frame = int(get_com_member(get_com_member(sw, "Frame"), "GetHWndx64"))
         view = int(get_com_member(get_com_member(model, "ActiveView"), "GetViewHWndx64"))
         if (
@@ -88,13 +88,13 @@ def _capture_model_window(sw, model, process_id):
             or not win32gui.IsChild(frame, view)
             or win32process.GetWindowThreadProcessId(frame)[1] != process_id
         ):
-            raise RuntimeError("SolidWorks 建模窗口不可用")
+            raise RuntimeError("SolidWorks modeling window is unavailable")
         thread, pid = win32process.GetWindowThreadProcessId(view)
         if pid != process_id:
-            raise RuntimeError("建模窗口的进程不匹配")
+            raise RuntimeError("Modeling window process mismatch")
         def verify_child(child, _):
             if win32gui.IsWindowVisible(child) and win32process.GetWindowThreadProcessId(child)[1] != process_id:
-                raise RuntimeError("建模窗口含有其他进程的子窗口")
+                raise RuntimeError("Modeling window contains child windows from another process")
             return True
 
         win32gui.EnumChildWindows(view, verify_child, None)
@@ -102,14 +102,14 @@ def _capture_model_window(sw, model, process_id):
 
     identity = window()
     if not _render_slot.acquire(blocking=False):
-        raise RuntimeError("上一次 SolidWorks 窗口捕获尚未退出")
+        raise RuntimeError("Previous SolidWorks window capture has not exited yet")
     result = Queue(maxsize=1)
 
     def render():
         try:
             _, view, thread = identity
             if tuple(win32process.GetWindowThreadProcessId(view)) != (thread, process_id):
-                raise RuntimeError("建模窗口已变更")
+                raise RuntimeError("Modeling window changed")
             value = _render_window(view)
         except Exception as error:
             value = error
@@ -127,7 +127,7 @@ def _capture_model_window(sw, model, process_id):
     if isinstance(image, Exception):
         raise image
     if window() != identity:
-        raise RuntimeError("SolidWorks 建模窗口已变更")
+        raise RuntimeError("SolidWorks modeling window changed")
     return image
 
 
@@ -141,7 +141,7 @@ def _render_window(view):
     left, top, right, bottom = win32gui.GetWindowRect(view)
     width, height = right - left, bottom - top
     if min(width, height) < 1 or width * height > 16_777_216:
-        raise RuntimeError("建模窗口尺寸超出预览限制")
+        raise RuntimeError("Modeling window size exceeds preview limit")
 
     print_window = ctypes.windll.user32.PrintWindow
     print_window.argtypes = (wintypes.HWND, wintypes.HDC, wintypes.UINT)
@@ -160,11 +160,11 @@ def _render_window(view):
             try:
                 dc = memory.GetSafeHdc()
                 if not paint_bitmap(dc, 0, 0, width, height, 0x00000042):  # BLACKNESS
-                    raise RuntimeError("SolidWorks 预览位图初始化失败")
+                    raise RuntimeError("SolidWorks preview bitmap initialization failed")
                 # PW_RENDERFULLCONTENT 请求 Windows 渲染该 HWND 自身的合成内容。
                 # 不读取桌面像素，也不尝试其他 HWND。
                 if not print_window(view, dc, 0x00000002):
-                    raise RuntimeError("SolidWorks 建模窗口捕获失败")
+                    raise RuntimeError("SolidWorks modeling window capture failed")
                 image = Image.frombytes("RGB", (width, height), bitmap.GetBitmapBits(True), "raw", "BGRX", 0, 1)
             finally:
                 memory.SelectObject(previous)
@@ -175,6 +175,6 @@ def _render_window(view):
     finally:
         win32gui.ReleaseDC(view, window_dc)
     if all(low == high for low, high in image.getextrema()):
-        raise RuntimeError("SolidWorks 返回空白预览")
+        raise RuntimeError("SolidWorks returned a blank preview")
     image.thumbnail((960, 720), Image.Resampling.LANCZOS)
     return image

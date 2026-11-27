@@ -57,7 +57,7 @@ def route_report(args: argparse.Namespace) -> dict:
         return {
             "status": "blocked",
             "error_code": "OPERATION_REQUIRED",
-            "reason": "请指定 --operation，或使用 --list 查看可用路由",
+            "reason": "Specify --operation, or use --list to view available routes",
         }
     return resolve_operation_backend(
         args.operation,

@@ -427,11 +427,11 @@ def decide(
 
     if kind == ErrorKind.TRANSIENT:
         if count < budget:
-            action, reason = "retry", "瞬时错误，允许有限重试"
+            action, reason = "retry", "Transient error; limited retry allowed"
         else:
-            action, reason = "fail", f"瞬时错误重试已达上限（max_retries={budget}）"
+            action, reason = "fail", f"Transient error retry limit reached (max_retries={budget})"
     elif kind == ErrorKind.INVALID_ARGUMENT:
-        action, reason = "replan_required", "参数无效，需上层 Agent 修正参数后重试"
+        action, reason = "replan_required", "Invalid argument; upper-level agent must fix parameters and retry"
     elif kind == ErrorKind.BACKEND_UNAVAILABLE:
         fallback = _resolve_fallback(
             operation_id=operation_id,
@@ -440,15 +440,15 @@ def decide(
             capability_facade=facade,
         )
         if fallback:
-            action, reason = "fallback_backend", f"主后端不可用，回退到 {fallback}"
+            action, reason = "fallback_backend", f"Primary backend unavailable; falling back to {fallback}"
         else:
-            action, reason = "block", "无可用后端且无合法 fallback"
+            action, reason = "block", "Backend unavailable and no valid fallback"
     elif kind == ErrorKind.TOOL_UNAVAILABLE:
         # Capability 仍存在 → 交还上层 Agent 组合/换入口；Capability 本身缺失 → CAPABILITY_GAP。
         if capability_id is not None and facade is not None:
             try:
                 if facade.get_capability(capability_id) is None:
-                    reason = "能力缺口（capability_gap），交还上层 Agent 查证（agent_resolution_required）"
+                    reason = "Capability gap (capability_gap); hand back to upper-level agent for lookup (agent_resolution_required)"
                     decision = RecoveryDecision(
                         decision="replan_required",
                         reason=reason,
@@ -460,7 +460,7 @@ def decide(
                     return decision
             except Exception:
                 pass
-        action, reason = "replan_required", "Tool 不可用，交还上层 Agent 组合或换入口"
+        action, reason = "replan_required", "Tool unavailable; hand back to upper-level agent to compose or switch entry points"
     elif kind == ErrorKind.ENVIRONMENT_MISSING:
         fallback = _resolve_fallback(
             operation_id=operation_id,
@@ -469,19 +469,19 @@ def decide(
             capability_facade=facade,
         )
         if fallback:
-            action, reason = "fallback_backend", f"环境缺失，回退到 {fallback}"
+            action, reason = "fallback_backend", f"Environment missing; falling back to {fallback}"
         else:
-            action, reason = "block", "环境缺失且无合法 fallback"
+            action, reason = "block", "Environment missing and no valid fallback"
     elif kind == ErrorKind.VERIFICATION_FAILED:
-        action, reason = "replan_required", "执行成功但验证失败，需修复后重做（不允许报告成功）"
+        action, reason = "replan_required", "Execution succeeded but verification failed; fix and redo (cannot report success)"
     elif kind == ErrorKind.USER_ACTION_REQUIRED:
-        action, reason = "user_action_required", "需要用户操作解除阻塞"
+        action, reason = "user_action_required", "User action required to unblock"
     elif kind == ErrorKind.POLICY_BLOCKED:
-        action, reason = "block", "Policy Gate 阻止，禁止 Recovery 绕过"
+        action, reason = "block", "Blocked by Policy Gate; recovery bypass not allowed"
     elif kind == ErrorKind.CAPABILITY_GAP:
-        action, reason = "replan_required", "能力缺口，交还上层 Agent 查证（agent_resolution_required）"
+        action, reason = "replan_required", "Capability gap; hand back to upper-level agent for lookup (agent_resolution_required)"
     else:  # FATAL 或未预期
-        action, reason = "fail", "致命错误，不允许自动重试"
+        action, reason = "fail", "Fatal error; automatic retry not allowed"
 
     decision = RecoveryDecision(
         decision=action,

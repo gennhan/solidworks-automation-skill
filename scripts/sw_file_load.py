@@ -7,7 +7,7 @@ def _describe(code, names):
     """@brief 位组合诊断保留未知位，不将警告套入错误枚举。"""
     value = int(code or 0)
     if value < 0:
-        return f"未知值({value})"
+        return f"Unknown({value})"
     remaining = value
     parts = []
     for bit, name in sorted(names.items()):
@@ -15,8 +15,8 @@ def _describe(code, names):
             parts.append(name)
             remaining &= ~bit
     if remaining:
-        parts.append(f"未知位(0x{remaining:X})")
-    return " | ".join(parts) if parts else "无"
+        parts.append(f"UnknownBits(0x{remaining:X})")
+    return " | ".join(parts) if parts else "None"
 
 def classify_sw_file_load_errors(code):
     """@brief errors 使用 swFileLoadError_e。"""

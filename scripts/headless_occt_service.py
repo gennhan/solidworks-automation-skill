@@ -30,7 +30,7 @@ def _params(feature: dict[str, Any]) -> dict[str, Any]:
 def _positive(params: dict[str, Any], key: str, default: float) -> float:
     value = float(params.get(key, default))
     if value <= 0:
-        raise ValueError(f"{key} 必须大于 0。")
+        raise ValueError(f"{key} must be greater than 0.")
     return value
 
 
@@ -95,16 +95,16 @@ def build_shape(document: dict[str, Any]):
                 height,
             ).Shape()
         else:
-            raise UnsupportedFeatureError(f"OCCT 后端暂不支持特征: {feature_id} ({kind})")
+            raise UnsupportedFeatureError(f"OCCT backend does not support feature: {feature_id} ({kind})")
 
         is_subtractive = kind == "hole" or operation in {"subtract", "cut", "remove"}
         if is_subtractive:
             if shape is None:
-                raise UnsupportedFeatureError(f"减材特征 {feature_id} 之前没有基础实体。")
+                raise UnsupportedFeatureError(f"No base solid before subtractive feature {feature_id}.")
             algorithm = BRepAlgoAPI_Cut(shape, primitive)
             algorithm.Build()
             if not algorithm.IsDone():
-                raise RuntimeError(f"OCCT 布尔切除失败: {feature_id}")
+                raise RuntimeError(f"OCCT boolean cut failed: {feature_id}")
             shape = algorithm.Shape()
         elif shape is None:
             shape = primitive
@@ -112,13 +112,13 @@ def build_shape(document: dict[str, Any]):
             algorithm = BRepAlgoAPI_Fuse(shape, primitive)
             algorithm.Build()
             if not algorithm.IsDone():
-                raise RuntimeError(f"OCCT 布尔合并失败: {feature_id}")
+                raise RuntimeError(f"OCCT boolean fuse failed: {feature_id}")
             shape = algorithm.Shape()
         else:
-            raise UnsupportedFeatureError(f"OCCT 后端暂不支持操作: {feature_id} ({operation})")
+            raise UnsupportedFeatureError(f"OCCT backend does not support operation: {feature_id} ({operation})")
 
     if shape is None:
-        raise UnsupportedFeatureError("NeutralCadDocument 没有可构造的实体特征。")
+        raise UnsupportedFeatureError("NeutralCadDocument has no constructible solid features.")
     return shape
 
 
@@ -167,7 +167,7 @@ def _mesh_shape(shape, linear_deflection: float = 0.2, angular_deflection: float
     mesher = BRepMesh_IncrementalMesh(shape, linear_deflection, False, angular_deflection, True)
     mesher.Perform()
     if not mesher.IsDone():
-        raise RuntimeError("OCCT 网格化失败。")
+        raise RuntimeError("OCCT meshing failed.")
 
 
 def export_occt(
@@ -192,7 +192,7 @@ def export_occt(
     shape = build_shape(document)
     evidence = collect_evidence(shape)
     if not evidence["valid"] or evidence["topology"]["solids"] < 1 or evidence["volume"] <= 0:
-        raise RuntimeError("OCCT 结果未通过实体有效性、拓扑或体积门禁。")
+        raise RuntimeError("OCCT result failed solid validity, topology, or volume gate.")
 
     normalized_formats = [item.lower().lstrip(".") for item in formats]
     artifacts: list[dict[str, Any]] = []
@@ -206,20 +206,20 @@ def export_occt(
                 target = _versioned_target(out_dir, name, "step", overwrite)
                 writer = STEPControl_Writer()
                 if writer.Transfer(shape, STEPControl_AsIs) != IFSelect_RetDone or writer.Write(str(target)) != IFSelect_RetDone:
-                    raise RuntimeError("STEP 写入失败。")
+                    raise RuntimeError("STEP write failed.")
             elif normalized == "iges":
                 target = _versioned_target(out_dir, name, "iges", overwrite)
                 writer = IGESControl_Writer()
                 if not writer.AddShape(shape) or not writer.Write(str(target)):
-                    raise RuntimeError("IGES 写入失败。")
+                    raise RuntimeError("IGES write failed.")
             elif normalized == "brep":
                 target = _versioned_target(out_dir, name, "brep", overwrite)
                 if not BRepTools.Write_s(shape, str(target)):
-                    raise RuntimeError("BREP 写入失败。")
+                    raise RuntimeError("BREP write failed.")
             elif normalized in {"stl", "obj", "glb"}:
                 continue
             else:
-                raise UnsupportedFeatureError(f"OCCT 后端不支持输出格式: {normalized}")
+                raise UnsupportedFeatureError(f"OCCT backend does not support output format: {normalized}")
             artifacts.append(
                 {
                     "kind": normalized,
@@ -238,7 +238,7 @@ def export_occt(
             else:
                 stl_path = Path(temp_context.name) / f"{name}.stl"
             if not StlAPI_Writer().Write(shape, str(stl_path)) or not stl_path.is_file():
-                raise RuntimeError("STL 写入失败。")
+                raise RuntimeError("STL write failed.")
             if "stl" in mesh_formats:
                 artifacts.append(
                     {
@@ -256,7 +256,7 @@ def export_occt(
 
                 mesh = trimesh.load_mesh(str(stl_path), force="mesh")
                 if mesh.is_empty or len(mesh.vertices) < 3 or len(mesh.faces) < 1:
-                    raise RuntimeError("OCCT 网格为空，拒绝写出 OBJ/GLB。")
+                    raise RuntimeError("OCCT mesh is empty; refusing to write OBJ/GLB.")
                 if "obj" in mesh_formats:
                     target = _versioned_target(out_dir, name, "obj", overwrite)
                     mesh.export(str(target), file_type="obj")

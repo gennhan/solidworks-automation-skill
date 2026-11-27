@@ -42,7 +42,7 @@ class BaseFlangeSpec:
         if not 0 < self.k_factor < 1:
             raise ValueError("K 因子必须位于 0 与 1 之间")
         if self.relief_ratio <= 0:
-            raise ValueError("卸料槽比例必须大于 0")
+            raise ValueError("Relief ratio must be greater than 0")
 
 
 def _feature_type(feature: Any) -> str:
@@ -77,13 +77,13 @@ def create_base_flange(model, sketch_ref, spec: BaseFlangeSpec):
 
     bend_allowance = get_com_member(manager, "CreateCustomBendAllowance")
     if bend_allowance is None:
-        raise RuntimeError("CreateCustomBendAllowance 未返回对象")
+        raise RuntimeError("CreateCustomBendAllowance returned None")
     bend_allowance.Type = SW_BEND_ALLOWANCE_K_FACTOR
     bend_allowance.KFactor = float(spec.k_factor)
 
     data = get_com_member(manager, "CreateDefinition", SW_FM_BASE_FLANGE)
     if data is None:
-        raise RuntimeError("CreateDefinition(swFmBaseFlange) 未返回特征数据")
+        raise RuntimeError("CreateDefinition(swFmBaseFlange) returned no feature data")
 
     data.Initialize(
         False,
@@ -108,12 +108,12 @@ def create_base_flange(model, sketch_ref, spec: BaseFlangeSpec):
 
     feature = get_com_member(manager, "CreateFeature", data)
     if feature is None:
-        raise RuntimeError("CreateFeature(IBaseFlangeFeatureData) 创建失败")
+        raise RuntimeError("CreateFeature(IBaseFlangeFeatureData) failed")
     # GetErrorCode2 还带一个 by-ref ``isWarning`` 参数；此处只需拒绝硬错误，
     # 使用无歧义的 GetErrorCode 可兼容 pywin32 静态与动态代理。
     error_code = int(get_com_member(feature, "GetErrorCode") or 0)
     if error_code:
-        raise RuntimeError(f"基体法兰返回特征错误码: {error_code}")
+        raise RuntimeError(f"Base flange returned feature error code: {error_code}")
     return feature
 
 

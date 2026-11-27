@@ -74,8 +74,8 @@ def ensure_motion_type_library(raise_on_error=False):
             errors.append(f"{path}: {exc}")
 
     if raise_on_error:
-        detail = "\n".join(errors) if errors else "未找到 swmotionstudy.tlb"
-        raise RuntimeError("无法加载 SolidWorks Motion Study 类型库:\n" + detail)
+        detail = "\n".join(errors) if errors else "swmotionstudy.tlb not found"
+        raise RuntimeError("Unable to load SolidWorks Motion Study type library:\n" + detail)
     return None
 
 
@@ -97,7 +97,7 @@ def motion_member(obj, attr_name, *args):
             return member(*args)
         if len(args) == 0:
             return member
-        raise TypeError(f"Motion Study 成员不可调用: {attr_name}")
+        raise TypeError(f"Motion Study member is not callable: {attr_name}")
     try:
         return member() if callable(member) else member
     except Exception as exc:
@@ -118,7 +118,7 @@ def get_motion_study_manager(asm_model, load_type_library=True):
         ensure_motion_type_library(raise_on_error=False)
     manager = safe_get_com_member(asm_model.Extension, "GetMotionStudyManager")
     if manager is None:
-        raise RuntimeError("无法获取 MotionStudyManager，请确认当前文档是装配体且 SolidWorks Motion 可用")
+        raise RuntimeError("Unable to acquire MotionStudyManager; confirm active document is an assembly and SolidWorks Motion is available")
     return manager
 
 
@@ -134,7 +134,7 @@ def create_motion_study(asm_model, name=None, duration=4.0, study_type=None):
     manager = get_motion_study_manager(asm_model)
     study = motion_member(manager, "CreateMotionStudy")
     if study is None:
-        raise RuntimeError("新建 Motion Study 失败")
+        raise RuntimeError("Failed to create new Motion Study")
     if name:
         try:
             study.Name = name
@@ -146,7 +146,7 @@ def create_motion_study(asm_model, name=None, duration=4.0, study_type=None):
         except Exception:
             pass
     if not bool(motion_member(study, "Activate")):
-        raise RuntimeError("激活 Motion Study 失败")
+        raise RuntimeError("Failed to activate Motion Study")
     if duration is not None:
         try:
             motion_member(study, "SetDuration", float(duration))
@@ -166,7 +166,7 @@ def _set_first_supported(obj, names, value):
             last_error = exc
     if last_error:
         raise last_error
-    raise ValueError("候选属性名不能为空")
+    raise ValueError("Candidate property names must not be empty")
 
 
 def _set_load_references(motor_data, references):
@@ -213,7 +213,7 @@ def add_constant_speed_rotary_motor(
     """
     motor_data = motion_member(motion_study, "CreateDefinition", SW_FM_AEM_ROTATIONAL_MOTOR)
     if motor_data is None:
-        raise RuntimeError("创建旋转马达 FeatureData 失败")
+        raise RuntimeError("Failed to create rotary motor FeatureData")
 
     motor_data.DirectionReference = direction_reference
     motion_member(motor_data, "ConstantSpeedMotor", float(rpm))
@@ -227,10 +227,10 @@ def add_constant_speed_rotary_motor(
         pass
 
     if not _set_load_references(motor_data, [load_reference]):
-        raise RuntimeError("设置旋转马达 LoadReferences 失败")
+        raise RuntimeError("Failed to set rotary motor LoadReferences")
     motor_feature = motion_member(motion_study, "CreateFeature", motor_data)
     if motor_feature is None:
-        raise RuntimeError("创建旋转马达特征失败")
+        raise RuntimeError("Failed to create rotary motor feature")
     if name:
         try:
             motor_feature.Name = name
@@ -424,55 +424,55 @@ def validate_motion_study_summary(
     check(
         "study-present",
         bool(studies),
-        f"未找到可用 Motion Study: {study_name or '任意算例'}",
-        success_message=f"已找到 Motion Study: {study_name or '任意算例'}",
+        f"No available Motion Study found: {study_name or 'any study'}",
+        success_message=f"Found Motion Study: {study_name or 'any study'}",
     )
     check(
         "type-library",
         bool(summary.get("motion_type_library")),
-        "未确认 swmotionstudy.tlb，Motion 结果读取可能不完整",
-        success_message="已确认 swmotionstudy.tlb",
+        "swmotionstudy.tlb not verified; Motion result readback may be incomplete",
+        success_message="swmotionstudy.tlb verified",
     )
 
     for study in studies:
-        name = str(study.get("name") or "未命名算例")
+        name = str(study.get("name") or "Unnamed Study")
         duration = float(study.get("duration_seconds") or 0.0)
         motor_count = int(study.get("motor_count") or 0)
         check(
             "duration",
             duration >= float(minimum_duration_seconds),
-            f"{name} 时长 {duration:g}s 小于要求 {minimum_duration_seconds:g}s",
+            f"{name} duration {duration:g}s is less than required {minimum_duration_seconds:g}s",
             name,
-            f"{name} 时长 {duration:g}s 满足要求",
+            f"{name} duration {duration:g}s meets requirement",
         )
         check(
             "motor-count",
             motor_count >= int(minimum_motor_count),
-            f"{name} 马达数量 {motor_count} 小于要求 {minimum_motor_count}",
+            f"{name} motor count {motor_count} is less than required {minimum_motor_count}",
             name,
-            f"{name} 检测到 {motor_count} 个马达特征",
+            f"{name} detected {motor_count} motor feature(s)",
         )
         if expected_study_type is not None:
             actual_type = int(study.get("study_type") or 0)
             check(
                 "study-type",
                 actual_type == int(expected_study_type),
-                f"{name} StudyType={actual_type}，期望 {expected_study_type}",
+                f"{name} StudyType={actual_type}, expected {expected_study_type}",
                 name,
-                f"{name} StudyType={actual_type} 符合要求",
+                f"{name} StudyType={actual_type} matches requirement",
             )
         if require_results:
             available = bool(study.get("results_available"))
-            check("results-present", available, f"{name} 没有可读取的计算结果", name, f"{name} 计算结果可读取")
+            check("results-present", available, f"{name} has no readable calculation results", name, f"{name} calculation results are readable")
             check(
                 "results-fresh",
                 available and study.get("results_out_of_date") is False,
-                f"{name} 结果不存在或已经过期，必须重新 Calculate",
+                f"{name} results are missing or out of date; must re-run Calculate",
                 name,
-                f"{name} 结果存在且未过期",
+                f"{name} results are present and up to date",
             )
         if study.get("results_error"):
-            check("results-readable", False, f"{name} 结果读取失败: {study['results_error']}", name)
+            check("results-readable", False, f"{name} result read failed: {study['results_error']}", name)
 
     return {
         "status": "pass" if checks and all(item["passed"] for item in checks) else "fail",

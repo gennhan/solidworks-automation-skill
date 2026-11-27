@@ -182,7 +182,7 @@ def ensure_run_transition(current: RunStatus | str, target: RunStatus | str) -> 
         cur = _coerce_enum(RunStatus, current, current)
         tgt = _coerce_enum(RunStatus, target, target)
         raise InvalidStateTransition(
-            f"非法 Run 状态转换: {getattr(cur, 'value', cur)} -> {getattr(tgt, 'value', tgt)}"
+            f"Invalid Run state transition: {getattr(cur, 'value', cur)} -> {getattr(tgt, 'value', tgt)}"
         )
 
 
@@ -192,7 +192,7 @@ def ensure_step_transition(current: StepStatus | str, target: StepStatus | str) 
         cur = _coerce_enum(StepStatus, current, current)
         tgt = _coerce_enum(StepStatus, target, target)
         raise InvalidStateTransition(
-            f"非法 Step 状态转换: {getattr(cur, 'value', cur)} -> {getattr(tgt, 'value', tgt)}"
+            f"Invalid Step state transition: {getattr(cur, 'value', cur)} -> {getattr(tgt, 'value', tgt)}"
         )
 
 
@@ -252,7 +252,7 @@ class RecoveryDecision(_JsonModel):
     def __post_init__(self) -> None:
         if self.decision not in RECOVERY_ACTIONS:
             raise ValueError(
-                f"非法恢复决策 {self.decision!r}，允许值: {sorted(RECOVERY_ACTIONS)}"
+                f"Invalid recovery decision {self.decision!r}, allowed values: {sorted(RECOVERY_ACTIONS)}"
             )
 
     @classmethod
@@ -326,7 +326,7 @@ class StepRecord(_JsonModel):
 
     def __post_init__(self) -> None:
         if not self.step_id:
-            raise ValueError("StepRecord.step_id 不能为空")
+            raise ValueError("StepRecord.step_id must not be empty")
 
     def transition(self, target: StepStatus | str) -> "StepRecord":
         """@brief 校验并更新 Step 状态，非法转换抛 InvalidStateTransition。"""
@@ -380,7 +380,7 @@ class RunContext(_JsonModel):
 
     def __post_init__(self) -> None:
         if not self.run_id:
-            raise ValueError("RunContext.run_id 不能为空")
+            raise ValueError("RunContext.run_id must not be empty")
         if not self.trace_id:
             self.trace_id = self.run_id
 

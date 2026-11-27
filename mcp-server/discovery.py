@@ -158,10 +158,10 @@ def _metadata(tool: Any) -> dict[str, Any]:
     elif hasattr(tool, "model_dump"):
         value = tool.model_dump(by_alias=True, exclude_none=True)
     else:
-        raise TypeError("工具元数据必须为字典或 MCP 工具对象")
+        raise TypeError("Tool metadata must be a dict or MCP tool object")
     name = value.get("name")
     if not isinstance(name, str) or not name:
-        raise ValueError("工具名称必须是非空字符串")
+        raise ValueError("Tool name must be a non-empty string")
     # FastMCP 的 Tool 内部字段叫 parameters，协议字段叫 inputSchema，统一成一个。
     if "inputSchema" not in value and "parameters" in value:
         value["inputSchema"] = value.pop("parameters")
@@ -181,7 +181,7 @@ class ToolCatalog:
             tool = _metadata(item)
             name = tool["name"]
             if name in self._tools:
-                raise ValueError(f"重复的工具名称: {name}")
+                raise ValueError(f"Duplicate tool name: {name}")
             self._tools[name] = tool
             self._name[name] = _normalize(name)
             self._text[name] = _normalize(
@@ -201,9 +201,9 @@ class ToolCatalog:
     def search(self, query: str, limit: int = 5) -> list[dict[str, Any]]:
         """返回紧凑候选；名称必须由调用方进一步校验及授权后才能执行。"""
         if not isinstance(query, str) or not query.strip() or len(query) > 512:
-            raise ValueError("检索内容须为 1 至 512 字符")
+            raise ValueError("Query must be 1 to 512 characters")
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 20:
-            raise ValueError("结果数量须为 1 至 20 的整数")
+            raise ValueError("Result limit must be an integer between 1 and 20")
         q = _normalize(query)
         groups = [group for group in _CONCEPTS if any(_contains(q, term) for term in group)]
         if not any(_contains(q, term) for term in _OBJECTS):

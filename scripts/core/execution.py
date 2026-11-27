@@ -55,7 +55,7 @@ def normalize_tool_payload(raw: Mapping[str, Any]) -> dict[str, Any]:
         payload.update(status="error", success=False,
                        error_code=payload.get("error_code") or "TOOL_OPERATION_FAILED",
                        failed_fields=failed)
-        payload.setdefault("message", "必要执行步骤失败: " + ", ".join(failed))
+        payload.setdefault("message", "Required execution step failed: " + ", ".join(failed))
     elif uncertain:
         payload.update(status="blocked", success=False, error_code="TOOL_RESULT_UNVERIFIED", unverified_fields=uncertain)
     return payload

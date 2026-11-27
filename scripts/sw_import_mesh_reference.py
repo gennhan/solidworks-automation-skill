@@ -93,9 +93,9 @@ def configure_mesh_import_preferences(
     unit_key = units.strip().lower()
     type_key = model_type.strip().lower()
     if unit_key not in SW_LENGTH_UNITS:
-        raise ValueError(f"不支持的单位: {units}")
+        raise ValueError(f"Unsupported units: {units}")
     if type_key not in SW_MESH_MODEL_TYPES:
-        raise ValueError(f"不支持的导入类型: {model_type}")
+        raise ValueError(f"Unsupported import type: {model_type}")
 
     report: dict[str, Any] = {
         "units": unit_key,
@@ -157,7 +157,7 @@ def import_mesh_reference(
     mesh = Path(mesh_path).expanduser().resolve()
     output = Path(output_sldprt).expanduser().resolve()
     if mesh.suffix.lower() not in {".obj", ".stl"}:
-        raise ValueError("当前脚本只处理 OBJ/STL。GLB/FBX/BLEND 请先用 Blender/trimesh 转换。")
+        raise ValueError("This script only handles OBJ/STL. Convert GLB/FBX/BLEND with Blender/trimesh first.")
     if not mesh.exists():
         raise FileNotFoundError(str(mesh))
 
@@ -187,7 +187,7 @@ def import_mesh_reference(
     result["loadfile4_errors"] = int(errors.value)
     result["opened"] = model is not None
     if model is None:
-        raise RuntimeError(f"OBJ/STL 导入失败，LoadFile4 errors={errors.value}")
+        raise RuntimeError(f"OBJ/STL import failed, LoadFile4 errors={errors.value}")
 
     result["title"] = get_com_member(model, "GetTitle")
     result["doc_type"] = get_com_member(model, "GetType")
@@ -201,7 +201,7 @@ def import_mesh_reference(
     result["saved"] = bool(saved)
     result["output_size_bytes"] = output.stat().st_size if output.exists() else 0
     if not saved:
-        raise RuntimeError(f"保存失败: {output}")
+        raise RuntimeError(f"Save failed: {output}")
 
     if review_dir:
         review_base = Path(review_dir).expanduser().resolve()

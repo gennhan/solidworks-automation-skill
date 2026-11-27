@@ -39,10 +39,10 @@ def _tolerance_bound(tolerance: Any, method: str) -> tuple[float | None, str | N
         status = get_com_member(tolerance, method, output)
         value = output.value
         if isinstance(status, bool) or status != 0 or not isinstance(value, (int, float)) or not math.isfinite(value):
-            return None, f"{method} 返回非有效状态或非有限值"
+            return None, f"{method} returned invalid status or non-finite value"
         return float(value), None
     except Exception as exc:
-        return None, f"{method} 读取失败: {type(exc).__name__}"
+        return None, f"{method} read failed: {type(exc).__name__}"
 
 
 def _dimension_row(dimension: Any, owner: str) -> tuple[dict[str, Any] | None, str | None]:
@@ -50,17 +50,17 @@ def _dimension_row(dimension: Any, owner: str) -> tuple[dict[str, Any] | None, s
     kind = _optional(dimension, "GetType")
     # swDimensionParamType_e: double linear=0，double angular=1。
     if isinstance(kind, bool) or kind not in (0, 1):
-        return None, f"{name or '<unnamed>'}: 未支持的尺寸类型 {kind!r}"
+        return None, f"{name or '<unnamed>'}: unsupported dimension type {kind!r}"
     value = _optional(dimension, "GetSystemValue3", 1, None)  # swThisConfiguration
     if isinstance(value, (tuple, list)):
         value = value[0] if len(value) == 1 else None
     if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
-        return None, f"{name or '<unnamed>'}: 无法读取当前配置的尺寸值"
+        return None, f"{name or '<unnamed>'}: unable to read dimension value for current configuration"
     scale = 1000.0 if kind == 0 else 180.0 / math.pi
     tolerance = _optional(dimension, "Tolerance")
     type_code = _optional(tolerance, "Type")
     if isinstance(type_code, bool) or not isinstance(type_code, int) or type_code not in TOLERANCE_TYPES:
-        return None, f"{name or '<unnamed>'}: 公差类型不可用或未支持"
+        return None, f"{name or '<unnamed>'}: tolerance type unavailable or unsupported"
     lower = upper = None
     row_status = "not_toleranced" if type_code in (0, 1) else "measured"
     if type_code not in (0, 1):
@@ -82,13 +82,13 @@ def extract_tolerances(model: Any) -> dict[str, Any]:
     """读取零件/装配特征或工程图视图上的已显示尺寸，不宣称完整覆盖。"""
     doc_type = _optional(model, "GetType")
     if doc_type not in (1, 2, 3):
-        return {"status": "blocked", "rows": [], "warnings": ["文档类型未知或不受支持"], "reviewRequired": True}
+        return {"status": "blocked", "rows": [], "warnings": ["Unknown or unsupported document type"], "reviewRequired": True}
     rows: list[dict[str, Any]] = []
     warnings: list[str] = []
     seen: set[str] = set()
     owner = _optional(model, "GetFirstView" if doc_type == 3 else "FirstFeature")
     if owner is None:
-        return {"status": "blocked", "rows": [], "warnings": ["无法读取文档的特征或视图，不能判断尺寸是否为空"], "reviewRequired": True}
+        return {"status": "blocked", "rows": [], "warnings": ["Unable to read document features or views; cannot determine if dimensions are empty"], "reviewRequired": True}
     for _ in range(20000):
         if owner is None:
             break
@@ -99,7 +99,7 @@ def extract_tolerances(model: Any) -> dict[str, Any]:
                 break
             dimension = _optional(display, "GetDimension2", 0) or _optional(display, "GetDimension")
             if dimension is None:
-                warnings.append("部分显示尺寸无法解析")
+                warnings.append("Some display dimensions could not be resolved")
             else:
                 row, error = _dimension_row(dimension, owner_name)
                 if error:
@@ -112,16 +112,16 @@ def extract_tolerances(model: Any) -> dict[str, Any]:
                         if row["name"]:
                             seen.add(key)
                         else:
-                            warnings.append("存在未命名尺寸，无法可靠去重")
+                            warnings.append("Unnamed dimensions present; cannot deduplicate reliably")
             display = _optional(owner, "GetNextDisplayDimension", display)
         else:
-            warnings.append("显示尺寸遍历达到上限，结果不完整")
+            warnings.append("Display dimension traversal limit reached; results are incomplete")
         owner = _optional(owner, "GetNextView" if doc_type == 3 else "GetNextFeature")
     else:
-        warnings.append("特征或视图遍历达到上限，结果不完整")
+        warnings.append("Feature or view traversal limit reached; results are incomplete")
     if any(row["status"] == "incomplete" for row in rows):
-        warnings.append("部分公差值未能读取，不能按零处理")
-    warnings.append("仅覆盖当前配置的已显示尺寸，隐藏尺寸及其他配置需另行核对")
+        warnings.append("Some tolerance values could not be read and must not be treated as zero")
+    warnings.append("Covers only displayed dimensions in the active configuration; hidden dimensions and other configurations must be verified separately")
     return {"status": "review_required", "rows": rows, "warnings": warnings, "reviewRequired": True}
 
 
@@ -153,7 +153,7 @@ def main(argv: list[str] | None = None) -> int:
         from sw_read_guard import SolidWorksReadGuard
     source = Path(os.path.expandvars(args.model)).expanduser().resolve()
     if not source.is_file() or source.suffix.casefold() not in {".sldprt", ".sldasm", ".slddrw"}:
-        parser.error("需要已保存的 SolidWorks 模型或图纸")
+        parser.error("Requires a saved SolidWorks model or drawing")
     with SolidWorksReadGuard():
         with SolidWorksSession(visible=True) as session:
             model = session.open(str(source), read_only=True, silent=True)

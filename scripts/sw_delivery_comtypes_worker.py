@@ -22,12 +22,12 @@ def main() -> int:
     try:
         raw = sys.stdin.buffer.read(1024 * 1024 + 1)
         if len(raw) > 1024 * 1024:
-            raise ValueError("Pack and Go 请求超过 1 MiB")
+            raise ValueError("Pack and Go request exceeds 1 MiB")
         payload = json.loads(raw.decode("utf-8"))
         target = payload["target"]
         existing = payload.get("existing_files") or {}
         if not isinstance(payload.get("expected_pid"), int) or payload["expected_pid"] <= 0:
-            raise ValueError("回退必须明确父实例 PID")
+            raise ValueError("Fallback requires explicit parent instance PID")
         import pythoncom
         pythoncom.CoInitialize()
         initialized = True

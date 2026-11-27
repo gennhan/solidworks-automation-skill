@@ -67,34 +67,34 @@ def _require(condition: bool, message: str) -> None:
 
 def _number(value: Any, field: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise DrcProfileError(f"{field} 必须是数值")
+        raise DrcProfileError(f"{field} must be a number")
     number = float(value)
     if number != number or number in (float("inf"), float("-inf")):
-        raise DrcProfileError(f"{field} 必须是有限数值")
+        raise DrcProfileError(f"{field} must be a finite number")
     return number
 
 
 def _validate_custom_rule(rule: Mapping[str, Any]) -> dict[str, Any]:
     """@brief 校验单条声明式自定义规则。"""
-    _require(isinstance(rule, Mapping), "customRules 每项必须是对象")
+    _require(isinstance(rule, Mapping), "Each item in customRules must be an object")
     unknown = set(rule) - CUSTOM_RULE_FIELDS
-    _require(not unknown, f"自定义规则含未知字段: {', '.join(sorted(unknown))}")
+    _require(not unknown, f"Custom rule contains unknown fields: {', '.join(sorted(unknown))}")
     rule_id = str(rule.get("id") or "").strip()
-    _require(bool(_IDENTIFIER.match(rule_id)), f"自定义规则 id 非法: {rule_id!r}")
+    _require(bool(_IDENTIFIER.match(rule_id)), f"Invalid custom rule id: {rule_id!r}")
     category = str(rule.get("category") or "custom")
-    _require(category in RULE_CATEGORIES, f"未知规则类别: {category}")
+    _require(category in RULE_CATEGORIES, f"Unknown rule category: {category}")
     severity = str(rule.get("severity") or "warning")
-    _require(severity in RULE_SEVERITIES, f"未知严重度: {severity}")
+    _require(severity in RULE_SEVERITIES, f"Unknown severity: {severity}")
     applies_to = str(rule.get("appliesTo") or "document")
-    _require(applies_to in APPLIES_TO, f"未知 appliesTo: {applies_to}")
+    _require(applies_to in APPLIES_TO, f"Unknown appliesTo: {applies_to}")
     field = str(rule.get("field") or "").strip()
-    _require(bool(field) and len(field) <= 64, "自定义规则 field 必须为非空短字符串")
+    _require(bool(field) and len(field) <= 64, "Custom rule field must be a non-empty short string")
     operator = str(rule.get("operator") or "").strip()
-    _require(operator in RULE_OPERATORS, f"未知算子: {operator}")
+    _require(operator in RULE_OPERATORS, f"Unknown operator: {operator}")
     value = rule.get("value")
-    _require(isinstance(value, (int, float, str)) and not isinstance(value, bool), "自定义规则 value 必须是数值或字符串")
+    _require(isinstance(value, (int, float, str)) and not isinstance(value, bool), "Custom rule value must be a number or string")
     message = str(rule.get("message") or "").strip()
-    _require(bool(message) and len(message) <= 300, "自定义规则 message 必须为非空短文本")
+    _require(bool(message) and len(message) <= 300, "Custom rule message must be non-empty short text")
     return {
         "id": rule_id,
         "category": category,
@@ -109,36 +109,36 @@ def _validate_custom_rule(rule: Mapping[str, Any]) -> dict[str, Any]:
 
 def validate_profile(payload: Mapping[str, Any]) -> dict[str, Any]:
     """@brief 校验一个 DRC Profile 并返回规范化副本。"""
-    _require(isinstance(payload, Mapping), "Profile 必须是 JSON 对象")
+    _require(isinstance(payload, Mapping), "Profile must be a JSON object")
     unknown = set(payload) - TOP_LEVEL_FIELDS
-    _require(not unknown, f"Profile 含未知顶层字段: {', '.join(sorted(unknown))}")
+    _require(not unknown, f"Profile contains unknown top-level fields: {', '.join(sorted(unknown))}")
     schema = str(payload.get("schema") or PROFILE_SCHEMA)
-    _require(schema == PROFILE_SCHEMA, f"schema 必须为 {PROFILE_SCHEMA}")
+    _require(schema == PROFILE_SCHEMA, f"schema must be {PROFILE_SCHEMA}")
 
     thresholds_in = payload.get("thresholds") or {}
-    _require(isinstance(thresholds_in, Mapping), "thresholds 必须是对象")
+    _require(isinstance(thresholds_in, Mapping), "thresholds must be an object")
     unknown_t = set(thresholds_in) - set(THRESHOLD_FIELDS)
-    _require(not unknown_t, f"thresholds 含未知项: {', '.join(sorted(unknown_t))}")
+    _require(not unknown_t, f"thresholds contains unknown keys: {', '.join(sorted(unknown_t))}")
     thresholds = {key: _number(value, key) for key, value in thresholds_in.items()}
-    _require(all(value > 0 for value in thresholds.values()), "阈值必须大于零；要停用规则请显式设置 disabledRules")
-    _require(thresholds.get("driveRmsUtilizationMax", 1.0) <= 1.0, "driveRmsUtilizationMax 不能大于 1")
-    _require(thresholds.get("driveTorqueSafetyFactor", 1.0) >= 1.0, "driveTorqueSafetyFactor 不能小于 1")
+    _require(all(value > 0 for value in thresholds.values()), "Thresholds must be greater than zero; use disabledRules to disable a rule")
+    _require(thresholds.get("driveRmsUtilizationMax", 1.0) <= 1.0, "driveRmsUtilizationMax cannot exceed 1")
+    _require(thresholds.get("driveTorqueSafetyFactor", 1.0) >= 1.0, "driveTorqueSafetyFactor cannot be less than 1")
 
     disabled_in = payload.get("disabledRules") or []
-    _require(isinstance(disabled_in, (list, tuple)), "disabledRules 必须是数组")
+    _require(isinstance(disabled_in, (list, tuple)), "disabledRules must be an array")
     disabled = []
     for item in disabled_in:
         text = str(item).strip()
-        _require(bool(_IDENTIFIER.match(text)), f"disabledRules 含非法规则 id: {text!r}")
+        _require(bool(_IDENTIFIER.match(text)), f"disabledRules contains invalid rule id: {text!r}")
         disabled.append(text)
 
     custom_in = payload.get("customRules") or []
-    _require(isinstance(custom_in, (list, tuple)), "customRules 必须是数组")
-    _require(len(custom_in) <= MAX_CUSTOM_RULES, f"自定义规则数量超过上限 {MAX_CUSTOM_RULES}")
+    _require(isinstance(custom_in, (list, tuple)), "customRules must be an array")
+    _require(len(custom_in) <= MAX_CUSTOM_RULES, f"Custom rule count exceeds limit {MAX_CUSTOM_RULES}")
     custom = [_validate_custom_rule(rule) for rule in custom_in]
     ids = [rule["id"] for rule in custom]
-    _require(len(ids) == len(set(ids)), "自定义规则 id 不能重复")
-    _require(not any(value.upper().startswith("DRC-") for value in ids), "自定义规则不能使用保留的 DRC- 前缀")
+    _require(len(ids) == len(set(ids)), "Custom rule ids must be unique")
+    _require(not any(value.upper().startswith("DRC-") for value in ids), "Custom rules cannot use the reserved DRC- prefix")
 
     return {
         "schema": PROFILE_SCHEMA,
@@ -156,8 +156,8 @@ def load_profile(source: str | Path | Mapping[str, Any]) -> dict[str, Any]:
     if isinstance(source, Mapping):
         return validate_profile(source)
     path = Path(source)
-    _require(path.is_file(), f"Profile 文件不存在: {path}")
-    _require(path.stat().st_size <= MAX_PROFILE_BYTES, "Profile 文件过大")
+    _require(path.is_file(), f"Profile file not found: {path}")
+    _require(path.stat().st_size <= MAX_PROFILE_BYTES, "Profile file is too large")
     payload = json.loads(path.read_text(encoding="utf-8"))
     return validate_profile(payload)
 
@@ -191,9 +191,9 @@ def list_rule_packs() -> list[dict[str, Any]]:
 def load_rule_pack(name: str) -> dict[str, Any]:
     """@brief 按名装载并校验一个行业规则包；名称受正则约束，防止路径穿越。"""
     safe = str(name).strip()
-    _require(bool(_PACK_NAME.match(safe)), f"非法规则包名: {name!r}")
+    _require(bool(_PACK_NAME.match(safe)), f"Invalid rule pack name: {name!r}")
     path = RULE_PACKS_DIR / f"{safe}.json"
-    _require(path.is_file(), f"规则包不存在: {safe}")
+    _require(path.is_file(), f"Rule pack not found: {safe}")
     return load_profile(path)
 
 

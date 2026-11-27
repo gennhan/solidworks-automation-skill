@@ -15,10 +15,10 @@ def _unit(vector):
     """@brief 检查并归一化方向；方向不是长度参数。"""
     values = tuple(float(value) for value in vector)
     if len(values) != 3:
-        raise ValueError("阵列方向必须有三个分量")
+        raise ValueError("Pattern direction must have 3 components")
     length = math.sqrt(sum(value * value for value in values))
     if not all(math.isfinite(value) for value in values) or length < 1e-12:
-        raise ValueError("阵列方向必须是非零有限向量")
+        raise ValueError("Pattern direction must be a non-zero finite vector")
     return tuple(value / length for value in values)
 
 
@@ -26,7 +26,7 @@ def _seed(model, name):
     """@brief 精确选择母特征，失败立即停止。"""
     feature = get_com_member(model, "FeatureByName", str(name))
     if feature is None or not bool(get_com_member(feature, "Select2", False, 4)):
-        raise ValueError(f"无法选择阵列母特征: {name}")
+        raise ValueError(f"Unable to select pattern seed feature: {name}")
 
 
 def _select_entity(model, entity, mark, append=True):
@@ -56,7 +56,7 @@ def _direction(model, vector, mark):
             selected = False
         if selected:
             return dot < 0
-    raise ValueError(f"找不到可选的阵列方向直边: {requested}")
+    raise ValueError(f"No selectable linear edge found for pattern direction: {requested}")
 
 
 def linear_pattern(model, feature_name, first, spacing, count, second=(0, 0, 0), second_spacing=0, second_count=1):
@@ -68,9 +68,9 @@ def linear_pattern(model, feature_name, first, spacing, count, second=(0, 0, 0),
     @return IFeature；空返回按执行失败抛出异常。
     """
     if int(count) < 2 or int(second_count) < 1 or not math.isfinite(float(spacing)) or spacing <= 0:
-        raise ValueError("阵列数量或间距无效")
+        raise ValueError("Invalid pattern count or spacing")
     if second_count > 1 and (not math.isfinite(float(second_spacing)) or second_spacing <= 0):
-        raise ValueError("第二方向间距无效")
+        raise ValueError("Invalid second direction spacing")
     model.ClearSelection2(True)
     try:
         _seed(model, feature_name)
@@ -84,7 +84,7 @@ def linear_pattern(model, feature_name, first, spacing, count, second=(0, 0, 0),
         else:
             feature = model.FeatureManager.FeatureLinearPattern3(*args)
         if feature is None:
-            raise RuntimeError("原生线性阵列创建失败")
+            raise RuntimeError("Native linear pattern creation failed")
         return feature
     finally:
         model.ClearSelection2(True)
@@ -93,7 +93,7 @@ def linear_pattern(model, feature_name, first, spacing, count, second=(0, 0, 0),
 def circular_pattern(model, feature_name, axis, angle, count, equal_spacing=True):
     """@brief 选择母特征与明确的轴实体，保留现有 7 参数原生接口。"""
     if int(count) < 2 or not math.isfinite(float(angle)) or not 0 < angle <= 2 * math.pi + 1e-9:
-        raise ValueError("圆周阵列数量或角度无效")
+        raise ValueError("Invalid circular pattern count or angle")
     model.ClearSelection2(True)
     try:
         _seed(model, feature_name)
@@ -103,10 +103,10 @@ def circular_pattern(model, feature_name, axis, angle, count, equal_spacing=True
         else:
             selected = _select_entity(model, axis, 1)
         if not selected:
-            raise ValueError(f"无法选择圆周阵列轴: {axis}")
+            raise ValueError(f"Unable to select circular pattern axis: {axis}")
         feature = model.FeatureManager.FeatureCircularPattern4(int(count), float(angle), False, "", False, bool(equal_spacing), False)
         if feature is None:
-            raise RuntimeError("原生圆周阵列创建失败")
+            raise RuntimeError("Native circular pattern creation failed")
         return feature
     finally:
         model.ClearSelection2(True)

@@ -113,41 +113,41 @@ def audit_fastener_hole(hole: Mapping[str, Any], *, head_clearance_mm: float = D
 
     # DRC-CSK-001 沉头几何有效性
     if sink_d is None or main is None:
-        checks.append(_check("DRC-CSK-001", "fastener", "info", "info", f"孔 {hid} 缺少主孔或沉孔直径，跳过有效性检查", target=hid))
+        checks.append(_check("DRC-CSK-001", "fastener", "info", "info", f"Hole {hid} missing main or counterbore/countersink diameter; skipping validity check", target=hid))
     elif main is not None and sink_d <= main:
-        checks.append(_check("DRC-CSK-001", "fastener", "fail", "major", f"孔 {hid} 沉孔直径 {sink_d:g} 不大于主孔 {main:g}，沉头无效", target=hid))
+        checks.append(_check("DRC-CSK-001", "fastener", "fail", "major", f"Hole {hid} sink diameter {sink_d:g} is not larger than main hole {main:g}; invalid sink", target=hid))
     elif sink_type == "counterbore" and (sink_depth is None or sink_depth <= 0):
-        checks.append(_check("DRC-CSK-001", "fastener", "fail", "major", f"孔 {hid} 柱形沉孔深度非正，沉头无效", target=hid))
+        checks.append(_check("DRC-CSK-001", "fastener", "fail", "major", f"Hole {hid} counterbore depth is non-positive; invalid counterbore", target=hid))
     else:
-        checks.append(_check("DRC-CSK-001", "fastener", "pass", "info", f"孔 {hid} 沉头几何有效", target=hid))
+        checks.append(_check("DRC-CSK-001", "fastener", "pass", "info", f"Hole {hid} sink geometry is valid", target=hid))
 
     # DRC-CSK-002/003 头部容纳
     nominal = hole.get("nominal_mm")
     head = head_dimensions(str(hole.get("head_type")), nominal) if nominal else None
     if head is None:
-        checks.append(_check("DRC-CSK-002", "fastener", "info", "info", f"孔 {hid} 头型/规格未知，跳过头部容纳检查", target=hid))
+        checks.append(_check("DRC-CSK-002", "fastener", "info", "info", f"Hole {hid} head type/size unknown; skipping head accommodation check", target=hid))
     else:
         if sink_d is not None:
             required_d = head["dk"] + head_clearance_mm
             if sink_d < required_d:
-                checks.append(_check("DRC-CSK-002", "fastener", "fail", "major", f"孔 {hid} 沉孔直径 {sink_d:g} 小于头径容纳 {required_d:g}（头 {head['dk']:g}+{head_clearance_mm:g}）", target=hid, required_mm=required_d))
+                checks.append(_check("DRC-CSK-002", "fastener", "fail", "major", f"Hole {hid} sink diameter {sink_d:g} is smaller than required {required_d:g} (head {head['dk']:g}+{head_clearance_mm:g})", target=hid, required_mm=required_d))
             else:
-                checks.append(_check("DRC-CSK-002", "fastener", "pass", "info", f"孔 {hid} 沉孔直径容纳螺栓头", target=hid))
+                checks.append(_check("DRC-CSK-002", "fastener", "pass", "info", f"Hole {hid} sink diameter accommodates bolt head", target=hid))
         if sink_type == "counterbore" and sink_depth is not None and "k" in head:
             if sink_depth < head["k"]:
-                checks.append(_check("DRC-CSK-003", "fastener", "warning", "warning", f"孔 {hid} 沉孔深度 {sink_depth:g} 小于头高 {head['k']:g}，螺栓头不齐平", target=hid, required_mm=head["k"]))
+                checks.append(_check("DRC-CSK-003", "fastener", "warning", "warning", f"Hole {hid} counterbore depth {sink_depth:g} is less than head height {head['k']:g}; bolt head will protrude", target=hid, required_mm=head["k"]))
             else:
-                checks.append(_check("DRC-CSK-003", "fastener", "pass", "info", f"孔 {hid} 沉孔深度容纳头高", target=hid))
+                checks.append(_check("DRC-CSK-003", "fastener", "pass", "info", f"Hole {hid} counterbore depth accommodates head height", target=hid))
 
     # DRC-CSK-004 朝向配合面
     sink_side = hole.get("sink_side")
     mating_side = hole.get("mating_side")
     if not sink_side or not mating_side:
-        checks.append(_check("DRC-CSK-004", "fastener", "info", "info", f"孔 {hid} 缺沉头朝向或配合面信息，跳过朝向检查", target=hid))
+        checks.append(_check("DRC-CSK-004", "fastener", "info", "info", f"Hole {hid} missing sink orientation or mating face info; skipping orientation check", target=hid))
     elif sink_side == mating_side:
-        checks.append(_check("DRC-CSK-004", "fastener", "fail", "critical", f"孔 {hid} 沉头开口朝向配合面 {mating_side}，螺钉头会顶在结合面上装不平", target=hid))
+        checks.append(_check("DRC-CSK-004", "fastener", "fail", "critical", f"Hole {hid} sink opens toward mating face {mating_side}; screw head will collide with mating surface", target=hid))
     else:
-        checks.append(_check("DRC-CSK-004", "fastener", "pass", "info", f"孔 {hid} 沉头朝向 {sink_side} 背离配合面，正确", target=hid))
+        checks.append(_check("DRC-CSK-004", "fastener", "pass", "info", f"Hole {hid} sink faces {sink_side} away from mating face", target=hid))
 
     return checks
 
@@ -162,9 +162,9 @@ def audit_orientation_consistency(holes: Sequence[Mapping[str, Any]]) -> list[di
     checks: list[dict[str, Any]] = []
     for group, sides in groups.items():
         if len(sides) > 1:
-            checks.append(_check("DRC-CSK-005", "fastener", "warning", "warning", f"紧固组 {group} 沉头朝向不一致: {', '.join(sorted(sides))}", target=group))
+            checks.append(_check("DRC-CSK-005", "fastener", "warning", "warning", f"Fastener group {group} has inconsistent sink orientations: {', '.join(sorted(sides))}", target=group))
     if not checks and groups:
-        checks.append(_check("DRC-CSK-005", "fastener", "pass", "info", "同组沉头朝向一致"))
+        checks.append(_check("DRC-CSK-005", "fastener", "pass", "info", "Sink orientations are consistent within group"))
     return checks
 
 
@@ -175,7 +175,7 @@ def audit_relief(stacks: Sequence[Mapping[str, Any]], *, min_gap_mm: float = 0.5
         {id, holeId, protrudes(bool), matingHasRelief(bool), gapMm}
     """
     if not stacks:
-        return [_check("DRC-FIT-001", "fastener", "info", "info", "无装配紧固链元数据，跳过跨零件避让检查")]
+        return [_check("DRC-FIT-001", "fastener", "info", "info", "No assembly fastener stack metadata; skipping cross-part clearance check")]
     checks: list[dict[str, Any]] = []
     for stack in stacks:
         sid = str(stack.get("id") or stack.get("holeId") or "stack")
@@ -183,20 +183,20 @@ def audit_relief(stacks: Sequence[Mapping[str, Any]], *, min_gap_mm: float = 0.5
         has_relief = stack.get("matingHasRelief")
         gap = _num(stack.get("gapMm"))
         if not isinstance(protrudes, bool):
-            checks.append(_check("DRC-FIT-001", "fastener", "info", "info", f"紧固链 {sid} 缺少有效的凸出证据", target=sid))
+            checks.append(_check("DRC-FIT-001", "fastener", "info", "info", f"Fastener stack {sid} missing valid protrusion evidence", target=sid))
             continue
         if not protrudes:
             continue
         if has_relief is True:
-            checks.append(_check("DRC-FIT-001", "fastener", "pass", "info", f"紧固链 {sid} 配合件已有避让特征", target=sid))
+            checks.append(_check("DRC-FIT-001", "fastener", "pass", "info", f"Fastener stack {sid} mating part has relief feature", target=sid))
         elif gap is not None and gap >= min_gap_mm:
-            checks.append(_check("DRC-FIT-001", "fastener", "pass", "info", f"紧固链 {sid} 配合面留有间隙 {gap:g}mm", target=sid))
+            checks.append(_check("DRC-FIT-001", "fastener", "pass", "info", f"Fastener stack {sid} mating face has clearance gap {gap:g}mm", target=sid))
         elif has_relief is False:
-            checks.append(_check("DRC-FIT-001", "fastener", "fail", "major", f"紧固链 {sid} 头部凸出但配合件无避让且无足够间隙，装配会顶死/干涉", target=sid))
+            checks.append(_check("DRC-FIT-001", "fastener", "fail", "major", f"Fastener stack {sid} head protrudes without relief or sufficient clearance on mating part; assembly interference", target=sid))
         else:
-            checks.append(_check("DRC-FIT-001", "fastener", "info", "info", f"紧固链 {sid} 的避让情况未知", target=sid))
+            checks.append(_check("DRC-FIT-001", "fastener", "info", "info", f"Fastener stack {sid} relief status is unknown", target=sid))
     if not checks:
-        checks.append(_check("DRC-FIT-001", "fastener", "info", "info", "无凸出紧固头，跳过跨零件避让检查"))
+        checks.append(_check("DRC-FIT-001", "fastener", "info", "info", "No protruding fastener heads; skipping cross-part clearance check"))
     return checks
 
 
@@ -209,7 +209,7 @@ def audit_fastener_holes(
     """@brief 汇总：逐孔沉头审计 + 朝向一致性 + 跨零件避让。"""
     checks: list[dict[str, Any]] = []
     if not holes:
-        checks.append(_check("DRC-CSK-000", "fastener", "info", "info", "无沉头/锪孔特征，跳过紧固装配审计"))
+        checks.append(_check("DRC-CSK-000", "fastener", "info", "info", "No countersink/counterbore features; skipping fastener assembly audit"))
     else:
         for hole in holes:
             checks.extend(audit_fastener_hole(hole, head_clearance_mm=head_clearance_mm))

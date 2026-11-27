@@ -36,22 +36,22 @@ MODELDOC_PATTERNS = (r"\bModelDoc2\b", r"\bswModel\b")
 SUB_PATTERN = r"\bSub\s+\w+\s*\("
 END_SUB_PATTERN = r"\bEnd\s+Sub\b"
 
-GPT_PROMPT = """你是 SolidWorks VBA 自动化工程师。请只输出可执行的 VBA 宏代码。"""
+GPT_PROMPT = """You are a SolidWorks VBA automation engineer. Output only executable VBA macro code."""
 
-STRICT_FORMAT_PROMPT = """你是 SolidWorks VBA 自动化工程师。
-必须遵守以下格式：
-1. 只输出一个完整 VBA 代码块，不要 Markdown，不要解释。
-2. 必须包含 `Sub main()` 与 `End Sub`。
-3. 必须声明并初始化 `SldWorks.SldWorks` 与 `ModelDoc2` 核心对象。
-4. 所有长度单位使用米，毫米必须显式除以 1000#。
-5. 禁止输出 JSON、自然语言说明、伪代码或省略号。
+STRICT_FORMAT_PROMPT = """You are a SolidWorks VBA automation engineer.
+Follow these formatting rules strictly:
+1. Output only a single complete VBA code block; no Markdown, no explanations.
+2. Must include `Sub main()` and `End Sub`.
+3. Must declare and initialize core `SldWorks.SldWorks` and `ModelDoc2` objects.
+4. All length units must be in meters; millimeters must be explicitly divided by 1000#.
+5. Do not output JSON, natural-language explanations, pseudocode, or ellipses.
 """
 
 RETRY_PROMPT_SUFFIX = """
-上一轮输出未通过自动校验。请严格修正：
-- 只输出 VBA 源码。
-- 必须包含 SldWorks / ModelDoc2 / Sub main() / End Sub。
-- 不要包含 Markdown 围栏、解释文字、JSON 或占位符。
+The previous output failed automatic validation. Fix strictly:
+- Output VBA source code only.
+- Must include SldWorks / ModelDoc2 / Sub main() / End Sub.
+- Do not include Markdown fences, explanatory text, JSON, or placeholders.
 """
 
 
@@ -192,7 +192,7 @@ def build_prompt(user_request: str, model_name: Optional[str] = None, strict: Op
     family = normalize_model_family(model_name)
     use_strict = strict if strict is not None else family in {"kimi", "claude", "generic"}
     system_prompt = STRICT_FORMAT_PROMPT if use_strict else GPT_PROMPT
-    return f"{system_prompt}\n\n用户需求：\n{user_request.strip()}\n"
+    return f"{system_prompt}\n\nUser request:\n{user_request.strip()}\n"
 
 
 def extract_vba_code(text: str) -> str:
@@ -215,17 +215,17 @@ def validate_vba_macro(code: str) -> MacroValidationResult:
     issues: List[str] = []
     normalized = code.strip()
     if not normalized:
-        issues.append("代码为空")
+        issues.append("Code is empty")
     if not _contains_any_pattern(normalized, CORE_OBJECT_PATTERNS):
-        issues.append("缺少 SolidWorks 核心对象 SldWorks")
+        issues.append("Missing SolidWorks core object SldWorks")
     if not _contains_any_pattern(normalized, MODELDOC_PATTERNS):
-        issues.append("缺少 ModelDoc2 文档对象")
+        issues.append("Missing ModelDoc2 document object")
     if not re.search(SUB_PATTERN, normalized, re.IGNORECASE):
-        issues.append("缺少 Sub 入口")
+        issues.append("Missing Sub entry point")
     if not re.search(END_SUB_PATTERN, normalized, re.IGNORECASE):
-        issues.append("缺少 End Sub")
+        issues.append("Missing End Sub")
     if "..." in normalized or "TODO" in normalized.upper():
-        issues.append("包含占位符或未完成代码")
+        issues.append("Contains placeholder or incomplete code")
     return MacroValidationResult(ok=not issues, issues=issues)
 
 
@@ -258,7 +258,7 @@ def generate_macro_with_guard(
 
     model_call 由具体代理实现，签名为 `model_call(prompt, timeout_seconds)`。
     """
-    last_validation = MacroValidationResult(ok=False, issues=["尚未调用模型"])
+    last_validation = MacroValidationResult(ok=False, issues=["Model not invoked yet"])
     prompt = build_prompt(user_request, model_name=model_name)
     attempts = 0
 
@@ -268,7 +268,7 @@ def generate_macro_with_guard(
             raw_output = model_call(prompt, timeout_seconds)
         except TimeoutError:
             raw_output = ""
-            last_validation = MacroValidationResult(ok=False, issues=["模型请求超时"])
+            last_validation = MacroValidationResult(ok=False, issues=["Model request timeout"])
         else:
             code = extract_vba_code(raw_output)
             validation = validate_vba_macro(code)
@@ -283,7 +283,7 @@ def generate_macro_with_guard(
 
         prompt = build_prompt(user_request, model_name=model_name, strict=True) + RETRY_PROMPT_SUFFIX
         if last_validation.issues:
-            prompt += "\n当前校验问题：\n" + "\n".join(f"- {issue}" for issue in last_validation.issues)
+            prompt += "\nCurrent validation issues:\n" + "\n".join(f"- {issue}" for issue in last_validation.issues)
 
     fallback = fallback_macro_for_request(user_request)
     if fallback:
@@ -295,7 +295,7 @@ def generate_macro_with_guard(
             validation=validation,
         )
 
-    raise ValueError("模型输出未通过校验，且没有匹配到本地 VBA 兜底模板: " + "; ".join(last_validation.issues))
+    raise ValueError("Model output failed validation and matched no local VBA fallback template: " + "; ".join(last_validation.issues))
 
 
 def write_macro_file(code: str, output_path: str) -> str:

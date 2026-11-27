@@ -238,7 +238,7 @@ def verify(
         step_id=step_id,
         capability_id=capability_id,
         status=None,
-        message="开始验证",
+        message="Starting verification",
         data=_execution_summary(execution),
     )
 
@@ -256,7 +256,7 @@ def verify(
     if reviewer_error is not None:
         verdict = VerificationResult(
             status=VerificationStatus.BLOCKED,
-            reason=f"Reviewer 执行失败: {type(reviewer_error).__name__}",
+            reason=f"Reviewer execution failed: {type(reviewer_error).__name__}",
             checks=[{"id": "verification_reviewer_error", "status": "blocked", "message": str(reviewer_error)}],
             error_code="reviewer_error",
             manual_review_required=False,
@@ -275,7 +275,7 @@ def verify(
     if not results:
         verdict = VerificationResult(
             status=VerificationStatus.BLOCKED,
-            reason="未配置 Reviewer 且无既有 Review 结果，无法完成验证",
+            reason="No reviewer configured and no existing review result; verification cannot complete",
             error_code="verification_unavailable",
         )
         _trace_event(
@@ -327,7 +327,7 @@ def verify(
         step_id=step_id,
         capability_id=capability_id,
         status=verdict.status,
-        message=verdict.reason or ("验证通过" if verdict.status == VerificationStatus.PASS else ""),
+        message=verdict.reason or ("Verification passed" if verdict.status == VerificationStatus.PASS else ""),
     )
     return verdict
 

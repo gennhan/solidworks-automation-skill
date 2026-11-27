@@ -250,7 +250,7 @@ def _common_candidates(product: str) -> list[Path]:
 def discover_installations(product: str, *, exists: Callable[[Path], bool] | None = None) -> list[dict[str, Any]]:
     """@brief 发现产品的全部安装，并按版本从新到旧排序。"""
     if product not in {"solidworks", "autocad"}:
-        raise ValueError(f"不支持的 CAD 产品: {product}")
+        raise ValueError(f"Unsupported CAD product: {product}")
     exists = exists or Path.is_file
     exe_name = "SLDWORKS.exe" if product == "solidworks" else "acad.exe"
     candidates: list[dict[str, Any]] = []
