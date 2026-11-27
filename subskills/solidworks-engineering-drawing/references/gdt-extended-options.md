@@ -1,7 +1,7 @@
 # SW2026 Extended GD&T Structured Inputs
 
 See [native-gdt.md](native-gdt.md) for entry points, source-file protection, and save-and-reopen rules. The fields documented here apply to both drawing-copy plans and `professionalAnnotations.geometricTolerances` in `DrawingSpec`, executed through the existing `solidworks_generate_drawing` MCP tool without adding new tools.
-Legacy single-frame fields and plain-letter datum lists remain backward-compatible. Numeric examples are for API regression only and must not be used directly as production tolerances.
+Legacy single-frame fields and plain-letter datum lists remain backward-compatible. Numeric examples are for API regression only and must not be used directly as production tolerances. Whenever the user requests TCVN or Vietnamese mechanical standards, load `references/tcvn_mechanical.md` (from the root skill directory) and use the ISO symbol library (`symbolLibrary: "iso"`) under the ISO Independency Principle.
 
 ## Common Datums and Datum Sub-Groups
 

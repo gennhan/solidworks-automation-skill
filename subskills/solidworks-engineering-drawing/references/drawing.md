@@ -4,6 +4,8 @@
 
 The GB/T route defaults to first-angle projection: the Top view sits below the Front view, and the Right view sits to the left of the Front view. SolidWorks `SetupSheet6` / `NewSheet4` projection parameters must match the view layout and be read back after creation.
 
+Whenever the user requests TCVN or Vietnamese mechanical standards, load `references/tcvn_mechanical.md` (from the root skill directory) for ISO-harmonized sheet formats, margins, title block/BOM conventions, first-angle projection, fits, welding symbols, and general tolerance notes.
+
 ## Evidence Requirements
 
 - View objects, orientations, positions, and scales must be read back.
